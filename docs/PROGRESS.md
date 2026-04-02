@@ -40,17 +40,17 @@
 
 ## Phase 3: Frontend 핵심
 
-- [ ] SvelteKit 프로젝트 초기화
-- [ ] 로그인 페이지
-- [ ] 레이아웃 (사이드바+메인+우측)
-- [ ] 파일 트리 컴포넌트
-- [ ] Markdown 렌더러 — wikilink/embed/callout/tag 플러그인
-- [ ] 문서 뷰어
-- [ ] CodeMirror 편집기 — 자동완성, 자동저장
-- [ ] 검색 (Quick Switcher)
-- [ ] 백링크 패널
-- [ ] 모바일 반응형
-- [ ] 다크/라이트 테마
+- [x] SvelteKit 프로젝트 초기화 (adapter-node, vite proxy)
+- [x] 로그인 페이지
+- [x] 레이아웃 (사이드바+메인+우측패널)
+- [x] 파일 트리 컴포넌트
+- [x] Markdown 렌더러 — wikilink/tag 플러그인 (marked)
+- [x] 문서 뷰어
+- [-] CodeMirror 편집기 — 기본 textarea 편집기 구현, CodeMirror는 Phase 4
+- [x] 검색 (Quick Switcher, ⌘K)
+- [x] 백링크 패널
+- [x] 모바일 반응형
+- [x] 다크/라이트 테마 (Catppuccin 색상)
 
 ## Phase 4: 고급 기능
 

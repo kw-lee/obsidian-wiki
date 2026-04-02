@@ -46,7 +46,7 @@
 - [x] 파일 트리 컴포넌트
 - [x] Markdown 렌더러 — wikilink/tag 플러그인 (marked)
 - [x] 문서 뷰어
-- [-] CodeMirror 편집기 — 기본 textarea 편집기 구현, CodeMirror는 Phase 4
+- [x] CodeMirror 편집기 — CodeMirror 6 (마크다운 구문 강조, 줄 번호, Catppuccin 테마, ⌘S 저장)
 - [x] 검색 (Quick Switcher, ⌘K)
 - [x] 백링크 패널
 - [x] 모바일 반응형

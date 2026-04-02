@@ -7,6 +7,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import FileTree from '$lib/components/FileTree.svelte';
 	import MarkdownView from '$lib/components/MarkdownView.svelte';
+	import CodeMirrorEditor from '$lib/components/CodeMirrorEditor.svelte';
 	import BacklinksPanel from '$lib/components/BacklinksPanel.svelte';
 	import SearchModal from '$lib/components/SearchModal.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
@@ -159,7 +160,11 @@
 					</div>
 				{/if}
 				{#if editing}
-					<textarea class="editor" bind:value={editContent}></textarea>
+					<CodeMirrorEditor
+					content={editContent}
+					onchange={(v) => (editContent = v)}
+					onsave={handleSave}
+				/>
 				{:else}
 					<MarkdownView content={doc.content} onnavigate={navigateTo} />
 				{/if}
@@ -275,19 +280,6 @@
 		padding: 0.15rem 0.5rem;
 		border-radius: 3px;
 		font-size: 0.8rem;
-	}
-	.editor {
-		width: 100%;
-		height: calc(100vh - 200px);
-		padding: 1.5rem;
-		border: none;
-		background: var(--bg-primary);
-		color: var(--text-primary);
-		font-family: 'SF Mono', 'Fira Code', monospace;
-		font-size: 0.9rem;
-		line-height: 1.6;
-		resize: none;
-		outline: none;
 	}
 	.empty-state {
 		display: flex;

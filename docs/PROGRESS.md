@@ -24,18 +24,19 @@
 
 ## Phase 2: Backend 핵심
 
-- [ ] FastAPI 프로젝트 초기화 — main.py, config.py, pyproject.toml
-- [ ] Auth (login/refresh/JWT)
-- [ ] DB 모델 (SQLAlchemy ORM)
+- [x] FastAPI 프로젝트 초기화 — main.py, config.py, pyproject.toml
+- [x] Auth (login/refresh/JWT)
+- [x] DB 모델 (SQLAlchemy ORM)
 - [ ] Alembic 마이그레이션 설정
-- [ ] Wiki CRUD API — doc 조회/저장/삭제/생성
-- [ ] Git 동기화 (pull/push) — git_ops.py, sync.py
-- [ ] 충돌 감지/3-way merge — conflict.py
-- [ ] 검색 API (FTS+trigram) — search.py
-- [ ] 첨부파일 서빙/업로드
-- [ ] 파일 트리 API
-- [ ] 백링크/태그/그래프 API
-- [ ] 전체/증분 인덱싱
+- [x] Wiki CRUD API — doc 조회/저장/삭제/생성
+- [x] Git 동기화 (pull/push) — git_ops.py, sync.py
+- [x] 충돌 감지/3-way merge — conflict.py
+- [x] 검색 API (FTS+trigram) — search.py
+- [x] 첨부파일 서빙/업로드
+- [x] 파일 트리 API
+- [x] 백링크/태그/그래프 API
+- [x] 전체/증분 인덱싱
+- [x] 단위 테스트 (17 passed) — auth, conflict, vault, health
 
 ## Phase 3: Frontend 핵심
 

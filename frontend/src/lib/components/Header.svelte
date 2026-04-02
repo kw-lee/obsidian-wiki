@@ -22,6 +22,7 @@
 		</button>
 	</div>
 	<div class="header-right">
+		<a href="/graph" class="icon-btn" title="그래프 뷰">◉</a>
 		<button class="icon-btn" onclick={toggleTheme} title="테마 전환">
 			{getTheme() === 'dark' ? '☀' : '☾'}
 		</button>

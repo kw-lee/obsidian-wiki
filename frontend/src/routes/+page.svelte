@@ -9,15 +9,20 @@
 	import MarkdownView from '$lib/components/MarkdownView.svelte';
 	import BacklinksPanel from '$lib/components/BacklinksPanel.svelte';
 	import SearchModal from '$lib/components/SearchModal.svelte';
+	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import { toggleTheme } from '$lib/stores/theme.svelte';
+	import { createDoc } from '$lib/api/wiki';
 
 	let tree = $state<TreeNode[]>([]);
 	let doc = $state<DocDetail | null>(null);
 	let selectedPath = $state('');
 	let searchOpen = $state(false);
+	let commandOpen = $state(false);
 	let editing = $state(false);
 	let editContent = $state('');
 	let saving = $state(false);
 	let sidebarOpen = $state(true);
+	let toast = $state('');
 
 	onMount(() => {
 		const auth = getAuth();
@@ -31,6 +36,10 @@
 			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
 				e.preventDefault();
 				searchOpen = !searchOpen;
+			}
+			if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+				e.preventDefault();
+				commandOpen = !commandOpen;
 			}
 			if ((e.metaKey || e.ctrlKey) && e.key === 's' && editing) {
 				e.preventDefault();
@@ -80,6 +89,33 @@
 	function navigateTo(path: string) {
 		if (!path.endsWith('.md')) path += '.md';
 		selectDoc(path);
+	}
+
+	function showToast(msg: string) {
+		toast = msg;
+		setTimeout(() => (toast = ''), 3000);
+	}
+
+	async function handleAction(action: string, payload?: string) {
+		if (action === 'search') {
+			commandOpen = false;
+			searchOpen = true;
+		} else if (action === 'toggle-theme') {
+			toggleTheme();
+		} else if (action === 'toast') {
+			showToast(payload ?? '');
+		} else if (action === 'new-doc') {
+			commandOpen = false;
+			const name = prompt('새 문서 경로 (예: folder/note.md)');
+			if (!name) return;
+			try {
+				const newDoc = await createDoc(name);
+				await loadTree();
+				selectDoc(newDoc.path);
+			} catch (e) {
+				showToast(e instanceof Error ? e.message : '문서 생성 실패');
+			}
+		}
 	}
 </script>
 
@@ -144,6 +180,11 @@
 </div>
 
 <SearchModal open={searchOpen} onclose={() => (searchOpen = false)} onselect={navigateTo} />
+<CommandPalette open={commandOpen} onclose={() => (commandOpen = false)} onaction={handleAction} />
+
+{#if toast}
+	<div class="toast">{toast}</div>
+{/if}
 
 <style>
 	.app-layout {
@@ -260,6 +301,20 @@
 		font-size: 0.85rem;
 		margin-top: 0.5rem;
 		opacity: 0.7;
+	}
+
+	.toast {
+		position: fixed;
+		bottom: 1.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
+		padding: 0.6rem 1.2rem;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		z-index: 200;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 	}
 
 	/* Mobile */

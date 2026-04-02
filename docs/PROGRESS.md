@@ -54,7 +54,8 @@
 
 ## Phase 4: 고급 기능
 
-- [ ] 그래프 뷰 (d3)
-- [ ] 플러그인 호환 (Dataview 등)
-- [ ] 커맨드 팔레트
-- [ ] nginx + HTTPS
+- [x] 그래프 뷰 (d3-force, 줌/드래그, 노드 클릭 네비게이션)
+- [ ] 플러그인 호환 (Dataview 등) — 추후
+- [x] 커맨드 팔레트 (⌘P) — 새 문서, 검색, 그래프, Git sync, 테마 전환
+- [x] nginx reverse proxy + HTTPS 템플릿
+- [x] Alembic async 마이그레이션 설정

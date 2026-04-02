@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.vault import build_tree, content_hash, read_doc, write_doc, delete_doc
+from app.services.vault import build_tree, content_hash, delete_doc, read_doc, write_doc
 
 
 @pytest.mark.asyncio

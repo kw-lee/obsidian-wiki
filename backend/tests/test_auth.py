@@ -25,9 +25,7 @@ def test_refresh_token():
 
 @pytest.mark.asyncio
 async def test_login_success(client, setup_vault):
-    resp = await client.post(
-        "/api/auth/login", json={"username": "admin", "password": "testpass"}
-    )
+    resp = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
@@ -36,18 +34,14 @@ async def test_login_success(client, setup_vault):
 
 @pytest.mark.asyncio
 async def test_login_wrong_password(client, setup_vault):
-    resp = await client.post(
-        "/api/auth/login", json={"username": "admin", "password": "wrongpass"}
-    )
+    resp = await client.post("/api/auth/login", json={"username": "admin", "password": "wrongpass"})
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_refresh(client, setup_vault):
     # Login first
-    resp = await client.post(
-        "/api/auth/login", json={"username": "admin", "password": "testpass"}
-    )
+    resp = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
     refresh_token = resp.json()["refresh_token"]
 
     # Refresh

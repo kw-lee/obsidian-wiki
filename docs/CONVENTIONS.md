@@ -26,6 +26,11 @@
 
 ## Git
 
+### 브랜치 & 커밋 관리
+- Phase 단위 또는 의미 있는 기능 단위로 커밋
+- 커밋 전 `ruff check`/`svelte-check` 등 린트 통과 확인
+- `docs/PROGRESS.md`에 완료 항목 반영 후 함께 커밋
+
 ### 커밋 메시지
 Conventional commits: `feat|fix|docs|style|refactor|test|chore|build|ci|perf`
 ```

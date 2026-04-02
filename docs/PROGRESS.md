@@ -15,11 +15,12 @@
 
 - [x] CLAUDE.md / docs 정리
 - [x] DB 스키마 — `backend/app/db/init.sql`
-- [ ] docker-compose.yml
-- [ ] Dockerfile.frontend
-- [ ] Dockerfile.backend
-- [ ] .env.example
-- [ ] .pre-commit-config.yaml
+- [x] docker-compose.yml + docker-compose.dev.yml
+- [x] Dockerfile.frontend (multi-stage: deps→build→prod)
+- [x] Dockerfile.backend (base→dev/prod)
+- [x] .env.example
+- [x] .pre-commit-config.yaml
+- [x] .gitignore
 
 ## Phase 2: Backend 핵심
 

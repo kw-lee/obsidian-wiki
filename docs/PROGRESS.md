@@ -59,3 +59,32 @@
 - [x] 커맨드 팔레트 (⌘P) — 새 문서, 검색, 그래프, Git sync, 테마 전환
 - [x] nginx reverse proxy + HTTPS 템플릿
 - [x] Alembic async 마이그레이션 설정
+
+## Phase 5: Docker 빌드/배포 & 테스트
+
+- [x] `.dockerignore` — backend, frontend 빌드 컨텍스트 최적화
+- [x] `docker-compose.test.yml` — PostgreSQL+Redis 포함 테스트 환경
+- [x] `Makefile` — build, up, dev, test, lint, migrate, shell, clean 커맨드
+- [x] Backend 테스트 확장 — wiki, search, sync, tags, attachments, indexer (6개 추가)
+- [x] Frontend Vitest 설정 — jsdom, setup, test scripts
+- [x] Frontend 테스트 — API client, wiki API, type contracts (3개 추가)
+- [x] `docs/DOCKER.md` — Docker 빌드/배포 가이드
+- [x] `docs/TESTING.md` — 테스트 가이드 (backend, frontend, Docker 통합)
+
+## Phase 6: 인증 개선 (Docker env 초기 계정 + 강제 변경)
+
+### Backend
+- [ ] `users` 테이블 추가 (Alembic 마이그레이션)
+- [ ] `config.py`: `INIT_ADMIN_USERNAME` / `INIT_ADMIN_PASSWORD` 환경변수 추가 (기존 `admin_username`, `admin_password_hash` 제거)
+- [ ] 서버 startup 이벤트: DB에 유저 미존재 시 env 초기 계정 생성 (bcrypt 해싱, `must_change_credentials=true`)
+- [ ] `auth.py` 리팩터: env 비교 → DB 조회 방식으로 변경
+- [ ] 로그인 응답에 `must_change_credentials` 상태 포함 (JWT 클레임 또는 응답 필드)
+- [ ] `POST /api/auth/change-credentials` 엔드포인트 — username/password 변경 + 플래그 해제 + 새 토큰 발급
+- [ ] `must_change=true` 토큰으로는 credential 변경 외 API 접근 차단 (미들웨어/디펜던시)
+- [ ] `.env.example` 업데이트
+- [ ] 테스트: 초기 계정 생성, 강제 변경 플로우, 변경 후 정상 접근
+
+### Frontend
+- [ ] 강제 credential 변경 페이지 (`/auth/setup` 또는 모달)
+- [ ] 로그인 후 `must_change` 감지 시 강제 리다이렉트 (다른 라우트 접근 차단)
+- [ ] 변경 완료 후 새 토큰으로 메인 페이지 이동

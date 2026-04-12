@@ -1,0 +1,54 @@
+services:
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: obsidian_test
+    volumes:
+      - ./backend/app/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  test-redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  backend-test:
+    build:
+      context: ./backend
+      target: dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://test:test@test-db:5432/obsidian_test
+      REDIS_URL: redis://test-redis:6379/0
+      JWT_SECRET: test-secret-for-ci
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD_HASH: "$2b$12$ejQrNFrzPiKryNCQuY251.ZgZqiFr266jQygjSMsBOIL7z09Acv0e"
+      VAULT_LOCAL_PATH: /tmp/test_vault
+    volumes:
+      - ./backend:/app
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "-v", "--tb=short"]
+
+  frontend-test:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npx", "vitest", "run"]

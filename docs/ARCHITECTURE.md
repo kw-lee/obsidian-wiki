@@ -19,7 +19,7 @@ Browser(Mobile)   ◄─https─► SvelteKit:3000 → FastAPI:8000 → Postgres
 | Backend | FastAPI (Python 3.12+) | async 네이티브, 타입힌트, Git/파일 조작 생태계 |
 | DB | PostgreSQL 16 | JSONB 메타데이터, FTS+trigram 한글 검색 |
 | Cache | Redis 7 | 검색 캐시, 편집 잠금, 세션. persistence 불필요 |
-| Auth | JWT + bcrypt | 단일 사용자이므로 최소 복잡도 |
+| Auth | JWT + bcrypt | 단일 사용자, Docker env 초기 계정 → 첫 로그인 시 강제 변경 |
 | Sync | Git | Obsidian의 기본 동기화 방식과 일치 |
 | Deploy | Docker Compose | PV 3개(db, vault, config)로 상태 분리 |
 
@@ -83,9 +83,36 @@ Raw MD → frontmatter 분리(python-frontmatter) → remark-parse
 - **전체 재구축**: truncate → vault .md/.mdx 순회 → frontmatter/wikilink/태그 추출 → DB upsert → 캐시 전체 무효화
 - **증분**: git pull 변경/삭제 파일만 갱신 → 태그 카운트 리프레시 → 해당 캐시 무효화
 
+## 인증 플로우
+
+### 초기 설정
+Docker env로 초기 계정 생성:
+- `INIT_ADMIN_USERNAME` / `INIT_ADMIN_PASSWORD` (평문) → 서버 최초 기동 시 bcrypt 해싱 후 DB 저장
+- DB에 사용자 레코드가 이미 존재하면 env 값 무시 (재기동 안전)
+
+### 첫 로그인 강제 변경
+- DB `users` 테이블에 `must_change_credentials: bool` 플래그
+- 초기 계정은 `must_change_credentials=true`로 생성
+- 로그인 성공 시 플래그가 true이면 → 토큰에 `must_change=true` 클레임 포함
+- 프론트: `must_change=true` 토큰 감지 → 강제 credential 변경 화면 리다이렉트 (다른 페이지 접근 차단)
+- `POST /api/auth/change-credentials` → username/password 모두 변경 → 플래그 해제 → 새 토큰 발급
+
+### users 테이블
+```sql
+CREATE TABLE users (
+    id                      SERIAL PRIMARY KEY,
+    username                TEXT UNIQUE NOT NULL,
+    password_hash           TEXT NOT NULL,
+    must_change_credentials BOOLEAN DEFAULT TRUE,
+    created_at              TIMESTAMPTZ DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
 ## DB 스키마
 
 `backend/app/db/init.sql` 참조. 주요 테이블:
+- `users`: username(UNIQUE), password_hash, must_change_credentials (인증)
 - `documents`: path(UNIQUE), frontmatter(JSONB), tags(TEXT[]), search_vector(TSVECTOR)
 - `links`: source_path → target_path (위키링크 그래프)
 - `tags`: name(UNIQUE) + doc_count

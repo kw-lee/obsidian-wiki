@@ -19,7 +19,7 @@
 ### 환경변수
 - `.env` 파일 기반, `.env.example`에 템플릿
 - `backend/app/config.py`에서 pydantic-settings로 관리
-- 필수: `DB_PASS`, `JWT_SECRET`, `GIT_REMOTE_URL`, `GIT_BRANCH`
+- 필수: `DB_PASS`, `JWT_SECRET`, `GIT_REMOTE_URL`, `GIT_BRANCH`, `INIT_ADMIN_USERNAME`, `INIT_ADMIN_PASSWORD`
 - 선택: 포트(3000/8000/5432/6379), `GIT_SYNC_INTERVAL_SECONDS`(기본 300), `VAULT_LOCAL_PATH`(dev)
 
 ---
@@ -75,9 +75,10 @@ npx svelte-check --threshold error && npx prettier --check 'src/**/*.{svelte,ts,
 ## 초기 설정
 
 1. `.env.example` → `.env`, `JWT_SECRET` 자동생성 (`openssl rand -hex 32`)
-2. 관리자 비밀번호 bcrypt 해시 → `ADMIN_PASSWORD_HASH`
+2. `INIT_ADMIN_USERNAME` / `INIT_ADMIN_PASSWORD` 설정 (평문, 서버가 최초 기동 시 bcrypt 해싱)
 3. SSH 키 (`config/ssh/id_ed25519`) → GitHub Deploy Key (write access)
 4. Vault git clone → `docker compose up -d`
+5. 첫 로그인 시 아이디/비밀번호 강제 변경 화면 진행
 
 ---
 

@@ -27,7 +27,7 @@ async def upload_attachment(
     file: UploadFile,
     folder: str = "attachments",
     _user: str = Depends(get_current_user),
-) -> dict[str, str]:
+) -> dict:
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename")
 

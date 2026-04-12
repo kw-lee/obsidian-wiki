@@ -32,8 +32,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://test:test@test-db:5432/obsidian_test
       REDIS_URL: redis://test-redis:6379/0
       JWT_SECRET: test-secret-for-ci
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD_HASH: "$2b$12$ejQrNFrzPiKryNCQuY251.ZgZqiFr266jQygjSMsBOIL7z09Acv0e"
+      INIT_ADMIN_USERNAME: admin
+      INIT_ADMIN_PASSWORD: testpass
       VAULT_LOCAL_PATH: /tmp/test_vault
     volumes:
       - ./backend:/app

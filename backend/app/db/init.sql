@@ -4,6 +4,15 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 
 CREATE TEXT SEARCH CONFIGURATION korean (COPY = simple);
 
+CREATE TABLE users (
+    id                       SERIAL PRIMARY KEY,
+    username                 TEXT UNIQUE NOT NULL,
+    password_hash            TEXT NOT NULL,
+    must_change_credentials  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at               TIMESTAMPTZ DEFAULT NOW(),
+    updated_at               TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE documents (
     id            SERIAL PRIMARY KEY,
     path          TEXT UNIQUE NOT NULL,
@@ -11,8 +20,8 @@ CREATE TABLE documents (
     content_hash  TEXT NOT NULL,
     frontmatter   JSONB DEFAULT '{}',
     tags          TEXT[] DEFAULT '{}',
-    created_at    TIMESTAMPTZ NOT NULL,
-    updated_at    TIMESTAMPTZ NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     search_vector TSVECTOR
 );
 

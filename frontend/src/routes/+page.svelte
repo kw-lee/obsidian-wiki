@@ -31,6 +31,10 @@
 			goto('/login');
 			return;
 		}
+		if (auth.mustChangeCredentials) {
+			goto('/auth/setup');
+			return;
+		}
 		loadTree();
 
 		function handleKeydown(e: KeyboardEvent) {

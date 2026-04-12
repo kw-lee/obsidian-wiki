@@ -15,6 +15,10 @@
 			goto('/login');
 			return;
 		}
+		if (auth.mustChangeCredentials) {
+			goto('/auth/setup');
+			return;
+		}
 		loadGraph();
 	});
 

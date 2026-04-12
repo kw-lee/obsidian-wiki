@@ -11,10 +11,14 @@
 		e.preventDefault();
 		loading = true;
 		error = '';
-		const ok = await login(username, password);
+		const result = await login(username, password);
 		loading = false;
-		if (ok) {
-			goto('/');
+		if (result.success) {
+			if (result.mustChange) {
+				goto('/auth/setup');
+			} else {
+				goto('/');
+			}
 		} else {
 			error = '로그인 실패: 아이디 또는 비밀번호를 확인하세요.';
 		}

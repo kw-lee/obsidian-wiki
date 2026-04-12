@@ -69,6 +69,16 @@ export async function api<T = unknown>(path: string, options: FetchOptions = {})
 		}
 	}
 
+	// Redirect to credential change page if required
+	if (res.status === 403) {
+		const detail = await res.json().catch(() => ({ detail: '' }));
+		if (detail.detail === 'Credential change required') {
+			window.location.href = '/auth/setup';
+			throw new Error('Credential change required');
+		}
+		throw new Error(detail.detail || res.statusText);
+	}
+
 	if (!res.ok) {
 		const detail = await res.json().catch(() => ({ detail: res.statusText }));
 		throw new Error(detail.detail || res.statusText);

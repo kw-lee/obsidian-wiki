@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.config import settings
-from app.db.models import Attachment, Document, EditSession, Link, Tag  # noqa: F401
+from app.db.models import Attachment, Document, EditSession, Link, Tag, User  # noqa: F401
 from app.db.session import Base
 
 config = context.config

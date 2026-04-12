@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
-    admin_username: str = "admin"
-    admin_password_hash: str = ""
+    init_admin_username: str = "admin"
+    init_admin_password: str = "changeme"
 
     # Git
     git_remote_url: str = ""

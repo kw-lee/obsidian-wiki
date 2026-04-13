@@ -12,17 +12,18 @@ import {
   getNeighborNodes,
   getNodeDegree,
   listGraphFolders,
+  listGraphTags,
   parseGraphRouteState,
   rankNodesByDegree,
 } from "./graph";
 
 const graph: GraphData = {
   nodes: [
-    { id: "alpha.md", title: "Alpha" },
-    { id: "beta.md", title: "Beta" },
-    { id: "projects/gamma.md", title: "Gamma" },
-    { id: "projects/sub/delta.md", title: "Delta" },
-    { id: "projects/sub/zeta.md", title: "Zeta" },
+    { id: "alpha.md", title: "Alpha", tags: ["planning"] },
+    { id: "beta.md", title: "Beta", tags: ["planning", "team"] },
+    { id: "projects/gamma.md", title: "Gamma", tags: ["team"] },
+    { id: "projects/sub/delta.md", title: "Delta", tags: ["archive"] },
+    { id: "projects/sub/zeta.md", title: "Zeta", tags: [] },
   ],
   edges: [
     { source: "alpha.md", target: "beta.md" },
@@ -50,6 +51,15 @@ describe("graph utils", () => {
         depth: "2",
         focusPath: "beta.md",
         query: "gamma",
+      }).nodes.map((node) => node.id),
+    ).toEqual(["beta.md", "projects/gamma.md"]);
+  });
+
+  it("filters graph nodes by tag", () => {
+    expect(
+      filterGraphData(graph, {
+        depth: "all",
+        tag: "team",
       }).nodes.map((node) => node.id),
     ).toEqual(["beta.md", "projects/gamma.md"]);
   });
@@ -89,23 +99,30 @@ describe("graph utils", () => {
     expect(listGraphFolders(graph)).toEqual(["", "projects", "projects/sub"]);
   });
 
+  it("lists unique tags for tag filtering controls", () => {
+    expect(listGraphTags(graph)).toEqual(["archive", "planning", "team"]);
+  });
+
   it("ranks nodes by degree for connectivity summaries", () => {
     expect(rankNodesByDegree(graph, 3)).toEqual([
       {
         id: "beta.md",
         title: "Beta",
+        tags: ["planning", "team"],
         degree: 2,
         folder: "",
       },
       {
         id: "projects/gamma.md",
         title: "Gamma",
+        tags: ["team"],
         degree: 2,
         folder: "projects",
       },
       {
         id: "alpha.md",
         title: "Alpha",
+        tags: ["planning"],
         degree: 1,
         folder: "",
       },
@@ -123,6 +140,7 @@ describe("graph utils", () => {
       selected: "projects/gamma.md",
       depth: "3",
       folder: "projects",
+      tag: "team",
       q: "gamma",
       labels: "0",
       physics: "0",
@@ -133,6 +151,7 @@ describe("graph utils", () => {
       selectedNodeId: "projects/gamma.md",
       depth: "3",
       folder: "projects",
+      tag: "team",
       query: "gamma",
       showLabels: false,
       physicsEnabled: false,
@@ -146,12 +165,13 @@ describe("graph utils", () => {
         selectedNodeId: "projects/gamma.md",
         depth: "2",
         folder: "projects",
+        tag: "team",
         query: "gamma",
         showLabels: false,
         physicsEnabled: false,
       }).toString(),
     ).toBe(
-      "focus=notes%2Fcurrent.md&selected=projects%2Fgamma.md&depth=2&folder=projects&q=gamma&labels=0&physics=0",
+      "focus=notes%2Fcurrent.md&selected=projects%2Fgamma.md&depth=2&folder=projects&tag=team&q=gamma&labels=0&physics=0",
     );
   });
 });

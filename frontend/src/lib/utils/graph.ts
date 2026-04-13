@@ -7,6 +7,7 @@ interface FilterGraphOptions {
   focusPath?: string | null;
   query?: string;
   folder?: string | null;
+  tag?: string | null;
 }
 
 export interface RankedGraphNode extends GraphNode {
@@ -19,6 +20,7 @@ export interface GraphRouteState {
   selectedNodeId: string | null;
   depth: GraphDepth;
   folder: string;
+  tag: string;
   query: string;
   showLabels: boolean;
   physicsEnabled: boolean;
@@ -32,6 +34,7 @@ export function filterGraphData(
   const depth = options.depth;
   const query = options.query?.trim().toLowerCase() ?? "";
   const folder = options.folder?.trim() ?? "";
+  const tag = normalizeTag(options.tag);
 
   const scopedNodes = folder
     ? data.nodes.filter((node) => matchesFolder(node.id, folder))
@@ -55,6 +58,20 @@ export function filterGraphData(
     const matches = new Set(
       scopedNodes
         .filter((node) => matchesQuery(node, query))
+        .map((node) => node.id),
+    );
+
+    if (focusPath && allowedIds.has(focusPath)) {
+      matches.add(focusPath);
+    }
+
+    allowedIds = new Set([...allowedIds].filter((id) => matches.has(id)));
+  }
+
+  if (tag) {
+    const matches = new Set(
+      scopedNodes
+        .filter((node) => node.tags.some((entry) => normalizeTag(entry) === tag))
         .map((node) => node.id),
     );
 
@@ -146,6 +163,22 @@ export function listGraphFolders(data: GraphData): string[] {
   });
 }
 
+export function listGraphTags(data: GraphData): string[] {
+  const tags = new Map<string, string>();
+
+  for (const node of data.nodes) {
+    for (const tag of node.tags) {
+      const normalized = normalizeTag(tag);
+      if (!normalized || tags.has(normalized)) {
+        continue;
+      }
+      tags.set(normalized, normalized);
+    }
+  }
+
+  return [...tags.values()].sort((left, right) => left.localeCompare(right));
+}
+
 export function rankNodesByDegree(
   data: GraphData,
   limit = 5,
@@ -187,6 +220,7 @@ export function parseGraphRouteState(
   const focusParam = searchParams.get("focus")?.trim() ?? "";
   const selectedParam = searchParams.get("selected")?.trim() ?? "";
   const folderParam = searchParams.get("folder")?.trim() ?? "";
+  const tagParam = searchParams.get("tag")?.trim() ?? "";
   const queryParam = searchParams.get("q")?.trim() ?? "";
   const depthParam = searchParams.get("depth")?.trim() ?? "";
 
@@ -195,6 +229,7 @@ export function parseGraphRouteState(
     selectedNodeId: selectedParam || null,
     depth: isGraphDepth(depthParam) ? depthParam : fallbackFocusPath ? "2" : "all",
     folder: folderParam || "__all__",
+    tag: tagParam || "__all__",
     query: queryParam,
     showLabels: searchParams.get("labels") !== "0",
     physicsEnabled: searchParams.get("physics") !== "0",
@@ -217,6 +252,9 @@ export function buildGraphRouteSearch(
   }
   if (state.folder && state.folder !== "__all__") {
     params.set("folder", state.folder);
+  }
+  if (state.tag && state.tag !== "__all__") {
+    params.set("tag", state.tag);
   }
   if (state.query) {
     params.set("q", state.query);
@@ -282,7 +320,8 @@ function buildAdjacency(edges: GraphEdge[]): Map<string, Set<string>> {
 function matchesQuery(node: GraphNode, query: string): boolean {
   return (
     node.title.toLowerCase().includes(query) ||
-    node.id.toLowerCase().includes(query)
+    node.id.toLowerCase().includes(query) ||
+    node.tags.some((tag) => normalizeTag(tag).includes(query))
   );
 }
 
@@ -308,4 +347,11 @@ function matchesFolder(nodeId: string, folder: string): boolean {
     return nodeFolder === "";
   }
   return nodeFolder === folder || nodeFolder.startsWith(`${folder}/`);
+}
+
+function normalizeTag(tag: string | null | undefined): string {
+  return (tag ?? "")
+    .trim()
+    .replace(/^#/, "")
+    .toLowerCase();
 }

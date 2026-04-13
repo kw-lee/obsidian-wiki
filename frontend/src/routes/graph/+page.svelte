@@ -17,6 +17,7 @@
     getNeighborNodes,
     getNodeDegree,
     listGraphFolders,
+    listGraphTags,
     parseGraphRouteState,
     rankNodesByDegree,
     type GraphDepth,
@@ -24,7 +25,7 @@
   import { buildWikiRoute } from "$lib/utils/routes";
   import { getLastWikiPath } from "$lib/utils/workspace";
 
-  type SimNode = d3.SimulationNodeDatum & { id: string; title: string };
+  type SimNode = d3.SimulationNodeDatum & { id: string; title: string; tags: string[] };
   type SimLink = d3.SimulationLinkDatum<SimNode> & {
     source: string | SimNode;
     target: string | SimNode;
@@ -37,6 +38,7 @@
   let searchQuery = $state("");
   let depth = $state<GraphDepth>("all");
   let folder = $state("__all__");
+  let tag = $state("__all__");
   let showLabels = $state(true);
   let physicsEnabled = $state(true);
   let currentPath = $state<string | null>(null);
@@ -50,6 +52,7 @@
   const backToWikiHref = $derived(buildWikiRoute(currentPath ?? ""));
   const effectiveFocusPath = $derived(selectedNodeId ?? currentPath);
   const folderOptions = $derived(graphData ? listGraphFolders(graphData) : []);
+  const tagOptions = $derived(graphData ? listGraphTags(graphData) : []);
   const visibleGraph = $derived.by(() => {
     if (!graphData) {
       return null;
@@ -57,6 +60,7 @@
     return filterGraphData(graphData, {
       depth,
       folder: folder === "__all__" ? null : folder,
+      tag: tag === "__all__" ? null : tag,
       focusPath: effectiveFocusPath,
       query: searchQuery,
     });
@@ -103,6 +107,7 @@
     selectedNodeId = routeState.selectedNodeId;
     depth = routeState.depth;
     folder = routeState.folder;
+    tag = routeState.tag;
     searchQuery = routeState.query;
     showLabels = routeState.showLabels;
     physicsEnabled = routeState.physicsEnabled;
@@ -155,6 +160,7 @@
       selectedNodeId,
       depth,
       folder,
+      tag,
       query: searchQuery.trim(),
       showLabels,
       physicsEnabled,
@@ -321,7 +327,13 @@
           : 0,
       );
 
-    node.append("title").text((graphNode) => graphNode.title);
+    node
+      .append("title")
+      .text((graphNode) =>
+        graphNode.tags.length > 0
+          ? `${graphNode.title}\n${graphNode.tags.map((entry) => `#${entry}`).join(" ")}`
+          : graphNode.title,
+      );
 
     function updatePositions() {
       link
@@ -474,6 +486,10 @@
     physicsEnabled = !physicsEnabled;
   }
 
+  function formatTags(tags: string[]) {
+    return tags.map((entry) => `#${entry}`);
+  }
+
   function formatFolder(path: string | null) {
     if (!path) {
       return t("graph.folder.none");
@@ -535,6 +551,16 @@
         </select>
       </label>
 
+      <label class="depth-control">
+        <span>{t("graph.tagLabel")}</span>
+        <select bind:value={tag}>
+          <option value="__all__">{t("graph.tag.all")}</option>
+          {#each tagOptions as option}
+            <option value={option}>{`#${option}`}</option>
+          {/each}
+        </select>
+      </label>
+
       <button class="tool-btn" onclick={resetZoom}>{t("graph.resetZoom")}</button>
       <button class="tool-btn" onclick={toggleLabels} aria-pressed={showLabels}>
         {showLabels ? t("graph.labels.hide") : t("graph.labels.show")}
@@ -559,6 +585,13 @@
       <strong>{selectedNode?.title ?? t("graph.selection.none")}</strong>
       {#if selectedNode}
         <span class="meta-path">{selectedNode.id}</span>
+        {#if selectedNode.tags.length > 0}
+          <div class="tag-list">
+            {#each formatTags(selectedNode.tags) as entry}
+              <span class="tag-chip">{entry}</span>
+            {/each}
+          </div>
+        {/if}
         {#if !isSelectedNodeVisible}
           <span class="meta-path">{t("graph.selection.filteredOut")}</span>
         {/if}
@@ -638,6 +671,13 @@
           <span class="meta-label">{t("graph.preview.title")}</span>
           <strong>{hoveredNode.title}</strong>
           <span class="meta-path">{hoveredNode.id}</span>
+          {#if hoveredNode.tags.length > 0}
+            <div class="tag-list">
+              {#each formatTags(hoveredNode.tags) as entry}
+                <span class="tag-chip">{entry}</span>
+              {/each}
+            </div>
+          {/if}
           <span class="meta-path">
             {t("graph.metrics.degreeValue", { count: hoveredDegree })}
           </span>
@@ -748,6 +788,23 @@
 
   .depth-control select {
     padding: 0 0.8rem;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+  }
+
+  .tag-chip {
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    background: color-mix(in srgb, var(--accent) 18%, var(--bg-primary));
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.1;
   }
 
   .tool-btn {

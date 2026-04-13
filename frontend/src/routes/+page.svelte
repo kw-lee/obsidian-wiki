@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { getAuth } from '$lib/stores/auth.svelte';
 	import { fetchTree, fetchDoc, saveDoc } from '$lib/api/wiki';
 	import type { TreeNode, DocDetail } from '$lib/types';
@@ -37,6 +38,10 @@
 			return;
 		}
 		loadTree();
+		const initialDoc = page.url.searchParams.get('doc');
+		if (initialDoc) {
+			selectDoc(initialDoc);
+		}
 
 		function handleKeydown(e: KeyboardEvent) {
 			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {

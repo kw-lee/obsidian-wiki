@@ -40,6 +40,7 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'commandPalette.newDoc': '새 문서 만들기',
 		'commandPalette.search': '문서 검색',
 		'commandPalette.graph': '그래프 뷰 열기',
+		'commandPalette.tasks': '작업 보기 열기',
 		'commandPalette.settings': '설정 열기',
 		'commandPalette.pull': 'Git Pull (동기화)',
 		'commandPalette.push': 'Git Push',
@@ -174,7 +175,19 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'system.noLogs': '표시할 로그가 아직 없습니다.',
 		'graph.title': '그래프 뷰',
 		'graph.back': '← Wiki',
-		'graph.count': '{nodes} 문서, {edges} 링크'
+		'graph.count': '{nodes} 문서, {edges} 링크',
+		'tasks.title': '작업 보기',
+		'tasks.description': '체크박스와 due date가 있는 작업을 vault 전체에서 모아 보여줍니다.',
+		'tasks.showCompleted': '완료된 작업 포함',
+		'tasks.loadFailed': '작업 목록을 불러오지 못했습니다.',
+		'tasks.empty': '표시할 작업이 없습니다.',
+		'tasks.open': '열림',
+		'tasks.done': '완료',
+		'tasks.priority.high': '높음',
+		'tasks.priority.medium': '중간',
+		'tasks.priority.low': '낮음',
+		'tasks.due': '마감',
+		'tasks.line': '라인'
 	},
 	en: {
 		'common.appName': 'Obsidian Wiki',
@@ -215,6 +228,7 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'commandPalette.newDoc': 'Create new document',
 		'commandPalette.search': 'Search documents',
 		'commandPalette.graph': 'Open graph view',
+		'commandPalette.tasks': 'Open task view',
 		'commandPalette.settings': 'Open settings',
 		'commandPalette.pull': 'Git Pull (sync)',
 		'commandPalette.push': 'Git Push',
@@ -350,6 +364,18 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'system.noLogs': 'No logs to show yet.',
 		'graph.title': 'Graph View',
 		'graph.back': '← Wiki',
-		'graph.count': '{nodes} documents, {edges} links'
+		'graph.count': '{nodes} documents, {edges} links',
+		'tasks.title': 'Task View',
+		'tasks.description': 'Collect checkbox tasks with due dates across the whole vault.',
+		'tasks.showCompleted': 'Include completed tasks',
+		'tasks.loadFailed': 'Failed to load tasks.',
+		'tasks.empty': 'No tasks to show.',
+		'tasks.open': 'Open',
+		'tasks.done': 'Done',
+		'tasks.priority.high': 'High',
+		'tasks.priority.medium': 'Medium',
+		'tasks.priority.low': 'Low',
+		'tasks.due': 'Due',
+		'tasks.line': 'Line'
 	}
 };

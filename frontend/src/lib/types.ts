@@ -54,6 +54,19 @@ export interface GraphData {
 	edges: GraphEdge[];
 }
 
+export interface TaskItem {
+	path: string;
+	line_number: number;
+	text: string;
+	completed: boolean;
+	due_date: string | null;
+	priority: 'low' | 'medium' | 'high' | null;
+}
+
+export interface TaskListResponse {
+	tasks: TaskItem[];
+}
+
 export interface SyncStatus {
 	last_sync: string | null;
 	ahead: number;

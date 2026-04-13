@@ -16,6 +16,7 @@ import {
 	search,
 	fetchTags,
 	fetchGraph,
+	fetchTasks,
 	syncPull,
 	syncPush,
 	fetchSyncStatus
@@ -86,6 +87,12 @@ describe('Wiki API functions', () => {
 		mockApi.mockResolvedValueOnce({ nodes: [], edges: [] });
 		await fetchGraph();
 		expect(mockApi).toHaveBeenCalledWith('/graph');
+	});
+
+	it('fetchTasks passes include_done as query param', async () => {
+		mockApi.mockResolvedValueOnce({ tasks: [] });
+		await fetchTasks(true);
+		expect(mockApi).toHaveBeenCalledWith('/tasks', { params: { include_done: 'true' } });
 	});
 
 	it('syncPull sends POST', async () => {

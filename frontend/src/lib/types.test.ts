@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import type {
 	AuthTokenPair,
 	TreeNode,
+	TaskItem,
+	TaskListResponse,
 	DocDetail,
 	SearchResponse,
 	BacklinkItem,
@@ -41,6 +43,34 @@ describe('Type contracts', () => {
 		};
 		expect(tree.children).toHaveLength(1);
 		expect(tree.children[0].name).toBe('child.md');
+	});
+
+	it('TaskItem has expected shape', () => {
+		const task: TaskItem = {
+			path: 'notes/todo.md',
+			line_number: 4,
+			text: 'Ship release',
+			completed: false,
+			due_date: '2026-04-20',
+			priority: 'high'
+		};
+		expect(task.priority).toBe('high');
+	});
+
+	it('TaskListResponse wraps tasks', () => {
+		const response: TaskListResponse = {
+			tasks: [
+				{
+					path: 'notes/todo.md',
+					line_number: 4,
+					text: 'Ship release',
+					completed: false,
+					due_date: '2026-04-20',
+					priority: 'high'
+				}
+			]
+		};
+		expect(response.tasks).toHaveLength(1);
 	});
 
 	it('DocDetail has expected shape', () => {

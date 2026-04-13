@@ -7,6 +7,7 @@
 - **단일 사용자** 셀프호스트 위키. 집 서버나 VPS 에 Docker 로 띄워서 씁니다.
 - **Git 기반 양방향 동기화**: Obsidian ↔ 원격 Git 리포 ↔ 서버. 충돌은 3-way merge 로 자동 처리하고 실패 시 diff 를 돌려줍니다.
 - **Obsidian 호환**: `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callout, Mermaid, KaTeX, checkbox 지원.
+- **작업 보기**: Obsidian 체크박스 작업과 `📅 YYYY-MM-DD` due date를 `/tasks` 에서 모아 볼 수 있습니다.
 - **검색**: PostgreSQL `tsvector` + `pg_trgm` 하이브리드 (한/영).
 - **편집**: CodeMirror 6 기반 마크다운 에디터 (구문 강조, ⌘S 저장).
 - **부가 기능**: 백링크 패널, 그래프 뷰 (d3-force), 커맨드 팔레트 (⌘P), Quick Switcher (⌘K), 다크/라이트 테마 (Catppuccin).

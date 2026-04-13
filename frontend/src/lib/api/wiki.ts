@@ -6,7 +6,8 @@ import type {
 	BacklinkItem,
 	TagInfo,
 	GraphData,
-	SyncStatus
+	SyncStatus,
+	TaskListResponse
 } from '$lib/types';
 
 export const fetchTree = () => api<TreeNode[]>('/wiki/tree');
@@ -37,6 +38,9 @@ export const search = (q: string) =>
 export const fetchTags = () => api<TagInfo[]>('/tags');
 
 export const fetchGraph = () => api<GraphData>('/graph');
+
+export const fetchTasks = (includeDone = false) =>
+	api<TaskListResponse>('/tasks', { params: { include_done: String(includeDone) } });
 
 export const syncPull = () => api<{ head: string; changed_files: number }>('/sync/pull', { method: 'POST' });
 

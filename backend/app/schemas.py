@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -75,6 +75,19 @@ class GraphEdge(BaseModel):
 class GraphData(BaseModel):
     nodes: list[GraphNode]
     edges: list[GraphEdge]
+
+
+class TaskItem(BaseModel):
+    path: str
+    line_number: int
+    text: str
+    completed: bool
+    due_date: date | None = None
+    priority: Literal["low", "medium", "high"] | None = None
+
+
+class TaskListResponse(BaseModel):
+    tasks: list[TaskItem]
 
 
 # ── Sync ──────────────────────────────────────────────

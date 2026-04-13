@@ -35,6 +35,14 @@
 				}
 			},
 			{
+				id: 'tasks',
+				label: t('commandPalette.tasks'),
+				action: () => {
+					onclose();
+					goto('/tasks');
+				}
+			},
+			{
 				id: 'settings',
 				label: t('commandPalette.settings'),
 				action: () => {

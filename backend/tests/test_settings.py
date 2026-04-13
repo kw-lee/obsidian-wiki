@@ -9,6 +9,7 @@ import app.db.session as session_mod
 from app.db.models import AppSettings, Document, Tag, User
 from app.main import app
 from app.schemas import SyncStatus, SyncTestResult
+from app.services.settings import ensure_app_settings
 from app.services.sync.crypto import decrypt_secret, encrypt_secret
 from app.services.sync_scheduler import SyncScheduler
 from app.services.vault import write_doc
@@ -119,6 +120,73 @@ async def test_sync_settings_persist(client, auth_headers, setup_vault):
         assert row is not None
         assert row.git_remote_url == "git@github.com:test/vault.git"
         assert row.sync_auto_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_redact_credential_bearing_urls_in_response(
+    client, auth_headers, setup_vault
+):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.git_remote_url = "https://writer:secret@example.com/private/wiki.git"
+        row.webdav_url = "https://davuser:secret@dav.example.com/remote.php/dav/files/me"
+        await session.commit()
+
+    resp = await client.get("/api/settings/sync", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["git_remote_url"] == "https://example.com/private/wiki.git"
+    assert data["webdav_url"] == "https://dav.example.com/remote.php/dav/files/me"
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_reject_embedded_git_credentials(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    monkeypatch.setattr("app.config.settings.allow_private_sync_targets", False)
+
+    resp = await client.put(
+        "/api/settings/sync",
+        json={
+            "sync_backend": "git",
+            "sync_interval_seconds": 120,
+            "sync_auto_enabled": False,
+            "git_remote_url": "https://writer:secret@example.com/private/wiki.git",
+            "git_branch": "main",
+            "webdav_url": "",
+            "webdav_username": "",
+            "webdav_password": "",
+            "webdav_remote_root": "/",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+    assert "embedded credentials" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_reject_private_webdav_targets_when_disabled(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    monkeypatch.setattr("app.config.settings.allow_private_sync_targets", False)
+
+    resp = await client.post(
+        "/api/settings/sync/test",
+        json={
+            "sync_backend": "webdav",
+            "git_remote_url": "",
+            "git_branch": "main",
+            "webdav_url": "http://127.0.0.1:1900/remote.php/dav/files/me",
+            "webdav_username": "me",
+            "webdav_password": "app-token",
+            "webdav_remote_root": "/vault",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+    assert "private or local" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -363,6 +431,21 @@ async def test_get_system_logs(client, auth_headers, setup_vault):
     assert resp.status_code == 200
     data = resp.json()
     assert any(entry["message"] == "System log tail smoke test" for entry in data["entries"])
+
+@pytest.mark.asyncio
+async def test_get_system_logs_redacts_sync_url_secrets(client, auth_headers, setup_vault):
+    logger = logging.getLogger("tests.system")
+    logger.warning("Sync target https://writer:secret@example.com/private/wiki.git")
+
+    resp = await client.get("/api/settings/system/logs?limit=20", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert any(
+        entry["message"] == "Sync target https://example.com/private/wiki.git"
+        for entry in data["entries"]
+    )
+    assert all("secret@" not in entry["message"] for entry in data["entries"])
+
 
 
 def test_encrypt_secret_roundtrip():

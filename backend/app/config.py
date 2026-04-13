@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     init_admin_username: str = "admin"
     init_admin_password: str = "changeme"
     app_timezone: str = Field(default="Asia/Seoul", alias="APP_TIMEZONE")
+    allow_private_sync_targets: bool = Field(
+        default=False, alias="ALLOW_PRIVATE_SYNC_TARGETS"
+    )
 
     # Legacy bootstrap-only sync seed values for the first AppSettings row.
     bootstrap_git_remote_url: str = Field(default="", alias="GIT_REMOTE_URL")

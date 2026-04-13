@@ -4,6 +4,8 @@ import logging
 from collections import deque
 from datetime import datetime, timezone
 
+from app.services.sync.targets import scrub_secrets
+
 _MAX_LOG_ENTRIES = 200
 _LOG_ENTRIES: deque[dict[str, object]] = deque(maxlen=_MAX_LOG_ENTRIES)
 _HANDLER: logging.Handler | None = None
@@ -16,7 +18,7 @@ class _InMemoryLogHandler(logging.Handler):
                 "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc),
                 "level": record.levelname,
                 "logger": record.name,
-                "message": record.getMessage(),
+                "message": scrub_secrets(record.getMessage()),
             }
         )
 

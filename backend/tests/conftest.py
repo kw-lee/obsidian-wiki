@@ -8,6 +8,7 @@ _defaults = {
     "INIT_ADMIN_USERNAME": "admin",
     "INIT_ADMIN_PASSWORD": "testpass",
     "VAULT_LOCAL_PATH": "/tmp/test_vault",
+    "ALLOW_PRIVATE_SYNC_TARGETS": "true",
 }
 for key, value in _defaults.items():
     os.environ.setdefault(key, value)

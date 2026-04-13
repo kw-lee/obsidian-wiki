@@ -40,6 +40,12 @@ from app.services.settings import (
     invalidate_settings_cache,
 )
 from app.services.sync.crypto import encrypt_secret
+from app.services.sync.targets import (
+    SyncTargetValidationError,
+    redact_url_secrets,
+    validate_git_remote_url,
+    validate_webdav_url,
+)
 from app.services.sync_job_manager import SyncJobManager
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync_service import get_active_sync_status, test_sync_backend
@@ -102,6 +108,54 @@ def _normalize_timezone(value: str) -> str:
             detail=f"Unknown timezone: {normalized}",
         ) from exc
     return normalized
+
+
+def _redact_sync_url(value: str) -> str:
+    return redact_url_secrets(value) if value else ""
+
+
+def _validate_sync_targets(git_remote_url: str, webdav_url: str) -> tuple[str, str]:
+    try:
+        validated_git = validate_git_remote_url(
+            git_remote_url,
+            allow_private_targets=app_settings.allow_private_sync_targets,
+        )
+        validated_webdav = validate_webdav_url(
+            webdav_url,
+            allow_private_targets=app_settings.allow_private_sync_targets,
+        )
+    except SyncTargetValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return validated_git, validated_webdav
+
+
+def _build_sync_settings_response(
+    *,
+    sync_backend: str,
+    sync_interval_seconds: int,
+    sync_auto_enabled: bool,
+    git_remote_url: str,
+    git_branch: str,
+    webdav_url: str,
+    webdav_username: str,
+    webdav_remote_root: str,
+    webdav_verify_tls: bool,
+    has_webdav_password: bool,
+    status_data: SyncStatus,
+) -> SyncSettingsResponse:
+    return SyncSettingsResponse(
+        sync_backend=sync_backend,
+        sync_interval_seconds=sync_interval_seconds,
+        sync_auto_enabled=sync_auto_enabled,
+        git_remote_url=_redact_sync_url(git_remote_url),
+        git_branch=git_branch,
+        webdav_url=_redact_sync_url(webdav_url),
+        webdav_username=webdav_username,
+        webdav_remote_root=webdav_remote_root,
+        webdav_verify_tls=webdav_verify_tls,
+        has_webdav_password=has_webdav_password,
+        status=status_data,
+    )
 
 
 def _vault_disk_usage_bytes(root: Path) -> int:
@@ -206,7 +260,7 @@ async def get_sync_settings(
     row = await ensure_app_settings(db)
     status_data = await get_active_sync_status(db)
     status_data = await _with_last_sync_from_jobs(request, status_data)
-    return SyncSettingsResponse(
+    return _build_sync_settings_response(
         sync_backend=row.sync_backend,
         sync_interval_seconds=row.sync_interval_seconds,
         sync_auto_enabled=row.sync_auto_enabled,
@@ -217,7 +271,7 @@ async def get_sync_settings(
         webdav_remote_root=row.webdav_remote_root,
         webdav_verify_tls=row.webdav_verify_tls,
         has_webdav_password=bool(row.webdav_password_enc),
-        status=status_data,
+        status_data=status_data,
     )
 
 
@@ -231,12 +285,13 @@ async def update_sync_settings(
     row = await ensure_app_settings(db)
 
     git_branch = body.git_branch.strip() or "main"
+    git_remote_url, webdav_url = _validate_sync_targets(body.git_remote_url, body.webdav_url)
     row.sync_backend = body.sync_backend
     row.sync_interval_seconds = body.sync_interval_seconds
     row.sync_auto_enabled = body.sync_auto_enabled
-    row.git_remote_url = body.git_remote_url.strip()
+    row.git_remote_url = git_remote_url
     row.git_branch = git_branch
-    row.webdav_url = body.webdav_url.strip()
+    row.webdav_url = webdav_url
     row.webdav_username = body.webdav_username.strip()
     row.webdav_remote_root = _normalize_remote_root(body.webdav_remote_root)
     row.webdav_verify_tls = body.webdav_verify_tls
@@ -253,7 +308,7 @@ async def update_sync_settings(
     runtime = await get_runtime_sync_settings(db, use_cache=False)
     status_data = await get_active_sync_status(db)
     status_data = await _with_last_sync_from_jobs(request, status_data)
-    return SyncSettingsResponse(
+    return _build_sync_settings_response(
         sync_backend=runtime.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -264,7 +319,7 @@ async def update_sync_settings(
         webdav_remote_root=runtime.webdav_remote_root,
         webdav_verify_tls=runtime.webdav_verify_tls,
         has_webdav_password=bool(runtime.webdav_password_enc),
-        status=status_data,
+        status_data=status_data,
     )
 
 
@@ -276,13 +331,14 @@ async def test_sync_settings(
 ) -> SyncTestResult:
     existing = await ensure_app_settings(db)
     runtime = await get_runtime_sync_settings(db)
+    git_remote_url, webdav_url = _validate_sync_targets(body.git_remote_url, body.webdav_url)
     runtime = runtime.__class__(
         sync_backend=body.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,
         sync_auto_enabled=runtime.sync_auto_enabled,
-        git_remote_url=body.git_remote_url.strip(),
+        git_remote_url=git_remote_url,
         git_branch=body.git_branch.strip() or "main",
-        webdav_url=body.webdav_url.strip(),
+        webdav_url=webdav_url,
         webdav_username=body.webdav_username.strip(),
         webdav_password_enc=(
             encrypt_secret(body.webdav_password)

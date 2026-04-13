@@ -37,6 +37,8 @@ export interface SearchResponse {
 export interface BacklinkItem {
   source_path: string;
   title: string;
+  snippet?: string | null;
+  mention_count: number;
 }
 
 export interface ResolvedWikiLink {

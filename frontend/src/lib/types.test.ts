@@ -277,8 +277,14 @@ describe("Type contracts", () => {
   });
 
   it("BacklinkItem has expected shape", () => {
-    const bl: BacklinkItem = { source_path: "other.md", title: "Other" };
+    const bl: BacklinkItem = {
+      source_path: "other.md",
+      title: "Other",
+      snippet: "Mentions [[note]] in the first paragraph.",
+      mention_count: 2,
+    };
     expect(bl.source_path).toBe("other.md");
+    expect(bl.mention_count).toBe(2);
   });
 
   it("TagInfo has expected shape", () => {

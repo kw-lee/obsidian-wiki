@@ -59,11 +59,11 @@ async def resolve_links_for_document(
     source_path: str,
     content: str,
 ) -> list[ResolvedWikiLink]:
-    catalog = await _load_catalog(session)
+    catalog = await load_resolver_catalog(session)
     return [resolve_wikilink(link, source_path, catalog) for link in parse_wikilinks(content)]
 
 
-async def _load_catalog(session: AsyncSession) -> _ResolverCatalog:
+async def load_resolver_catalog(session: AsyncSession) -> _ResolverCatalog:
     document_rows = await session.execute(select(Document.path))
     attachment_rows = await session.execute(select(Attachment.path))
 

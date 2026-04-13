@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete as sql_delete
@@ -26,7 +27,13 @@ from app.services.git_ops import (
     read_file_at_commit,
 )
 from app.services.indexer import index_file
-from app.services.wiki_links import resolve_links_for_document
+from app.services.wiki_links import (
+    ParsedWikiLink,
+    load_resolver_catalog,
+    parse_wikilinks,
+    resolve_links_for_document,
+    resolve_wikilink,
+)
 
 router = APIRouter()
 
@@ -59,6 +66,29 @@ def _normalize_frontmatter(value: object) -> dict:
             return {}
         return decoded if isinstance(decoded, dict) else {}
     return {}
+
+
+def _normalize_snippet(text: str, max_length: int = 160) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= max_length:
+        return compact
+    return f"{compact[: max_length - 1].rstrip()}…"
+
+
+def _extract_backlink_snippet(source_content: str, source_path: str, target_path: str, catalog) -> str | None:
+    for raw_line in source_content.splitlines():
+        line = raw_line.strip()
+        if not line or "[[" not in line:
+            continue
+        for parsed in parse_wikilinks(line):
+            resolved = resolve_wikilink(parsed, source_path, catalog)
+            if resolved.vault_path == target_path:
+                return _normalize_snippet(line)
+    for raw_line in source_content.splitlines():
+        line = raw_line.strip()
+        if line:
+            return _normalize_snippet(line)
+    return None
 
 
 @router.get("/tree", response_model=list[TreeNode])
@@ -192,11 +222,46 @@ async def get_backlinks(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> list[BacklinkItem]:
-    # Find documents that link to this path (match by filename without extension too)
-    stem = path.rsplit("/", 1)[-1].removesuffix(".md")
+    catalog = await load_resolver_catalog(db)
     result = await db.execute(
-        select(Link.source_path, Document.title)
+        select(Link.source_path, Link.target_path, Link.alias, Document.title)
         .join(Document, Document.path == Link.source_path)
-        .where((Link.target_path == path) | (Link.target_path == stem))
     )
-    return [BacklinkItem(source_path=r[0], title=r[1]) for r in result.all()]
+
+    grouped: dict[str, dict[str, object]] = defaultdict(
+        lambda: {"title": "", "mention_count": 0, "snippet": None}
+    )
+
+    for source_path, raw_target, alias, title in result.all():
+        resolved = resolve_wikilink(
+            ParsedWikiLink(
+                raw_target=raw_target,
+                display_text=alias or raw_target,
+                embed=False,
+            ),
+            source_path,
+            catalog,
+        )
+        if resolved.vault_path != path:
+            continue
+
+        item = grouped[source_path]
+        item["title"] = title
+        item["mention_count"] = int(item["mention_count"]) + 1
+        if item["snippet"] is None:
+            try:
+                content = await vault.read_doc(source_path)
+            except FileNotFoundError:
+                content = ""
+            item["snippet"] = _extract_backlink_snippet(content, source_path, path, catalog)
+
+    items = [
+        BacklinkItem(
+            source_path=source_path,
+            title=str(payload["title"]),
+            snippet=payload["snippet"] if isinstance(payload["snippet"], str) else None,
+            mention_count=int(payload["mention_count"]),
+        )
+        for source_path, payload in grouped.items()
+    ]
+    return sorted(items, key=lambda item: (item.title.lower(), item.source_path.lower()))

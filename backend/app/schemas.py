@@ -64,6 +64,8 @@ class SearchResponse(BaseModel):
 class BacklinkItem(BaseModel):
     source_path: str
     title: str
+    snippet: str | None = None
+    mention_count: int = 1
 
 
 class ResolvedWikiLink(BaseModel):

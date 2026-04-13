@@ -7,6 +7,7 @@ vault and may use PostgreSQL-specific features. They are marked to accept 500 on
 import subprocess
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from app.services.vault import write_doc
@@ -195,3 +196,77 @@ async def test_backlinks_empty(client, auth_headers, setup_vault):
     except OperationalError:
         pytest.skip("SQLite does not support PostgreSQL dialect")
     assert resp.status_code in (200, 500)
+
+
+@pytest.mark.asyncio
+async def test_backlinks_include_snippets_and_relative_resolution(client, auth_headers, setup_vault):
+    from app.db.session import async_session
+
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "projects").mkdir()
+
+    target_content = "# Target\nBody"
+    source_content = "# Source\nSee [[../notes/target]] for context.\nAnd [[../notes/target#Overview]]."
+    await write_doc("notes/target.md", target_content)
+    await write_doc("projects/source.md", source_content)
+
+    async with async_session() as session:
+        await session.execute(
+            text("""
+                INSERT INTO documents (path, title, content_hash, frontmatter, tags)
+                VALUES (:path, :title, :content_hash, :frontmatter, :tags)
+            """),
+            {
+                "path": "notes/target.md",
+                "title": "Target",
+                "content_hash": "target-hash",
+                "frontmatter": "{}",
+                "tags": "",
+            },
+        )
+        await session.execute(
+            text("""
+                INSERT INTO documents (path, title, content_hash, frontmatter, tags)
+                VALUES (:path, :title, :content_hash, :frontmatter, :tags)
+            """),
+            {
+                "path": "projects/source.md",
+                "title": "Source",
+                "content_hash": "source-hash",
+                "frontmatter": "{}",
+                "tags": "",
+            },
+        )
+        await session.execute(
+            text("""
+                INSERT INTO links (source_path, target_path, alias)
+                VALUES (:source_path, :target_path, :alias)
+            """),
+            {
+                "source_path": "projects/source.md",
+                "target_path": "../notes/target",
+                "alias": None,
+            },
+        )
+        await session.execute(
+            text("""
+                INSERT INTO links (source_path, target_path, alias)
+                VALUES (:source_path, :target_path, :alias)
+            """),
+            {
+                "source_path": "projects/source.md",
+                "target_path": "../notes/target#Overview",
+                "alias": "Overview",
+            },
+        )
+        await session.commit()
+
+    response = await client.get("/api/wiki/backlinks/notes/target.md", headers=auth_headers)
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["source_path"] == "projects/source.md"
+    assert payload[0]["mention_count"] == 2
+    assert "See [[../notes/target]] for context." in payload[0]["snippet"]

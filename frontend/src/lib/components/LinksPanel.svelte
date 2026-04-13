@@ -23,6 +23,29 @@
   const visibleOutgoingLinks = $derived(
     outgoingLinks.filter((link) => !link.embed),
   );
+  const backlinkMentions = $derived(
+    backlinks.reduce((total, link) => total + (link.mention_count || 0), 0),
+  );
+  const frontlinkSummary = $derived.by(() => {
+    const summary = {
+      note: 0,
+      attachment: 0,
+      ambiguous: 0,
+      unresolved: 0,
+    };
+    for (const link of visibleOutgoingLinks) {
+      if (link.kind === "attachment") {
+        summary.attachment += 1;
+      } else if (link.kind === "ambiguous") {
+        summary.ambiguous += 1;
+      } else if (!link.exists || link.kind === "unresolved") {
+        summary.unresolved += 1;
+      } else {
+        summary.note += 1;
+      }
+    }
+    return summary;
+  });
 
   $effect(() => {
     if (selectedTab !== activeTab) {
@@ -64,12 +87,17 @@
 
 <div class="panel">
   <div class="panel-header">
-    <h3>{t("links.title")}</h3>
-    <span class="panel-count">
-      {activeTab === "backlinks"
-        ? t("links.count", { count: backlinks.length })
-        : t("links.count", { count: visibleOutgoingLinks.length })}
-    </span>
+    <div>
+      <h3>{t("links.title")}</h3>
+      <span class="panel-count">
+        {activeTab === "backlinks"
+          ? t("links.countWithMentions", {
+              count: backlinks.length,
+              mentions: backlinkMentions,
+            })
+          : t("links.count", { count: visibleOutgoingLinks.length })}
+      </span>
+    </div>
   </div>
 
   <div class="tabs">
@@ -87,6 +115,27 @@
     </button>
   </div>
 
+  {#if activeTab === "frontlinks" && visibleOutgoingLinks.length > 0}
+    <div class="summary-grid">
+      <div class="summary-card">
+        <strong>{frontlinkSummary.note}</strong>
+        <span>{t("links.status.note")}</span>
+      </div>
+      <div class="summary-card">
+        <strong>{frontlinkSummary.attachment}</strong>
+        <span>{t("links.status.attachment")}</span>
+      </div>
+      <div class="summary-card">
+        <strong>{frontlinkSummary.ambiguous}</strong>
+        <span>{t("links.status.ambiguous")}</span>
+      </div>
+      <div class="summary-card">
+        <strong>{frontlinkSummary.unresolved}</strong>
+        <span>{t("links.status.unresolved")}</span>
+      </div>
+    </div>
+  {/if}
+
   {#if activeTab === "backlinks"}
     {#if backlinks.length === 0}
       <p class="empty">{t("links.backlinksEmpty")}</p>
@@ -95,8 +144,14 @@
         {#each backlinks as link}
           <li>
             <button class="link-card" onclick={() => onnavigate(link.source_path)}>
-              <strong>{link.title}</strong>
-              <span>{link.source_path}</span>
+              <div class="card-top">
+                <strong>{link.title}</strong>
+                <span class="status-pill">{t("links.mentions", { count: link.mention_count })}</span>
+              </div>
+              <span class="card-path">{link.source_path}</span>
+              {#if link.snippet}
+                <span class="card-snippet">{link.snippet}</span>
+              {/if}
             </button>
           </li>
         {/each}
@@ -137,6 +192,19 @@
               {#if link.subpath}
                 <span class="card-meta">#{link.subpath}</span>
               {/if}
+              <span class="card-snippet">
+                {#if link.kind === "ambiguous"}
+                  {t("links.preview.ambiguous")}
+                {:else if link.kind === "attachment"}
+                  {t("links.preview.attachment")}
+                {:else if !link.exists || link.kind === "unresolved"}
+                  {t("links.preview.unresolved")}
+                {:else if link.subpath}
+                  {t("links.preview.subpath", { value: link.subpath })}
+                {:else}
+                  {t("links.preview.note")}
+                {/if}
+              </span>
             </button>
           </li>
         {/each}
@@ -157,6 +225,11 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  .panel-header > div {
+    display: grid;
+    gap: 0.2rem;
   }
 
   h3 {
@@ -233,10 +306,40 @@
   }
 
   .card-path,
-  .card-meta {
+  .card-meta,
+  .card-snippet {
     color: var(--text-muted);
     font-size: 0.8rem;
     word-break: break-all;
+  }
+
+  .card-snippet {
+    line-height: 1.45;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .summary-card {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-primary) 86%, transparent);
+  }
+
+  .summary-card strong {
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .summary-card span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
   }
 
   .status-pill {

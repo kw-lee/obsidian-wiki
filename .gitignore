@@ -10,6 +10,11 @@ __pycache__/
 *.egg-info/
 .venv/
 
+# Test / local DB artifacts
+*.db
+*.sqlite
+*.sqlite3
+
 # Node
 node_modules/
 frontend/build/

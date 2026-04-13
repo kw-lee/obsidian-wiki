@@ -5,6 +5,7 @@ import bcrypt
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.db.models import User
@@ -13,7 +14,12 @@ from app.routers import attachments, auth, search, sync, tags, wiki
 
 
 async def _ensure_initial_admin() -> None:
-    """Create the initial admin user from env vars if no users exist."""
+    """Create the initial admin user from env vars if no users exist.
+
+    Safe against concurrent workers: relies on the unique constraint on
+    ``users.username`` — if another worker wins the race, we swallow the
+    IntegrityError instead of crashing startup.
+    """
     async with async_session() as session:
         result = await session.execute(select(User).limit(1))
         if result.scalar_one_or_none() is not None:
@@ -28,7 +34,11 @@ async def _ensure_initial_admin() -> None:
                 must_change_credentials=True,
             )
         )
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Another worker inserted the admin concurrently — fine.
+            await session.rollback()
 
 
 @asynccontextmanager

@@ -120,6 +120,31 @@ class SyncStatus(BaseModel):
     message: str | None = None
 
 
+class SyncJobResponse(BaseModel):
+    id: str
+    action: Literal["pull", "push", "bootstrap"]
+    source: Literal["manual", "automatic"]
+    backend: str | None = None
+    status: Literal["queued", "running", "succeeded", "failed", "conflict"]
+    phase: str | None = None
+    message: str | None = None
+    current: int = 0
+    total: int = 0
+    progress_percent: int | None = None
+    bootstrap_strategy: Literal["remote", "local"] | None = None
+    head: str | None = None
+    changed_files: int = 0
+    started_at: datetime | None = None
+    updated_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+
+
+class SyncJobStartRequest(BaseModel):
+    action: Literal["pull", "push", "bootstrap"]
+    bootstrap_strategy: Literal["remote", "local"] | None = None
+
+
 # ── Settings ──────────────────────────────────────────
 class ProfileSettingsResponse(BaseModel):
     username: str

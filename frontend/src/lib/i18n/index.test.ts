@@ -26,6 +26,6 @@ describe('i18n helpers', () => {
 
 	it('interpolates message parameters', () => {
 		setLocale('en');
-		expect(t('commandPalette.pullSuccess', { count: 3 })).toBe('Pull complete: 3 file changes');
+		expect(t('sync.jobPullStarted')).toBe('Started a background pull.');
 	});
 });

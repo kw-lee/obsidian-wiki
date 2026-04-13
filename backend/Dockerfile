@@ -10,6 +10,9 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir .
 
 COPY . .
+RUN chmod +x /app/docker/entrypoint.sh
+
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
 
 # ── Development ───────────────────────────────────────
 FROM base AS dev

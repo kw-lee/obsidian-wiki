@@ -1,21 +1,23 @@
 <script lang="ts">
-	import '../app.css';
-	import { onMount } from 'svelte';
-	import { initAuth } from '$lib/stores/auth.svelte';
-	import { initI18n } from '$lib/i18n/index.svelte';
-	import { initTheme } from '$lib/stores/theme.svelte';
+  import "../app.css";
+  import { onMount } from "svelte";
+  import { initAuth } from "$lib/stores/auth.svelte";
+  import { initI18n } from "$lib/i18n/index.svelte";
+  import { initSyncMonitor } from "$lib/stores/sync.svelte";
+  import { initTheme } from "$lib/stores/theme.svelte";
 
-	let { children } = $props();
+  let { children } = $props();
 
-	onMount(() => {
-		initAuth();
-		initI18n();
-		void initTheme();
-	});
+  onMount(() => {
+    initAuth();
+    initI18n();
+    void initTheme();
+    initSyncMonitor();
+  });
 </script>
 
 <svelte:head>
-	<title>Obsidian Wiki</title>
+  <title>Obsidian Wiki</title>
 </svelte:head>
 
 {@render children()}

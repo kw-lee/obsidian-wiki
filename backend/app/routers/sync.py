@@ -1,12 +1,24 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.db.session import get_db
-from app.schemas import SyncStatus
-from app.services.sync_service import get_active_sync_status, pull_active_backend, push_active_backend
+from app.schemas import SyncJobResponse, SyncJobStartRequest, SyncStatus
+from app.services.sync_job_manager import SyncJobManager
+from app.services.sync_service import (
+    get_active_sync_status,
+    pull_active_backend,
+    push_active_backend,
+)
 
 router = APIRouter()
+
+
+def _get_job_manager(request: Request) -> SyncJobManager:
+    manager = getattr(request.app.state, "sync_job_manager", None)
+    if not isinstance(manager, SyncJobManager):
+        raise RuntimeError("Sync job manager is not configured")
+    return manager
 
 
 @router.post("/pull")
@@ -33,3 +45,26 @@ async def get_sync_status(
     _user: str = Depends(get_current_user),
 ) -> SyncStatus:
     return await get_active_sync_status(db)
+
+
+@router.post("/job", response_model=SyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def start_sync_job(
+    body: SyncJobStartRequest,
+    request: Request,
+    _user: str = Depends(get_current_user),
+) -> SyncJobResponse:
+    manager = _get_job_manager(request)
+    return await manager.start_job(
+        action=body.action,
+        source="manual",
+        bootstrap_strategy=body.bootstrap_strategy,
+    )
+
+
+@router.get("/job", response_model=SyncJobResponse | None)
+async def get_current_sync_job(
+    request: Request,
+    _user: str = Depends(get_current_user),
+) -> SyncJobResponse | None:
+    manager = _get_job_manager(request)
+    return await manager.get_current_job()

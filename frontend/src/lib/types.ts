@@ -92,6 +92,26 @@ export interface SyncStatus {
 	message?: string | null;
 }
 
+export interface SyncJob {
+	id: string;
+	action: 'pull' | 'push' | 'bootstrap';
+	source: 'manual' | 'automatic';
+	backend?: string | null;
+	status: 'queued' | 'running' | 'succeeded' | 'failed' | 'conflict';
+	phase?: string | null;
+	message?: string | null;
+	current: number;
+	total: number;
+	progress_percent?: number | null;
+	bootstrap_strategy?: 'remote' | 'local' | null;
+	head?: string | null;
+	changed_files: number;
+	started_at?: string | null;
+	updated_at?: string | null;
+	finished_at?: string | null;
+	error?: string | null;
+}
+
 export interface AuthTokenPair {
 	access_token: string;
 	refresh_token: string;

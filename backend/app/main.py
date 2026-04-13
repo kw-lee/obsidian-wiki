@@ -10,9 +10,20 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
-from app.routers import attachments, auth, dataview, search, settings as settings_router, sync, tags, tasks, wiki
+from app.routers import (
+    attachments,
+    auth,
+    dataview,
+    search,
+    settings as settings_router,
+    sync,
+    tags,
+    tasks,
+    wiki,
+)
 from app.services.log_buffer import install_log_buffer
 from app.services.settings import ensure_app_settings
+from app.services.sync_job_manager import SyncJobManager
 from app.services.sync_scheduler import SyncScheduler
 
 
@@ -27,9 +38,7 @@ async def _ensure_initial_admin() -> None:
         result = await session.execute(select(User).limit(1))
         if result.scalar_one_or_none() is not None:
             return
-        hashed = bcrypt.hashpw(
-            settings.init_admin_password.encode(), bcrypt.gensalt()
-        ).decode()
+        hashed = bcrypt.hashpw(settings.init_admin_password.encode(), bcrypt.gensalt()).decode()
         session.add(
             User(
                 username=settings.init_admin_username,
@@ -55,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await ensure_app_settings(session)
 
     scheduler = SyncScheduler(async_session)
+    app.state.sync_job_manager = SyncJobManager(async_session)
     app.state.sync_scheduler = scheduler
     await scheduler.start()
     try:

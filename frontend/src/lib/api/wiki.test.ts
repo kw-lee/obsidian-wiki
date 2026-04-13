@@ -1,125 +1,151 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the client module
-vi.mock('./client', () => ({
-	api: vi.fn()
+vi.mock("./client", () => ({
+  api: vi.fn(),
 }));
 
-import { api } from './client';
+import { api } from "./client";
 import {
-	fetchTree,
-	fetchDoc,
-	saveDoc,
-	createDoc,
-	deleteDoc,
-	fetchBacklinks,
-	search,
-	fetchTags,
-	fetchGraph,
-	fetchTasks,
-	queryDataview,
-	syncPull,
-	syncPush,
-	fetchSyncStatus
-} from './wiki';
+  fetchTree,
+  fetchDoc,
+  saveDoc,
+  createDoc,
+  deleteDoc,
+  fetchBacklinks,
+  search,
+  fetchTags,
+  fetchGraph,
+  fetchTasks,
+  queryDataview,
+  syncPull,
+  syncPush,
+  fetchSyncStatus,
+  startSyncJob,
+  fetchCurrentSyncJob,
+} from "./wiki";
 
 const mockApi = vi.mocked(api);
 
-describe('Wiki API functions', () => {
-	beforeEach(() => {
-		mockApi.mockReset();
-	});
+describe("Wiki API functions", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
 
-	it('fetchTree calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce([]);
-		await fetchTree();
-		expect(mockApi).toHaveBeenCalledWith('/wiki/tree');
-	});
+  it("fetchTree calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce([]);
+    await fetchTree();
+    expect(mockApi).toHaveBeenCalledWith("/wiki/tree");
+  });
 
-	it('fetchDoc calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce({ path: 'test.md' });
-		await fetchDoc('folder/test.md');
-		expect(mockApi).toHaveBeenCalledWith('/wiki/doc/folder/test.md');
-	});
+  it("fetchDoc calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ path: "test.md" });
+    await fetchDoc("folder/test.md");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/doc/folder/test.md");
+  });
 
-	it('saveDoc sends PUT with content and base_commit', async () => {
-		mockApi.mockResolvedValueOnce({ path: 'test.md' });
-		await saveDoc('test.md', 'new content', 'abc123');
-		expect(mockApi).toHaveBeenCalledWith('/wiki/doc/test.md', {
-			method: 'PUT',
-			body: JSON.stringify({ content: 'new content', base_commit: 'abc123' })
-		});
-	});
+  it("saveDoc sends PUT with content and base_commit", async () => {
+    mockApi.mockResolvedValueOnce({ path: "test.md" });
+    await saveDoc("test.md", "new content", "abc123");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/doc/test.md", {
+      method: "PUT",
+      body: JSON.stringify({ content: "new content", base_commit: "abc123" }),
+    });
+  });
 
-	it('createDoc sends POST', async () => {
-		mockApi.mockResolvedValueOnce({ path: 'new.md' });
-		await createDoc('new.md', '# New');
-		expect(mockApi).toHaveBeenCalledWith('/wiki/doc', {
-			method: 'POST',
-			body: JSON.stringify({ path: 'new.md', content: '# New' })
-		});
-	});
+  it("createDoc sends POST", async () => {
+    mockApi.mockResolvedValueOnce({ path: "new.md" });
+    await createDoc("new.md", "# New");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/doc", {
+      method: "POST",
+      body: JSON.stringify({ path: "new.md", content: "# New" }),
+    });
+  });
 
-	it('deleteDoc sends DELETE', async () => {
-		mockApi.mockResolvedValueOnce(undefined);
-		await deleteDoc('old.md');
-		expect(mockApi).toHaveBeenCalledWith('/wiki/doc/old.md', { method: 'DELETE' });
-	});
+  it("deleteDoc sends DELETE", async () => {
+    mockApi.mockResolvedValueOnce(undefined);
+    await deleteDoc("old.md");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/doc/old.md", {
+      method: "DELETE",
+    });
+  });
 
-	it('fetchBacklinks calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce([]);
-		await fetchBacklinks('note.md');
-		expect(mockApi).toHaveBeenCalledWith('/wiki/backlinks/note.md');
-	});
+  it("fetchBacklinks calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce([]);
+    await fetchBacklinks("note.md");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/backlinks/note.md");
+  });
 
-	it('search passes query as param', async () => {
-		mockApi.mockResolvedValueOnce({ query: 'test', results: [], total: 0 });
-		await search('test');
-		expect(mockApi).toHaveBeenCalledWith('/search', { params: { q: 'test' } });
-	});
+  it("search passes query as param", async () => {
+    mockApi.mockResolvedValueOnce({ query: "test", results: [], total: 0 });
+    await search("test");
+    expect(mockApi).toHaveBeenCalledWith("/search", { params: { q: "test" } });
+  });
 
-	it('fetchTags calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce([]);
-		await fetchTags();
-		expect(mockApi).toHaveBeenCalledWith('/tags');
-	});
+  it("fetchTags calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce([]);
+    await fetchTags();
+    expect(mockApi).toHaveBeenCalledWith("/tags");
+  });
 
-	it('fetchGraph calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce({ nodes: [], edges: [] });
-		await fetchGraph();
-		expect(mockApi).toHaveBeenCalledWith('/graph');
-	});
+  it("fetchGraph calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ nodes: [], edges: [] });
+    await fetchGraph();
+    expect(mockApi).toHaveBeenCalledWith("/graph");
+  });
 
-	it('fetchTasks passes include_done as query param', async () => {
-		mockApi.mockResolvedValueOnce({ tasks: [] });
-		await fetchTasks(true);
-		expect(mockApi).toHaveBeenCalledWith('/tasks', { params: { include_done: 'true' } });
-	});
+  it("fetchTasks passes include_done as query param", async () => {
+    mockApi.mockResolvedValueOnce({ tasks: [] });
+    await fetchTasks(true);
+    expect(mockApi).toHaveBeenCalledWith("/tasks", {
+      params: { include_done: "true" },
+    });
+  });
 
-	it('queryDataview posts the raw query', async () => {
-		mockApi.mockResolvedValueOnce({ kind: 'list', columns: [], rows: [] });
-		await queryDataview('LIST FROM "projects"');
-		expect(mockApi).toHaveBeenCalledWith('/dataview/query', {
-			method: 'POST',
-			body: JSON.stringify({ query: 'LIST FROM "projects"' })
-		});
-	});
+  it("queryDataview posts the raw query", async () => {
+    mockApi.mockResolvedValueOnce({ kind: "list", columns: [], rows: [] });
+    await queryDataview('LIST FROM "projects"');
+    expect(mockApi).toHaveBeenCalledWith("/dataview/query", {
+      method: "POST",
+      body: JSON.stringify({ query: 'LIST FROM "projects"' }),
+    });
+  });
 
-	it('syncPull sends POST', async () => {
-		mockApi.mockResolvedValueOnce({ head: 'abc', changed_files: 0 });
-		await syncPull();
-		expect(mockApi).toHaveBeenCalledWith('/sync/pull', { method: 'POST' });
-	});
+  it("syncPull sends POST", async () => {
+    mockApi.mockResolvedValueOnce({ head: "abc", changed_files: 0 });
+    await syncPull();
+    expect(mockApi).toHaveBeenCalledWith("/sync/pull", { method: "POST" });
+  });
 
-	it('syncPush sends POST', async () => {
-		mockApi.mockResolvedValueOnce({});
-		await syncPush();
-		expect(mockApi).toHaveBeenCalledWith('/sync/push', { method: 'POST' });
-	});
+  it("syncPush sends POST", async () => {
+    mockApi.mockResolvedValueOnce({});
+    await syncPush();
+    expect(mockApi).toHaveBeenCalledWith("/sync/push", { method: "POST" });
+  });
 
-	it('fetchSyncStatus calls correct endpoint', async () => {
-		mockApi.mockResolvedValueOnce({ last_sync: null, ahead: 0, behind: 0, dirty: false });
-		await fetchSyncStatus();
-		expect(mockApi).toHaveBeenCalledWith('/sync/status');
-	});
+  it("fetchSyncStatus calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce({
+      last_sync: null,
+      ahead: 0,
+      behind: 0,
+      dirty: false,
+    });
+    await fetchSyncStatus();
+    expect(mockApi).toHaveBeenCalledWith("/sync/status");
+  });
+
+  it("startSyncJob posts a sync job request", async () => {
+    mockApi.mockResolvedValueOnce({ id: "job-1", action: "pull" });
+    await startSyncJob({ action: "pull" });
+    expect(mockApi).toHaveBeenCalledWith("/sync/job", {
+      method: "POST",
+      body: JSON.stringify({ action: "pull" }),
+    });
+  });
+
+  it("fetchCurrentSyncJob calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce(null);
+    await fetchCurrentSyncJob();
+    expect(mockApi).toHaveBeenCalledWith("/sync/job");
+  });
 });

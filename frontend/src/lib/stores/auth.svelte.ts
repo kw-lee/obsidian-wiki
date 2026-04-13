@@ -4,6 +4,7 @@ interface AuthState {
 	isAuthenticated: boolean;
 	username: string | null;
 	mustChangeCredentials: boolean;
+	initialized: boolean;
 }
 
 interface LoginResponse {
@@ -15,7 +16,8 @@ interface LoginResponse {
 let state = $state<AuthState>({
 	isAuthenticated: false,
 	username: null,
-	mustChangeCredentials: false
+	mustChangeCredentials: false,
+	initialized: false
 });
 
 function applySession(username: string, data: LoginResponse) {
@@ -24,6 +26,7 @@ function applySession(username: string, data: LoginResponse) {
 	state.isAuthenticated = true;
 	state.username = username;
 	state.mustChangeCredentials = data.must_change_credentials;
+	state.initialized = true;
 	if (data.must_change_credentials) {
 		localStorage.setItem('must_change_credentials', 'true');
 	} else {
@@ -38,6 +41,7 @@ export function initAuth() {
 	state.isAuthenticated = !!token;
 	state.username = token ? (localStorage.getItem('username') ?? null) : null;
 	state.mustChangeCredentials = mustChange;
+	state.initialized = true;
 }
 
 export async function login(
@@ -83,8 +87,12 @@ export function logout() {
 	state.isAuthenticated = false;
 	state.username = null;
 	state.mustChangeCredentials = false;
+	state.initialized = true;
 }
 
 export function getAuth(): AuthState {
+	if (typeof window !== 'undefined' && !state.initialized) {
+		initAuth();
+	}
 	return state;
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import threading
 from datetime import UTC, datetime
@@ -100,9 +101,7 @@ def webdav_server():
 
             body = (
                 '<?xml version="1.0" encoding="utf-8"?>'
-                '<d:multistatus xmlns:d="DAV:">'
-                + "".join(responses)
-                + "</d:multistatus>"
+                '<d:multistatus xmlns:d="DAV:">' + "".join(responses) + "</d:multistatus>"
             ).encode("utf-8")
             self.send_response(207)
             self.send_header("Content-Type", "application/xml; charset=utf-8")
@@ -201,6 +200,37 @@ def webdav_server():
         thread.join(timeout=2)
 
 
+@pytest.fixture(autouse=True)
+def stub_webdav_reindex(monkeypatch):
+    calls: dict[str, list[list[str]] | list[int]] = {"incremental": [], "full": []}
+
+    async def fake_incremental_reindex(db, changed_paths):  # noqa: ANN001
+        calls["incremental"].append(list(changed_paths))
+        await db.commit()
+
+    async def fake_full_reindex(db):  # noqa: ANN001
+        calls["full"].append(1)
+        await db.commit()
+        return 0
+
+    monkeypatch.setattr(
+        "app.services.sync.webdav_backend.incremental_reindex", fake_incremental_reindex
+    )
+    monkeypatch.setattr("app.services.sync.webdav_backend.full_reindex", fake_full_reindex)
+    return calls
+
+
+async def _wait_for_job(client, auth_headers):
+    for _ in range(40):
+        resp = await client.get("/api/sync/job", headers=auth_headers)
+        assert resp.status_code == 200
+        payload = resp.json()
+        if payload and payload["status"] in {"succeeded", "failed", "conflict"}:
+            return payload
+        await asyncio.sleep(0.05)
+    raise AssertionError("Timed out waiting for sync job to finish")
+
+
 async def _configure_webdav(client, auth_headers, base_url: str):
     resp = await client.put(
         "/api/settings/sync",
@@ -243,7 +273,9 @@ async def test_webdav_test_connection(client, auth_headers, webdav_server, setup
 
 
 @pytest.mark.asyncio
-async def test_webdav_pull_downloads_remote_files(client, auth_headers, webdav_server, setup_vault):
+async def test_webdav_pull_downloads_remote_files(
+    client, auth_headers, webdav_server, setup_vault, stub_webdav_reindex
+):
     state, base_url = webdav_server
     state.set_file("remote.md", b"# Remote\n")
     await _configure_webdav(client, auth_headers, base_url)
@@ -254,9 +286,28 @@ async def test_webdav_pull_downloads_remote_files(client, auth_headers, webdav_s
     assert (setup_vault / "remote.md").read_text(encoding="utf-8") == "# Remote\n"
 
     async with session_mod.async_session() as session:
-        result = await session.execute(select(WebDAVManifest).where(WebDAVManifest.path == "remote.md"))
+        result = await session.execute(
+            select(WebDAVManifest).where(WebDAVManifest.path == "remote.md")
+        )
         manifest = result.scalar_one_or_none()
         assert manifest is not None
+
+    assert stub_webdav_reindex["incremental"] == [["remote.md"]]
+
+
+@pytest.mark.asyncio
+async def test_webdav_pull_conflict_does_not_partially_write_local_files(
+    client, auth_headers, webdav_server, setup_vault
+):
+    state, base_url = webdav_server
+    state.set_file("a.md", b"# Remote A\n")
+    state.set_file("z.md", b"remote version\n")
+    (setup_vault / "z.md").write_text("local version\n", encoding="utf-8")
+    await _configure_webdav(client, auth_headers, base_url)
+
+    resp = await client.post("/api/sync/pull", headers=auth_headers)
+    assert resp.status_code == 409
+    assert not (setup_vault / "a.md").exists()
 
 
 @pytest.mark.asyncio
@@ -312,7 +363,9 @@ async def test_webdav_pull_auto_merges_non_overlapping_changes(
     assert state.files["merge.md"] == b"local\nline2\nremote\n"
 
     async with session_mod.async_session() as session:
-        result = await session.execute(select(WebDAVManifest).where(WebDAVManifest.path == "merge.md"))
+        result = await session.execute(
+            select(WebDAVManifest).where(WebDAVManifest.path == "merge.md")
+        )
         manifest = result.scalar_one_or_none()
         assert manifest is not None
         assert manifest.base_content == "local\nline2\nremote\n"
@@ -336,3 +389,51 @@ async def test_webdav_status_reports_divergence(client, auth_headers, webdav_ser
     assert data["backend"] == "webdav"
     assert data["ahead"] >= 1
     assert data["behind"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_webdav_bootstrap_remote_job_applies_remote_baseline(
+    client, auth_headers, webdav_server, setup_vault, stub_webdav_reindex
+):
+    state, base_url = webdav_server
+    state.set_file("remote.md", b"# Remote Baseline\n")
+    (setup_vault / "local.md").write_text("# Local only\n", encoding="utf-8")
+    await _configure_webdav(client, auth_headers, base_url)
+
+    start_resp = await client.post(
+        "/api/sync/job",
+        json={"action": "bootstrap", "bootstrap_strategy": "remote"},
+        headers=auth_headers,
+    )
+    assert start_resp.status_code == 202
+
+    job = await _wait_for_job(client, auth_headers)
+    assert job["status"] == "succeeded"
+    assert job["bootstrap_strategy"] == "remote"
+    assert (setup_vault / "remote.md").read_text(encoding="utf-8") == "# Remote Baseline\n"
+    assert not (setup_vault / "local.md").exists()
+    assert stub_webdav_reindex["full"] == [1]
+
+
+@pytest.mark.asyncio
+async def test_webdav_bootstrap_local_job_applies_local_baseline(
+    client, auth_headers, webdav_server, setup_vault, stub_webdav_reindex
+):
+    state, base_url = webdav_server
+    state.set_file("remote.md", b"# Old Remote\n")
+    (setup_vault / "local.md").write_text("# Local Baseline\n", encoding="utf-8")
+    await _configure_webdav(client, auth_headers, base_url)
+
+    start_resp = await client.post(
+        "/api/sync/job",
+        json={"action": "bootstrap", "bootstrap_strategy": "local"},
+        headers=auth_headers,
+    )
+    assert start_resp.status_code == 202
+
+    job = await _wait_for_job(client, auth_headers)
+    assert job["status"] == "succeeded"
+    assert job["bootstrap_strategy"] == "local"
+    assert state.files["local.md"] == b"# Local Baseline\n"
+    assert "remote.md" not in state.files
+    assert stub_webdav_reindex["full"] == [1]

@@ -16,7 +16,7 @@ def _sync_disabled_error() -> HTTPException:
     )
 
 
-def _get_backend(runtime):
+def build_sync_backend(runtime):
     if runtime.sync_backend == "git":
         return GitSyncBackend(runtime)
     if runtime.sync_backend == "webdav":
@@ -26,7 +26,7 @@ def _get_backend(runtime):
 
 async def pull_active_backend(db: AsyncSession) -> tuple[str | None, list[str]]:
     runtime = await get_runtime_sync_settings(db)
-    backend = _get_backend(runtime)
+    backend = build_sync_backend(runtime)
     if backend is None:
         raise _sync_disabled_error()
     return await backend.pull(db)
@@ -34,7 +34,7 @@ async def pull_active_backend(db: AsyncSession) -> tuple[str | None, list[str]]:
 
 async def push_active_backend(db: AsyncSession) -> None:
     runtime = await get_runtime_sync_settings(db)
-    backend = _get_backend(runtime)
+    backend = build_sync_backend(runtime)
     if backend is None:
         raise _sync_disabled_error()
     await backend.push(db)
@@ -42,7 +42,7 @@ async def push_active_backend(db: AsyncSession) -> None:
 
 async def get_active_sync_status(db: AsyncSession) -> SyncStatus:
     runtime = await get_runtime_sync_settings(db)
-    backend = _get_backend(runtime)
+    backend = build_sync_backend(runtime)
     if backend is None:
         return SyncStatus(backend="none", message="Sync is disabled")
     return await backend.status(db)
@@ -50,7 +50,7 @@ async def get_active_sync_status(db: AsyncSession) -> SyncStatus:
 
 async def run_scheduled_sync(db: AsyncSession) -> SyncStatus:
     runtime = await get_runtime_sync_settings(db, use_cache=False)
-    backend = _get_backend(runtime)
+    backend = build_sync_backend(runtime)
     if backend is None:
         return SyncStatus(backend="none", message="Sync is disabled")
     if not runtime.sync_auto_enabled:
@@ -69,7 +69,7 @@ async def run_scheduled_sync(db: AsyncSession) -> SyncStatus:
 
 async def test_sync_backend(db: AsyncSession, runtime_override=None):
     runtime = runtime_override or await get_runtime_sync_settings(db)
-    backend = _get_backend(runtime)
+    backend = build_sync_backend(runtime)
     if backend is None:
         raise _sync_disabled_error()
     return await backend.test()

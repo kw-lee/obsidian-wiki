@@ -101,6 +101,10 @@ async def client():
                 await session.commit()
 
         from app.main import app
+        from app.services.sync_job_manager import SyncJobManager
+
+        if not hasattr(app.state, "sync_job_manager"):
+            app.state.sync_job_manager = SyncJobManager(_test_session)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c

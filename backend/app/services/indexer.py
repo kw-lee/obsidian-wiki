@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 import frontmatter
-from sqlalchemy import delete, text
+from sqlalchemy import delete, func, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,7 +55,7 @@ async def index_file(session: AsyncSession, relative_path: str, content: str) ->
             "content_hash": stmt.excluded.content_hash,
             "frontmatter": stmt.excluded.frontmatter,
             "tags": stmt.excluded.tags,
-            "updated_at": text("NOW()"),
+            "updated_at": func.now(),
         },
     )
     await session.execute(stmt)

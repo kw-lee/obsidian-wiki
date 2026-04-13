@@ -42,7 +42,7 @@ async def run_async_migrations() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    async with connectable.connect() as connection:
+    async with connectable.begin() as connection:
         await connection.execute(
             text("select set_config('app.bootstrap_git_remote_url', :value, false)"),
             {"value": settings.bootstrap_git_remote_url},

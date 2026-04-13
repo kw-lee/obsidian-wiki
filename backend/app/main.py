@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
-from app.routers import attachments, auth, search, settings as settings_router, sync, tags, tasks, wiki
+from app.routers import attachments, auth, dataview, search, settings as settings_router, sync, tags, tasks, wiki
 from app.services.log_buffer import install_log_buffer
 from app.services.settings import ensure_app_settings
 from app.services.sync_scheduler import SyncScheduler
@@ -82,6 +82,7 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+app.include_router(dataview.router, prefix="/api", tags=["dataview"])
 
 
 @app.get("/health")

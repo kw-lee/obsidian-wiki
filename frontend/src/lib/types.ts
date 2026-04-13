@@ -67,6 +67,21 @@ export interface TaskListResponse {
 	tasks: TaskItem[];
 }
 
+export interface DataviewCell {
+	value: string;
+	link_path: string | null;
+}
+
+export interface DataviewRow {
+	cells: DataviewCell[];
+}
+
+export interface DataviewQueryResponse {
+	kind: 'list' | 'table';
+	columns: string[];
+	rows: DataviewRow[];
+}
+
 export interface SyncStatus {
 	last_sync: string | null;
 	ahead: number;

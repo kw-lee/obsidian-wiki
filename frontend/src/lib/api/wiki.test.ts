@@ -17,6 +17,7 @@ import {
 	fetchTags,
 	fetchGraph,
 	fetchTasks,
+	queryDataview,
 	syncPull,
 	syncPush,
 	fetchSyncStatus
@@ -93,6 +94,15 @@ describe('Wiki API functions', () => {
 		mockApi.mockResolvedValueOnce({ tasks: [] });
 		await fetchTasks(true);
 		expect(mockApi).toHaveBeenCalledWith('/tasks', { params: { include_done: 'true' } });
+	});
+
+	it('queryDataview posts the raw query', async () => {
+		mockApi.mockResolvedValueOnce({ kind: 'list', columns: [], rows: [] });
+		await queryDataview('LIST FROM "projects"');
+		expect(mockApi).toHaveBeenCalledWith('/dataview/query', {
+			method: 'POST',
+			body: JSON.stringify({ query: 'LIST FROM "projects"' })
+		});
 	});
 
 	it('syncPull sends POST', async () => {

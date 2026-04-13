@@ -7,7 +7,8 @@ import type {
 	TagInfo,
 	GraphData,
 	SyncStatus,
-	TaskListResponse
+	TaskListResponse,
+	DataviewQueryResponse
 } from '$lib/types';
 
 export const fetchTree = () => api<TreeNode[]>('/wiki/tree');
@@ -41,6 +42,12 @@ export const fetchGraph = () => api<GraphData>('/graph');
 
 export const fetchTasks = (includeDone = false) =>
 	api<TaskListResponse>('/tasks', { params: { include_done: String(includeDone) } });
+
+export const queryDataview = (query: string) =>
+	api<DataviewQueryResponse>('/dataview/query', {
+		method: 'POST',
+		body: JSON.stringify({ query })
+	});
 
 export const syncPull = () => api<{ head: string; changed_files: number }>('/sync/pull', { method: 'POST' });
 

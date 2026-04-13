@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Marked } from 'marked';
+	import DataviewBlock from './DataviewBlock.svelte';
 	import ExcalidrawView from './ExcalidrawView.svelte';
 
 	let { path, content, onnavigate }: { path: string; content: string; onnavigate: (path: string) => void } = $props();
@@ -55,7 +56,33 @@
 		]
 	});
 
-	let html = $derived(marked.parse(content) as string);
+	type Segment =
+		| { type: 'markdown'; content: string }
+		| { type: 'dataview'; query: string };
+
+	function splitSegments(source: string): Segment[] {
+		const segments: Segment[] = [];
+		const regex = /```dataview\s*\n([\s\S]*?)```/g;
+		let lastIndex = 0;
+		for (const match of source.matchAll(regex)) {
+			const index = match.index ?? 0;
+			if (index > lastIndex) {
+				segments.push({ type: 'markdown', content: source.slice(lastIndex, index) });
+			}
+			segments.push({ type: 'dataview', query: match[1].trim() });
+			lastIndex = index + match[0].length;
+		}
+		if (lastIndex < source.length) {
+			segments.push({ type: 'markdown', content: source.slice(lastIndex) });
+		}
+		return segments.length > 0 ? segments : [{ type: 'markdown', content: source }];
+	}
+
+	let segments = $derived(splitSegments(content));
+
+	function renderMarkdown(source: string) {
+		return marked.parse(source) as string;
+	}
 
 	function handleClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
@@ -74,7 +101,13 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="markdown-body" onclick={handleClick}>
-		{@html html}
+		{#each segments as segment, index (`${segment.type}-${index}`)}
+			{#if segment.type === 'markdown'}
+				{@html renderMarkdown(segment.content)}
+			{:else}
+				<DataviewBlock query={segment.query} {onnavigate} />
+			{/if}
+		{/each}
 	</div>
 {/if}
 

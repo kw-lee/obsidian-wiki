@@ -90,6 +90,25 @@ class TaskListResponse(BaseModel):
     tasks: list[TaskItem]
 
 
+class DataviewQueryRequest(BaseModel):
+    query: str
+
+
+class DataviewCell(BaseModel):
+    value: str
+    link_path: str | None = None
+
+
+class DataviewRow(BaseModel):
+    cells: list[DataviewCell]
+
+
+class DataviewQueryResponse(BaseModel):
+    kind: Literal["list", "table"]
+    columns: list[str]
+    rows: list[DataviewRow]
+
+
 # ── Sync ──────────────────────────────────────────────
 class SyncStatus(BaseModel):
     last_sync: datetime | None = None

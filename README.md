@@ -9,6 +9,7 @@
 - **Obsidian 호환**: `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callout, Mermaid, KaTeX, checkbox 지원.
 - **작업 보기**: Obsidian 체크박스 작업과 `📅 YYYY-MM-DD` due date를 `/tasks` 에서 모아 볼 수 있습니다.
 - **Excalidraw 읽기 전용**: `.excalidraw.md` 문서는 함께 export된 PNG/SVG가 있으면 웹에서 미리보기로 표시합니다.
+- **Dataview 기본 지원**: `dataview` 코드 블록에서 `LIST/TABLE FROM "folder"` 또는 `FROM #tag` 정적 조회를 렌더링합니다.
 - **검색**: PostgreSQL `tsvector` + `pg_trgm` 하이브리드 (한/영).
 - **편집**: CodeMirror 6 기반 마크다운 에디터 (구문 강조, ⌘S 저장).
 - **부가 기능**: 백링크 패널, 그래프 뷰 (d3-force), 커맨드 팔레트 (⌘P), Quick Switcher (⌘K), 다크/라이트 테마 (Catppuccin).

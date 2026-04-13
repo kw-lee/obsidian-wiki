@@ -4,6 +4,7 @@ import type {
 	TreeNode,
 	TaskItem,
 	TaskListResponse,
+	DataviewQueryResponse,
 	DocDetail,
 	SearchResponse,
 	BacklinkItem,
@@ -71,6 +72,22 @@ describe('Type contracts', () => {
 			]
 		};
 		expect(response.tasks).toHaveLength(1);
+	});
+
+	it('DataviewQueryResponse has expected shape', () => {
+		const response: DataviewQueryResponse = {
+			kind: 'table',
+			columns: ['status', 'file.link'],
+			rows: [
+				{
+					cells: [
+						{ value: 'active', link_path: null },
+						{ value: 'Alpha', link_path: 'projects/alpha.md' }
+					]
+				}
+			]
+		};
+		expect(response.rows[0].cells[1].link_path).toBe('projects/alpha.md');
 	});
 
 	it('DocDetail has expected shape', () => {

@@ -190,7 +190,10 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'tasks.line': '라인',
 		'excalidraw.title': 'Excalidraw 미리보기',
 		'excalidraw.description': 'Export된 PNG/SVG가 있으면 읽기 전용으로 표시합니다.',
-		'excalidraw.fallback': '함께 export된 이미지가 없어 원본 문서 내용을 대신 표시합니다.'
+		'excalidraw.fallback': '함께 export된 이미지가 없어 원본 문서 내용을 대신 표시합니다.',
+		'dataview.loading': 'Dataview 결과를 불러오는 중...',
+		'dataview.error': '이 Dataview 쿼리는 아직 지원되지 않거나 실행에 실패했습니다.',
+		'dataview.empty': '조건에 맞는 문서가 없습니다.'
 	},
 	en: {
 		'common.appName': 'Obsidian Wiki',
@@ -382,6 +385,9 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'tasks.line': 'Line',
 		'excalidraw.title': 'Excalidraw Preview',
 		'excalidraw.description': 'If an exported PNG or SVG exists, show it in read-only mode.',
-		'excalidraw.fallback': 'No exported image was found, so the raw document content is shown instead.'
+		'excalidraw.fallback': 'No exported image was found, so the raw document content is shown instead.',
+		'dataview.loading': 'Loading Dataview results...',
+		'dataview.error': 'This Dataview query is not supported yet or failed to run.',
+		'dataview.empty': 'No documents matched this query.'
 	}
 };

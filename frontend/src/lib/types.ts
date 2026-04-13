@@ -14,6 +14,11 @@ export interface DocDetail {
   updated_at: string | null;
   content: string;
   base_commit: string | null;
+  outgoing_links: ResolvedWikiLink[];
+}
+
+export interface FolderCreateResult {
+  path: string;
 }
 
 export interface SearchResult {
@@ -32,6 +37,18 @@ export interface SearchResponse {
 export interface BacklinkItem {
   source_path: string;
   title: string;
+}
+
+export interface ResolvedWikiLink {
+  raw_target: string;
+  display_text: string;
+  kind: "note" | "attachment" | "heading" | "block" | "unresolved" | "ambiguous";
+  vault_path: string | null;
+  subpath: string | null;
+  embed: boolean;
+  exists: boolean;
+  ambiguous_paths: string[];
+  mime_type: string | null;
 }
 
 export interface TagInfo {

@@ -5,6 +5,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import { getSyncMonitor, isSyncJobActive } from "$lib/stores/sync.svelte";
+  import { buildWikiRoute } from "$lib/utils/routes";
+  import { getLastWikiPath } from "$lib/utils/workspace";
 
   let { children } = $props();
   const syncMonitor = getSyncMonitor();
@@ -16,6 +18,7 @@
     { href: "/settings/appearance", label: t("settings.tabs.appearance") },
     { href: "/settings/system", label: t("settings.tabs.system") },
   ]);
+  const backToWikiHref = $derived(buildWikiRoute(getLastWikiPath() ?? ""));
 
   onMount(() => {
     const auth = getAuth();
@@ -38,6 +41,7 @@
     </div>
 
     <nav>
+      <a href={backToWikiHref} class="back-link">{t("settings.backToWiki")}</a>
       {#each tabs as tab}
         <a href={tab.href} class:active={page.url.pathname === tab.href}
           >{tab.label}</a

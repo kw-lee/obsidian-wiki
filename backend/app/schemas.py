@@ -17,6 +17,7 @@ class DocMeta(BaseModel):
 class DocDetail(DocMeta):
     content: str
     base_commit: str | None = None
+    outgoing_links: list["ResolvedWikiLink"] = []
 
 
 class DocSaveRequest(BaseModel):
@@ -27,6 +28,14 @@ class DocSaveRequest(BaseModel):
 class DocCreateRequest(BaseModel):
     path: str
     content: str = ""
+
+
+class FolderCreateRequest(BaseModel):
+    path: str
+
+
+class FolderCreateResponse(BaseModel):
+    path: str
 
 
 # ── Tree ──────────────────────────────────────────────
@@ -55,6 +64,18 @@ class SearchResponse(BaseModel):
 class BacklinkItem(BaseModel):
     source_path: str
     title: str
+
+
+class ResolvedWikiLink(BaseModel):
+    raw_target: str
+    display_text: str
+    kind: Literal["note", "attachment", "heading", "block", "unresolved", "ambiguous"]
+    vault_path: str | None = None
+    subpath: str | None = None
+    embed: bool = False
+    exists: bool = False
+    ambiguous_paths: list[str] = []
+    mime_type: str | None = None
 
 
 class TagInfo(BaseModel):
@@ -271,3 +292,7 @@ class SystemSettingsUpdateRequest(BaseModel):
 
 class SystemLogsResponse(BaseModel):
     entries: list[SystemLogEntry]
+
+
+DocDetail.model_rebuild()
+TreeNode.model_rebuild()

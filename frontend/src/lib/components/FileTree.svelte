@@ -5,11 +5,15 @@
 	let {
 		nodes,
 		selectedPath,
-		onselect
+		expandedPaths,
+		onselect,
+		ontoggle
 	}: {
 		nodes: TreeNode[];
 		selectedPath: string;
+		expandedPaths: Set<string>;
 		onselect: (path: string) => void;
+		ontoggle: (path: string, open: boolean) => void;
 	} = $props();
 </script>
 
@@ -17,18 +21,24 @@
 	{#each nodes as node}
 		<li>
 			{#if node.is_dir}
-				<details open>
+				<details
+					open={expandedPaths.has(node.path)}
+					ontoggle={(event) => ontoggle(node.path, (event.currentTarget as HTMLDetailsElement).open)}
+				>
 					<summary class="dir">{node.name}</summary>
 					<FileTree
 						nodes={node.children}
 						{selectedPath}
+						{expandedPaths}
 						{onselect}
+						{ontoggle}
 					/>
 				</details>
 			{:else}
 				<button
 					class="file"
 					class:active={selectedPath === node.path}
+					data-tree-path={node.path}
 					onclick={() => onselect(node.path)}
 				>
 					{node.name.replace(/\.md$/, '')}

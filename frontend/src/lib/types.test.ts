@@ -12,6 +12,7 @@ import type {
   GraphData,
   AppearanceSettings,
   ProfileSettings,
+  ResolvedWikiLink,
   RebuildIndexResult,
   SystemLogs,
   SystemSettings,
@@ -96,6 +97,17 @@ describe("Type contracts", () => {
   });
 
   it("DocDetail has expected shape", () => {
+    const link: ResolvedWikiLink = {
+      raw_target: "target",
+      display_text: "Target",
+      kind: "note",
+      vault_path: "target.md",
+      subpath: null,
+      embed: false,
+      exists: true,
+      ambiguous_paths: [],
+      mime_type: null,
+    };
     const doc: DocDetail = {
       path: "test.md",
       title: "Test",
@@ -105,9 +117,11 @@ describe("Type contracts", () => {
       updated_at: null,
       content: "# Test",
       base_commit: "abc123",
+      outgoing_links: [link],
     };
     expect(doc.tags).toContain("tag1");
     expect(doc.base_commit).toBe("abc123");
+    expect(doc.outgoing_links[0].vault_path).toBe("target.md");
   });
 
   it("SearchResponse has expected shape", () => {

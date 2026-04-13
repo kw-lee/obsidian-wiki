@@ -5,6 +5,7 @@
 	import { fetchGraph } from '$lib/api/wiki';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { GraphData } from '$lib/types';
+	import { buildWikiRoute } from '$lib/utils/routes';
 	import * as d3 from 'd3';
 
 	let container: HTMLDivElement;
@@ -91,7 +92,7 @@
 			.attr('stroke-width', 1.5)
 			.style('cursor', 'pointer')
 			.on('click', (_event, d) => {
-				goto(`/?doc=${encodeURIComponent(d.id)}`);
+				goto(buildWikiRoute(d.id));
 			})
 			.call(
 				d3

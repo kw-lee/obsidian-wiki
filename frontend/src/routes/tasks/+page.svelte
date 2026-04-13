@@ -5,6 +5,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { fetchTasks } from '$lib/api/wiki';
 	import type { TaskItem } from '$lib/types';
+	import { buildWikiRoute } from '$lib/utils/routes';
 
 	let tasks = $state<TaskItem[]>([]);
 	let loading = $state(true);
@@ -48,7 +49,7 @@
 	}
 
 	function openTask(task: TaskItem) {
-		goto(`/?doc=${encodeURIComponent(task.path)}`);
+		goto(buildWikiRoute(task.path));
 	}
 </script>
 

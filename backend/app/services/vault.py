@@ -35,6 +35,16 @@ async def write_doc(relative: str, content: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()
 
 
+async def create_folder(relative: str) -> str:
+    """Create a folder and a hidden placeholder so git can track it."""
+    path = resolve(relative)
+    path.mkdir(parents=True, exist_ok=False)
+    placeholder = path / ".gitkeep"
+    async with aiofiles.open(placeholder, "w", encoding="utf-8") as f:
+        await f.write("")
+    return str(placeholder.relative_to(vault_path()))
+
+
 async def delete_doc(relative: str) -> None:
     path = resolve(relative)
     path.unlink(missing_ok=True)
@@ -59,9 +69,8 @@ def build_tree(root: Path | None = None, prefix: str = "") -> list[dict]:
         rel = f"{prefix}/{entry.name}" if prefix else entry.name
         if entry.is_dir():
             children = build_tree(entry, rel)
-            if children:  # skip empty dirs
-                node = {"name": entry.name, "path": rel, "is_dir": True, "children": children}
-                nodes.append(node)
+            node = {"name": entry.name, "path": rel, "is_dir": True, "children": children}
+            nodes.append(node)
         elif entry.suffix.lower() in (".md", ".mdx"):
             nodes.append({"name": entry.name, "path": rel, "is_dir": False, "children": []})
     return nodes

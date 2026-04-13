@@ -93,6 +93,22 @@ async def test_create_doc_auto_md_extension(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_create_folder(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.post("/api/wiki/folder", json={"path": "notes/subfolder"}, headers=auth_headers)
+    assert resp.status_code == 201
+    assert resp.json()["path"] == "notes/subfolder"
+    assert (setup_vault / "notes" / "subfolder").is_dir()
+
+
+@pytest.mark.asyncio
+async def test_create_folder_conflict(client, auth_headers, setup_vault):
+    (setup_vault / "notes").mkdir()
+    resp = await client.post("/api/wiki/folder", json={"path": "notes"}, headers=auth_headers)
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_create_doc_conflict(client, auth_headers, setup_vault):
     await write_doc("existing.md", "content")
     resp = await client.post(

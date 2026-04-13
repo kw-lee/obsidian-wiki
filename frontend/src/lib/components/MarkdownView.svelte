@@ -1,61 +1,22 @@
 <script lang="ts">
 	import { Marked } from 'marked';
+	import type { ResolvedWikiLink } from '$lib/types';
 	import { stripYamlFrontmatter } from '$lib/utils/markdown';
+	import { buildWikiRoute } from '$lib/utils/routes';
 	import DataviewBlock from './DataviewBlock.svelte';
 	import ExcalidrawView from './ExcalidrawView.svelte';
 
-	let { path, content, onnavigate }: { path: string; content: string; onnavigate: (path: string) => void } = $props();
-
-	const marked = new Marked();
-
-	// Custom wikilink extension
-	marked.use({
-		extensions: [
-			{
-				name: 'wikilink',
-				level: 'inline',
-				start(src: string) {
-					return src.indexOf('[[');
-				},
-				tokenizer(src: string) {
-					const match = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/.exec(src);
-					if (match) {
-						return {
-							type: 'wikilink',
-							raw: match[0],
-							target: match[1].trim(),
-							alias: match[2]?.trim()
-						};
-					}
-					return undefined;
-				},
-				renderer(token) {
-					const t = token as Record<string, string>;
-					const display = t.alias || t.target;
-					const href = t.target.endsWith('.md') ? t.target : `${t.target}.md`;
-					return `<a class="wikilink" data-path="${href}">${display}</a>`;
-				}
-			},
-			{
-				name: 'tag',
-				level: 'inline',
-				start(src: string) {
-					return src.indexOf('#');
-				},
-				tokenizer(src: string) {
-					const match = /^#([a-zA-Z0-9가-힣_/-]+)/.exec(src);
-					if (match) {
-						return { type: 'tag', raw: match[0], tag: match[1] };
-					}
-					return undefined;
-				},
-				renderer(token) {
-					const t = token as Record<string, string>;
-					return `<span class="tag">#${t.tag}</span>`;
-				}
-			}
-		]
-	});
+	let {
+		path,
+		content,
+		links = [],
+		onnavigate
+	}: {
+		path: string;
+		content: string;
+		links?: ResolvedWikiLink[];
+		onnavigate: (path: string) => void;
+	} = $props();
 
 	type Segment =
 		| { type: 'markdown'; content: string }
@@ -83,17 +44,159 @@
 	let segments = $derived(splitSegments(renderedContent));
 
 	function renderMarkdown(source: string) {
+		const marked = new Marked();
+		const lookup = buildLookup(links);
+		marked.use({
+			extensions: [
+				{
+					name: 'wikilink',
+					level: 'inline',
+					start(src: string) {
+						const plainIndex = src.indexOf('[[');
+						const embedIndex = src.indexOf('![[');
+						if (plainIndex === -1) return embedIndex;
+						if (embedIndex === -1) return plainIndex;
+						return Math.min(plainIndex, embedIndex);
+					},
+					tokenizer(src: string) {
+						const match = /^(!)?\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/.exec(src);
+						if (match) {
+							return {
+								type: 'wikilink',
+								raw: match[0],
+								target: match[2].trim(),
+								alias: match[3]?.trim() ?? '',
+								embed: Boolean(match[1])
+							};
+						}
+						return undefined;
+					},
+					renderer(token) {
+						const t = token as Record<string, string | boolean>;
+						const embed = Boolean(t.embed);
+						const target = String(t.target);
+						const alias = String(t.alias ?? '');
+						const resolved = consumeLookup(lookup, target, alias, embed);
+						return renderResolvedLink(resolved, target, alias, embed);
+					}
+				},
+				{
+					name: 'tag',
+					level: 'inline',
+					start(src: string) {
+						return src.indexOf('#');
+					},
+					tokenizer(src: string) {
+						const match = /^#([a-zA-Z0-9가-힣_/-]+)/.exec(src);
+						if (match) {
+							return { type: 'tag', raw: match[0], tag: match[1] };
+						}
+						return undefined;
+					},
+					renderer(token) {
+						const t = token as Record<string, string>;
+						return `<span class="tag">#${escapeHtml(t.tag)}</span>`;
+					}
+				}
+			]
+		});
 		return marked.parse(source) as string;
 	}
 
 	function handleClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		const link = target.closest('a.wikilink') as HTMLAnchorElement | null;
+		const link = target.closest('[data-path]') as HTMLElement | null;
 		if (link) {
 			e.preventDefault();
-			const path = link.dataset.path;
-			if (path) onnavigate(path);
+			const nextPath = link.dataset.path;
+			if (nextPath) onnavigate(nextPath);
 		}
+	}
+
+	function buildLookup(items: ResolvedWikiLink[]) {
+		const map = new Map<string, ResolvedWikiLink[]>();
+		for (const item of items) {
+			const key = buildLookupKey(item.raw_target, item.display_text, item.embed);
+			const queue = map.get(key) ?? [];
+			queue.push(item);
+			map.set(key, queue);
+		}
+		return map;
+	}
+
+	function consumeLookup(
+		lookup: Map<string, ResolvedWikiLink[]>,
+		target: string,
+		alias: string,
+		embed: boolean
+	): ResolvedWikiLink | undefined {
+		const primaryKey = buildLookupKey(target, alias || target, embed);
+		const secondaryKey = buildLookupKey(target, target, embed);
+		for (const key of [primaryKey, secondaryKey]) {
+			const queue = lookup.get(key);
+			if (queue && queue.length > 0) {
+				return queue.shift();
+			}
+		}
+		return undefined;
+	}
+
+	function buildLookupKey(target: string, displayText: string, embed: boolean) {
+		return `${embed ? '1' : '0'}:${target}:${displayText}`;
+	}
+
+	function renderResolvedLink(
+		link: ResolvedWikiLink | undefined,
+		target: string,
+		alias: string,
+		embed: boolean
+	) {
+		const display = escapeHtml(alias || link?.display_text || target);
+		if (!link) {
+			return `<span class="wikilink unresolved">${display}</span>`;
+		}
+		if (embed) {
+			return renderEmbed(link, display);
+		}
+		if (link.kind === 'ambiguous') {
+			return `<span class="wikilink ambiguous" title="${escapeAttr(link.ambiguous_paths.join(', '))}">${display}</span>`;
+		}
+		if (!link.exists || !link.vault_path) {
+			if (link.kind === 'unresolved' && link.vault_path) {
+				return renderAnchor(link.vault_path, display, 'wikilink unresolved');
+			}
+			return `<span class="wikilink unresolved">${display}</span>`;
+		}
+		const classes = link.kind === 'attachment' ? 'wikilink attachment' : 'wikilink';
+		return renderAnchor(link.vault_path, display, classes);
+	}
+
+	function renderEmbed(link: ResolvedWikiLink, display: string) {
+		if (!link.vault_path) {
+			return `<span class="wiki-embed unresolved">${display}</span>`;
+		}
+		const classes = ['wiki-embed', link.kind === 'attachment' ? 'attachment' : 'note', !link.exists ? 'unresolved' : '']
+			.filter(Boolean)
+			.join(' ');
+		const label = escapeHtml(link.exists ? link.vault_path : link.raw_target);
+		return `<a class="${classes}" href="${escapeAttr(buildWikiRoute(link.vault_path))}" data-path="${escapeAttr(link.vault_path)}"><strong>${display}</strong><span>${label}</span></a>`;
+	}
+
+	function renderAnchor(targetPath: string, display: string, classes: string) {
+		return `<a class="${classes}" href="${escapeAttr(buildWikiRoute(targetPath))}" data-path="${escapeAttr(targetPath)}">${display}</a>`;
+	}
+
+	function escapeHtml(value: string) {
+		return value
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;')
+			.replaceAll('"', '&quot;')
+			.replaceAll("'", '&#39;');
+	}
+
+	function escapeAttr(value: string) {
+		return escapeHtml(value);
 	}
 </script>
 
@@ -163,6 +266,31 @@
 	}
 	.markdown-body :global(a.wikilink:hover) {
 		text-decoration: underline;
+	}
+	.markdown-body :global(a.wikilink.attachment) {
+		text-decoration-style: dashed;
+	}
+	.markdown-body :global(.wikilink.unresolved) {
+		color: var(--warning, #d97706);
+	}
+	.markdown-body :global(.wikilink.ambiguous) {
+		color: var(--text-muted);
+		border-bottom: 1px dashed currentColor;
+	}
+	.markdown-body :global(.wiki-embed) {
+		display: grid;
+		gap: 0.2rem;
+		margin: 0.85rem 0;
+		padding: 0.9rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+		text-decoration: none;
+	}
+	.markdown-body :global(.wiki-embed span) {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		word-break: break-all;
 	}
 	.markdown-body :global(.tag) {
 		background: var(--tag-bg);

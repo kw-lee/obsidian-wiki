@@ -1,6 +1,7 @@
 """Full and incremental indexing of vault markdown files into the database."""
 
 import hashlib
+import json
 import logging
 import re
 from pathlib import Path
@@ -22,7 +23,23 @@ TAG_RE = re.compile(r"(?:^|\s)#([a-zA-Z0-9가-힣_/-]+)", re.MULTILINE)
 
 def _extract_links(content: str) -> list[tuple[str, str | None]]:
     """Extract (target, alias) tuples from wikilinks."""
-    return [(m.group(1).strip(), m.group(2)) for m in WIKILINK_RE.finditer(content)]
+    links: list[tuple[str, str | None]] = []
+    for match in WIKILINK_RE.finditer(content):
+        target = _normalize_link_target(match.group(1).strip())
+        if not target:
+            continue
+        alias = match.group(2).strip() if match.group(2) else None
+        links.append((target, alias))
+    return links
+
+
+def _normalize_link_target(raw_target: str) -> str:
+    if raw_target.startswith(("#", "^")):
+        return ""
+    for marker in ("#", "^"):
+        if marker in raw_target:
+            raw_target = raw_target.split(marker, 1)[0]
+    return raw_target.strip()
 
 
 def _normalize_frontmatter_tags(fm_tags: object) -> list[str]:
@@ -68,12 +85,24 @@ def _serialize_frontmatter(metadata: dict[object, object]) -> dict[str, object]:
     return jsonable_encoder(metadata)
 
 
+def _storage_payloads(
+    session: AsyncSession,
+    frontmatter: dict[str, object],
+    tags: list[str],
+) -> tuple[dict[str, object] | str, list[str] | str]:
+    if session.bind is not None and session.bind.dialect.name == "sqlite":
+        return json.dumps(frontmatter, ensure_ascii=False), ",".join(tags)
+    return frontmatter, tags
+
+
 async def index_file(session: AsyncSession, relative_path: str, content: str) -> None:
     """Index a single markdown file."""
     fm = frontmatter.loads(content)
     title = _resolve_title(relative_path, dict(fm.metadata))
     fm_tags = fm.metadata.get("tags", [])
     tags = _extract_tags(fm.content, fm_tags)
+    serialized_frontmatter = _serialize_frontmatter(dict(fm.metadata))
+    stored_frontmatter, stored_tags = _storage_payloads(session, serialized_frontmatter, tags)
     chash = hashlib.sha256(content.encode()).hexdigest()
 
     # Upsert document
@@ -81,8 +110,8 @@ async def index_file(session: AsyncSession, relative_path: str, content: str) ->
         path=relative_path,
         title=title,
         content_hash=chash,
-        frontmatter=_serialize_frontmatter(dict(fm.metadata)),
-        tags=tags,
+        frontmatter=stored_frontmatter,
+        tags=stored_tags,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["path"],

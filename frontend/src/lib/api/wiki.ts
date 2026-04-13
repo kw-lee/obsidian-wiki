@@ -2,6 +2,7 @@ import { api } from "./client";
 import type {
   TreeNode,
   DocDetail,
+  FolderCreateResult,
   SearchResponse,
   BacklinkItem,
   TagInfo,
@@ -30,6 +31,12 @@ export const createDoc = (path: string, content: string = "") =>
   api<DocDetail>("/wiki/doc", {
     method: "POST",
     body: JSON.stringify({ path, content }),
+  });
+
+export const createFolder = (path: string) =>
+  api<FolderCreateResult>("/wiki/folder", {
+    method: "POST",
+    body: JSON.stringify({ path }),
   });
 
 export const deleteDoc = (path: string) =>

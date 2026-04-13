@@ -5,10 +5,12 @@
 
   let {
     open,
+    currentPath = "",
     onclose,
     onaction,
   }: {
     open: boolean;
+    currentPath?: string;
     onclose: () => void;
     onaction: (action: string, payload?: string) => void;
   } = $props();
@@ -59,6 +61,25 @@
         goto("/settings/profile");
       },
     },
+    ...(currentPath
+      ? [
+          {
+            id: "edit-current",
+            label: t("commandPalette.editCurrent"),
+            action: () => onaction("edit-current", currentPath),
+          },
+          {
+            id: "copy-path",
+            label: t("commandPalette.copyPath"),
+            action: () => onaction("copy-path", currentPath),
+          },
+          {
+            id: "reveal-current",
+            label: t("commandPalette.revealCurrent"),
+            action: () => onaction("reveal-current", currentPath),
+          },
+        ]
+      : []),
     {
       id: "pull",
       label: t("commandPalette.pull"),

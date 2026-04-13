@@ -11,6 +11,7 @@ import {
   fetchDoc,
   saveDoc,
   createDoc,
+  createFolder,
   deleteDoc,
   fetchBacklinks,
   search,
@@ -67,6 +68,15 @@ describe("Wiki API functions", () => {
     await deleteDoc("old.md");
     expect(mockApi).toHaveBeenCalledWith("/wiki/doc/old.md", {
       method: "DELETE",
+    });
+  });
+
+  it("createFolder sends POST", async () => {
+    mockApi.mockResolvedValueOnce({ path: "notes" });
+    await createFolder("notes");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/folder", {
+      method: "POST",
+      body: JSON.stringify({ path: "notes" }),
     });
   });
 

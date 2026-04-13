@@ -70,6 +70,8 @@ export interface GraphNode {
   title: string;
   kind: "note" | "unresolved" | "attachment" | "ambiguous";
   tags: string[];
+  mime_type?: string | null;
+  candidate_paths?: string[];
 }
 
 export interface GraphEdge {

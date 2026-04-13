@@ -26,7 +26,11 @@
     rankNodesByDegree,
     type GraphDepth,
   } from "$lib/utils/graph";
-  import { buildWikiRoute } from "$lib/utils/routes";
+  import {
+    buildAttachmentApiPath,
+    buildWikiRoute,
+    getViewerKind,
+  } from "$lib/utils/routes";
   import { getLastWikiPath } from "$lib/utils/workspace";
 
   type SimNode = d3.SimulationNodeDatum & { id: string; title: string; tags: string[] };
@@ -74,10 +78,12 @@
   const selectedNode = $derived(
     graphData ? findGraphNode(graphData, effectiveFocusPath) : null,
   );
+  const selectedCandidatePaths = $derived(selectedNode?.candidate_paths ?? []);
   const selectedCreatableNodeId = $derived(
     selectedNode && isUnresolvedGraphNode(selectedNode) ? selectedNode.id : null,
   );
   const selectedOpenable = $derived(isNavigableGraphNode(selectedNode));
+  const selectedAttachmentPreviewUrl = $derived(attachmentPreviewUrl(selectedNode));
   const selectedDegree = $derived(
     graphData ? getNodeDegree(graphData, effectiveFocusPath) : 0,
   );
@@ -85,10 +91,12 @@
     visibleGraph ? getNeighborNodes(visibleGraph, effectiveFocusPath).slice(0, 5) : [],
   );
   const hoveredNode = $derived(graphData ? findGraphNode(graphData, hoveredNodeId) : null);
+  const hoveredCandidatePaths = $derived(hoveredNode?.candidate_paths ?? []);
   const hoveredCreatableNodeId = $derived(
     hoveredNode && isUnresolvedGraphNode(hoveredNode) ? hoveredNode.id : null,
   );
   const hoveredOpenable = $derived(isNavigableGraphNode(hoveredNode));
+  const hoveredAttachmentPreviewUrl = $derived(attachmentPreviewUrl(hoveredNode));
   const hoveredDegree = $derived(graphData ? getNodeDegree(graphData, hoveredNodeId) : 0);
   const hoveredNeighbors = $derived(
     visibleGraph ? getNeighborNodes(visibleGraph, hoveredNodeId).slice(0, 4) : [],
@@ -605,6 +613,10 @@
     goto(buildWikiRoute(node.id));
   }
 
+  function openCandidate(path: string) {
+    goto(buildWikiRoute(path));
+  }
+
   function toggleLabels() {
     showLabels = !showLabels;
   }
@@ -615,6 +627,37 @@
 
   function formatTags(tags: string[]) {
     return tags.map((entry) => `#${entry}`);
+  }
+
+  function attachmentPreviewUrl(node: GraphNode | null | undefined) {
+    if (!node || !isAttachmentGraphNode(node)) {
+      return null;
+    }
+    return getViewerKind(node.id) === "image" ? buildAttachmentApiPath(node.id) : null;
+  }
+
+  function attachmentViewerLabel(node: GraphNode | null | undefined) {
+    if (!node || !isAttachmentGraphNode(node)) {
+      return "";
+    }
+    switch (getViewerKind(node.id)) {
+      case "image":
+        return t("graph.attachment.kind.image");
+      case "pdf":
+        return t("graph.attachment.kind.pdf");
+      case "media":
+        return t("graph.attachment.kind.media");
+      default:
+        return t("graph.attachment.kind.binary");
+    }
+  }
+
+  function attachmentMimeLabel(node: GraphNode | null | undefined) {
+    return node?.mime_type ?? t("graph.attachment.mimeUnknown");
+  }
+
+  function primaryActionLabel(node: GraphNode | null | undefined) {
+    return isAttachmentGraphNode(node) ? t("graph.openAttachment") : t("graph.openNote");
   }
 
   function nodeKindLabel(node: GraphNode | null | undefined) {
@@ -738,12 +781,52 @@
             {/each}
           </div>
         {/if}
+        {#if isAttachmentGraphNode(selectedNode)}
+          <div class="info-list">
+            <span class="meta-path">
+              {t("graph.attachment.viewerLabel")}: {attachmentViewerLabel(selectedNode)}
+            </span>
+            <span class="meta-path">
+              {t("graph.attachment.mimeLabel")}: {attachmentMimeLabel(selectedNode)}
+            </span>
+          </div>
+          {#if selectedAttachmentPreviewUrl}
+            <img
+              class="attachment-preview"
+              src={selectedAttachmentPreviewUrl}
+              alt={t("graph.attachment.previewAlt", { title: selectedNode.title })}
+              loading="lazy"
+            />
+          {/if}
+        {/if}
+        {#if isAmbiguousGraphNode(selectedNode)}
+          <div class="candidate-section">
+            <span class="meta-label">{t("graph.preview.candidates")}</span>
+            {#if selectedCandidatePaths.length > 0}
+              <div class="candidate-list">
+                {#each selectedCandidatePaths as candidate}
+                  <button
+                    class="candidate-chip"
+                    type="button"
+                    title={t("graph.openCandidate")}
+                    onclick={() => openCandidate(candidate)}
+                  >
+                    <span>{candidate}</span>
+                  </button>
+                {/each}
+              </div>
+              <span class="meta-path">{t("graph.preview.candidatesHint")}</span>
+            {:else}
+              <span class="meta-path">{t("graph.preview.candidatesEmpty")}</span>
+            {/if}
+          </div>
+        {/if}
         {#if !isSelectedNodeVisible}
           <span class="meta-path">{t("graph.selection.filteredOut")}</span>
         {/if}
       {/if}
       <button class="meta-action" onclick={openFocusedNote} disabled={!selectedOpenable}>
-        {t("graph.openNote")}
+        {primaryActionLabel(selectedNode)}
       </button>
       {#if selectedCreatableNodeId}
         <button
@@ -862,12 +945,52 @@
               {/each}
             </div>
           {/if}
+          {#if isAttachmentGraphNode(hoveredNode)}
+            <div class="info-list">
+              <span class="meta-path">
+                {t("graph.attachment.viewerLabel")}: {attachmentViewerLabel(hoveredNode)}
+              </span>
+              <span class="meta-path">
+                {t("graph.attachment.mimeLabel")}: {attachmentMimeLabel(hoveredNode)}
+              </span>
+            </div>
+            {#if hoveredAttachmentPreviewUrl}
+              <img
+                class="attachment-preview"
+                src={hoveredAttachmentPreviewUrl}
+                alt={t("graph.attachment.previewAlt", { title: hoveredNode.title })}
+                loading="lazy"
+              />
+            {/if}
+          {/if}
           <span class="meta-path">
             {t("graph.metrics.degreeValue", { count: hoveredDegree })}
           </span>
           <span class="meta-path">
             {t("graph.metrics.folderValue", { folder: formatFolder(hoveredNode.id) })}
           </span>
+          {#if isAmbiguousGraphNode(hoveredNode)}
+            <div class="candidate-section">
+              <span class="meta-label">{t("graph.preview.candidates")}</span>
+              {#if hoveredCandidatePaths.length > 0}
+                <div class="candidate-list">
+                  {#each hoveredCandidatePaths as candidate}
+                    <button
+                      class="candidate-chip"
+                      type="button"
+                      title={t("graph.openCandidate")}
+                      onclick={() => openCandidate(candidate)}
+                    >
+                      <span>{candidate}</span>
+                    </button>
+                  {/each}
+                </div>
+                <span class="meta-path">{t("graph.preview.candidatesHint")}</span>
+              {:else}
+                <span class="meta-path">{t("graph.preview.candidatesEmpty")}</span>
+              {/if}
+            </div>
+          {/if}
 
           <div class="hover-neighbors">
             <span class="meta-label">{t("graph.preview.neighbors")}</span>
@@ -889,7 +1012,7 @@
               {t("graph.selection.selected")}
             </button>
             <button class="meta-action" type="button" onclick={() => openNode(hoveredNode.id)} disabled={!hoveredOpenable}>
-              {t("graph.openNote")}
+              {primaryActionLabel(hoveredNode)}
             </button>
             {#if hoveredCreatableNodeId}
               <button
@@ -1109,6 +1232,47 @@
 
   .error {
     color: var(--danger);
+  }
+
+  .info-list,
+  .candidate-section {
+    display: grid;
+    gap: 0.25rem;
+    padding-top: 0.2rem;
+  }
+
+  .candidate-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .candidate-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid color-mix(in srgb, var(--danger) 18%, var(--border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--danger) 10%, var(--bg-secondary));
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .candidate-chip:hover {
+    background: color-mix(in srgb, var(--danger) 16%, var(--bg-secondary));
+  }
+
+  .attachment-preview {
+    width: 100%;
+    max-height: 12rem;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-primary));
+    margin-top: 0.35rem;
   }
 
   .ranked-list {

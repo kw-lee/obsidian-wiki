@@ -151,11 +151,21 @@ describe("Type contracts", () => {
 
   it("GraphData has nodes and edges", () => {
     const graph: GraphData = {
-      nodes: [{ id: "a.md", title: "A", kind: "note", tags: [] }],
+      nodes: [
+        {
+          id: "a.md",
+          title: "A",
+          kind: "ambiguous",
+          tags: [],
+          candidate_paths: ["notes/a.md", "archive/a.md"],
+          mime_type: null,
+        },
+      ],
       edges: [{ source: "a.md", target: "b.md" }],
     };
     expect(graph.nodes).toHaveLength(1);
     expect(graph.edges[0].source).toBe("a.md");
+    expect(graph.nodes[0].candidate_paths).toHaveLength(2);
   });
 
   it("SyncStatus has expected defaults", () => {

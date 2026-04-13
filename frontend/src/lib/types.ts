@@ -68,7 +68,7 @@ export interface TagInfo {
 export interface GraphNode {
   id: string;
   title: string;
-  kind: "note" | "unresolved";
+  kind: "note" | "unresolved" | "attachment" | "ambiguous";
   tags: string[];
 }
 

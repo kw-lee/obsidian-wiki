@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import * as d3 from "d3";
 
-  import { fetchGraph } from "$lib/api/wiki";
+  import { createDoc, fetchGraph } from "$lib/api/wiki";
   import { t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import type { GraphData, GraphNode } from "$lib/types";
@@ -16,6 +16,9 @@
     findGraphNode,
     getNeighborNodes,
     getNodeDegree,
+    isAmbiguousGraphNode,
+    isAttachmentGraphNode,
+    isNavigableGraphNode,
     isUnresolvedGraphNode,
     listGraphFolders,
     listGraphTags,
@@ -45,6 +48,8 @@
   let currentPath = $state<string | null>(null);
   let selectedNodeId = $state<string | null>(null);
   let hoveredNodeId = $state<string | null>(null);
+  let creatingNodeId = $state<string | null>(null);
+  let actionError = $state("");
 
   let zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
   let svgSelection: d3.Selection<SVGSVGElement, unknown, null, undefined> | null =
@@ -69,6 +74,10 @@
   const selectedNode = $derived(
     graphData ? findGraphNode(graphData, effectiveFocusPath) : null,
   );
+  const selectedCreatableNodeId = $derived(
+    selectedNode && isUnresolvedGraphNode(selectedNode) ? selectedNode.id : null,
+  );
+  const selectedOpenable = $derived(isNavigableGraphNode(selectedNode));
   const selectedDegree = $derived(
     graphData ? getNodeDegree(graphData, effectiveFocusPath) : 0,
   );
@@ -76,6 +85,10 @@
     visibleGraph ? getNeighborNodes(visibleGraph, effectiveFocusPath).slice(0, 5) : [],
   );
   const hoveredNode = $derived(graphData ? findGraphNode(graphData, hoveredNodeId) : null);
+  const hoveredCreatableNodeId = $derived(
+    hoveredNode && isUnresolvedGraphNode(hoveredNode) ? hoveredNode.id : null,
+  );
+  const hoveredOpenable = $derived(isNavigableGraphNode(hoveredNode));
   const hoveredDegree = $derived(graphData ? getNodeDegree(graphData, hoveredNodeId) : 0);
   const hoveredNeighbors = $derived(
     visibleGraph ? getNeighborNodes(visibleGraph, hoveredNodeId).slice(0, 4) : [],
@@ -180,6 +193,7 @@
     try {
       graphData = await fetchGraph();
       hoveredNodeId = null;
+      actionError = "";
     } catch {
       graphData = null;
       loadFailed = true;
@@ -271,14 +285,18 @@
         nodeOpacity(data, nodeById.get(graphNode.id) ?? null),
       )
       .attr("stroke-dasharray", (graphNode) =>
-        isUnresolvedGraphNode(nodeById.get(graphNode.id)) ? "4 3" : null,
+        isUnresolvedGraphNode(nodeById.get(graphNode.id))
+          ? "4 3"
+          : isAmbiguousGraphNode(nodeById.get(graphNode.id))
+            ? "2 4"
+            : null,
       )
       .style("cursor", "pointer")
       .on("click", (_event, graphNode) => {
         selectedNodeId = graphNode.id;
       })
       .on("dblclick", (_event, graphNode) => {
-        goto(buildWikiRoute(graphNode.id));
+        openNode(graphNode.id);
       })
       .on("mouseenter", (_event, graphNode) => {
         hoveredNodeId = graphNode.id;
@@ -323,11 +341,18 @@
         graphNode.id === selectedId || graphNode.id === currentPath ? "600" : "400",
       )
       .attr("font-style", (graphNode) =>
-        isUnresolvedGraphNode(nodeById.get(graphNode.id)) ? "italic" : "normal",
+        isUnresolvedGraphNode(nodeById.get(graphNode.id)) ||
+        isAmbiguousGraphNode(nodeById.get(graphNode.id))
+          ? "italic"
+          : "normal",
       )
       .attr("fill", (graphNode) =>
         isUnresolvedGraphNode(nodeById.get(graphNode.id))
           ? "color-mix(in srgb, var(--warning) 88%, var(--text-primary))"
+          : isAttachmentGraphNode(nodeById.get(graphNode.id))
+            ? "color-mix(in srgb, #0ea5a6 78%, var(--text-primary))"
+            : isAmbiguousGraphNode(nodeById.get(graphNode.id))
+              ? "color-mix(in srgb, var(--danger) 76%, var(--text-primary))"
           : graphNode.id === selectedId
             ? "var(--text-primary)"
             : "var(--text-secondary)",
@@ -417,6 +442,12 @@
     if (node.kind === "unresolved") {
       return "color-mix(in srgb, var(--warning) 24%, var(--bg-primary))";
     }
+    if (isAttachmentGraphNode(node)) {
+      return "color-mix(in srgb, var(--accent) 20%, #0ea5a6)";
+    }
+    if (isAmbiguousGraphNode(node)) {
+      return "color-mix(in srgb, var(--danger) 18%, var(--bg-primary))";
+    }
     if (node.id === selectedNodeId) {
       return "var(--text-primary)";
     }
@@ -432,6 +463,12 @@
     }
     if (node.kind === "unresolved") {
       return "color-mix(in srgb, var(--warning) 62%, var(--border))";
+    }
+    if (isAttachmentGraphNode(node)) {
+      return "color-mix(in srgb, #0ea5a6 72%, var(--border))";
+    }
+    if (isAmbiguousGraphNode(node)) {
+      return "color-mix(in srgb, var(--danger) 64%, var(--border))";
     }
     if (node.id === selectedNodeId) {
       return "var(--accent)";
@@ -450,6 +487,12 @@
     if (node.kind === "unresolved") {
       return 1.75;
     }
+    if (isAttachmentGraphNode(node)) {
+      return 2;
+    }
+    if (isAmbiguousGraphNode(node)) {
+      return 1.75;
+    }
     if (node.id === selectedNodeId) {
       return 3;
     }
@@ -466,6 +509,12 @@
     const degree = getNodeDegree(data, node.id);
     if (node.kind === "unresolved") {
       return 0.84;
+    }
+    if (isAttachmentGraphNode(node)) {
+      return 0.9;
+    }
+    if (isAmbiguousGraphNode(node)) {
+      return 0.82;
     }
     if (node.id === selectedNodeId || node.id === currentPath) {
       return 1;
@@ -510,10 +559,34 @@
   }
 
   function openFocusedNote() {
-    if (!effectiveFocusPath) {
+    if (!selectedNode || !isNavigableGraphNode(selectedNode)) {
       return;
     }
-    goto(buildWikiRoute(effectiveFocusPath));
+    goto(buildWikiRoute(selectedNode.id));
+  }
+
+  async function createNote(nodeId: string | null) {
+    if (!graphData || !nodeId) {
+      return;
+    }
+
+    const unresolvedNode = findGraphNode(graphData, nodeId);
+    if (!unresolvedNode || !isUnresolvedGraphNode(unresolvedNode)) {
+      return;
+    }
+
+    creatingNodeId = unresolvedNode.id;
+    actionError = "";
+
+    try {
+      const created = await createDoc(unresolvedNode.id, "");
+      await goto(buildWikiRoute(created.path));
+    } catch (error) {
+      actionError =
+        error instanceof Error ? error.message : t("graph.createNoteFailed");
+    } finally {
+      creatingNodeId = null;
+    }
   }
 
   function selectNode(nodeId: string) {
@@ -525,7 +598,11 @@
   }
 
   function openNode(nodeId: string) {
-    goto(buildWikiRoute(nodeId));
+    const node = graphData ? findGraphNode(graphData, nodeId) : null;
+    if (!node || !isNavigableGraphNode(node)) {
+      return;
+    }
+    goto(buildWikiRoute(node.id));
   }
 
   function toggleLabels() {
@@ -544,7 +621,16 @@
     if (!node) {
       return "";
     }
-    return isUnresolvedGraphNode(node) ? t("graph.nodeKind.unresolved") : t("graph.nodeKind.note");
+    if (isUnresolvedGraphNode(node)) {
+      return t("graph.nodeKind.unresolved");
+    }
+    if (isAttachmentGraphNode(node)) {
+      return t("graph.nodeKind.attachment");
+    }
+    if (isAmbiguousGraphNode(node)) {
+      return t("graph.nodeKind.ambiguous");
+    }
+    return t("graph.nodeKind.note");
   }
 
   function formatFolder(path: string | null) {
@@ -656,9 +742,23 @@
           <span class="meta-path">{t("graph.selection.filteredOut")}</span>
         {/if}
       {/if}
-      <button class="meta-action" onclick={openFocusedNote} disabled={!selectedNode}>
+      <button class="meta-action" onclick={openFocusedNote} disabled={!selectedOpenable}>
         {t("graph.openNote")}
       </button>
+      {#if selectedCreatableNodeId}
+        <button
+          class="meta-action"
+          onclick={() => createNote(selectedCreatableNodeId)}
+          disabled={creatingNodeId === selectedCreatableNodeId}
+        >
+          {creatingNodeId === selectedCreatableNodeId
+            ? t("graph.creatingNote")
+            : t("graph.createNote")}
+        </button>
+      {/if}
+      {#if actionError}
+        <span class="meta-path error">{actionError}</span>
+      {/if}
     </div>
 
     <div class="meta-card">
@@ -677,9 +777,19 @@
         <span>{t("graph.nodeKind.note")}</span>
       </div>
       <div class="legend-item">
+        <span class="legend-swatch attachment"></span>
+        <span>{t("graph.nodeKind.attachment")}</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch ambiguous"></span>
+        <span>{t("graph.nodeKind.ambiguous")}</span>
+      </div>
+      <div class="legend-item">
         <span class="legend-swatch unresolved"></span>
         <span>{t("graph.nodeKind.unresolved")}</span>
       </div>
+      <span class="meta-path">{t("graph.nodeKind.attachmentHint")}</span>
+      <span class="meta-path">{t("graph.nodeKind.ambiguousHint")}</span>
       <span class="meta-path">{t("graph.nodeKind.unresolvedHint")}</span>
     </div>
 
@@ -778,9 +888,21 @@
             <button class="meta-action" type="button" onclick={() => selectNode(hoveredNode.id)}>
               {t("graph.selection.selected")}
             </button>
-            <button class="meta-action" type="button" onclick={() => openNode(hoveredNode.id)}>
+            <button class="meta-action" type="button" onclick={() => openNode(hoveredNode.id)} disabled={!hoveredOpenable}>
               {t("graph.openNote")}
             </button>
+            {#if hoveredCreatableNodeId}
+              <button
+                class="meta-action"
+                type="button"
+                onclick={() => createNote(hoveredCreatableNodeId)}
+                disabled={creatingNodeId === hoveredCreatableNodeId}
+              >
+                {creatingNodeId === hoveredCreatableNodeId
+                  ? t("graph.creatingNote")
+                  : t("graph.createNote")}
+              </button>
+            {/if}
           </div>
         </aside>
       {/if}
@@ -914,6 +1036,17 @@
     background: var(--accent);
   }
 
+  .legend-swatch.attachment {
+    background: color-mix(in srgb, var(--accent) 20%, #0ea5a6);
+    border-color: color-mix(in srgb, #0ea5a6 72%, var(--border));
+  }
+
+  .legend-swatch.ambiguous {
+    background: color-mix(in srgb, var(--danger) 18%, var(--bg-primary));
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--danger) 64%, var(--border));
+  }
+
   .legend-swatch.unresolved {
     background: color-mix(in srgb, var(--warning) 24%, var(--bg-primary));
     border-style: dashed;
@@ -972,6 +1105,10 @@
   .meta-action:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+
+  .error {
+    color: var(--danger);
   }
 
   .ranked-list {

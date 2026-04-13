@@ -11,6 +11,9 @@ import {
   findGraphNode,
   getNeighborNodes,
   getNodeDegree,
+  isAmbiguousGraphNode,
+  isAttachmentGraphNode,
+  isNavigableGraphNode,
   isUnresolvedGraphNode,
   listGraphFolders,
   listGraphTags,
@@ -25,11 +28,15 @@ const graph: GraphData = {
     { id: "projects/gamma.md", title: "Gamma", kind: "note", tags: ["team"] },
     { id: "projects/sub/delta.md", title: "Delta", kind: "note", tags: ["archive"] },
     { id: "projects/sub/zeta.md", title: "Zeta", kind: "unresolved", tags: [] },
+    { id: "assets/diagram.png", title: "diagram", kind: "attachment", tags: [] },
+    { id: "graph:ambiguous:abc", title: "shared.png", kind: "ambiguous", tags: [] },
   ],
   edges: [
     { source: "alpha.md", target: "beta.md" },
     { source: "beta.md", target: "projects/gamma.md" },
     { source: "projects/gamma.md", target: "projects/sub/delta.md" },
+    { source: "beta.md", target: "assets/diagram.png" },
+    { source: "projects/gamma.md", target: "graph:ambiguous:abc" },
   ],
 };
 
@@ -43,7 +50,7 @@ describe("graph utils", () => {
       filterGraphData(graph, { depth: "1", focusPath: "beta.md" }).nodes.map(
         (node) => node.id,
       ),
-    ).toEqual(["alpha.md", "beta.md", "projects/gamma.md"]);
+    ).toEqual(["alpha.md", "beta.md", "projects/gamma.md", "assets/diagram.png"]);
   });
 
   it("applies query filtering within the selected neighborhood", () => {
@@ -79,9 +86,9 @@ describe("graph utils", () => {
   });
 
   it("counts unique neighbors for a node", () => {
-    expect(countNeighbors(graph, "beta.md")).toBe(2);
+    expect(countNeighbors(graph, "beta.md")).toBe(3);
     expect(countNeighbors(graph, "projects/sub/zeta.md")).toBe(0);
-    expect(getNodeDegree(graph, "projects/gamma.md")).toBe(2);
+    expect(getNodeDegree(graph, "projects/gamma.md")).toBe(3);
   });
 
   it("finds nodes by id", () => {
@@ -94,15 +101,24 @@ describe("graph utils", () => {
     expect(isUnresolvedGraphNode(findGraphNode(graph, "alpha.md"))).toBe(false);
   });
 
+  it("distinguishes attachment and ambiguous graph nodes", () => {
+    expect(isAttachmentGraphNode(findGraphNode(graph, "assets/diagram.png"))).toBe(true);
+    expect(isAmbiguousGraphNode(findGraphNode(graph, "graph:ambiguous:abc"))).toBe(true);
+    expect(isNavigableGraphNode(findGraphNode(graph, "alpha.md"))).toBe(true);
+    expect(isNavigableGraphNode(findGraphNode(graph, "assets/diagram.png"))).toBe(true);
+    expect(isNavigableGraphNode(findGraphNode(graph, "graph:ambiguous:abc"))).toBe(false);
+  });
+
   it("returns direct neighbor nodes for hover previews", () => {
     expect(getNeighborNodes(graph, "projects/gamma.md").map((node) => node.id)).toEqual([
       "beta.md",
       "projects/sub/delta.md",
+      "graph:ambiguous:abc",
     ]);
   });
 
   it("lists folder prefixes for folder filtering controls", () => {
-    expect(listGraphFolders(graph)).toEqual(["", "projects", "projects/sub"]);
+    expect(listGraphFolders(graph)).toEqual(["", "assets", "projects", "projects/sub"]);
   });
 
   it("lists unique tags for tag filtering controls", () => {
@@ -116,7 +132,7 @@ describe("graph utils", () => {
         title: "Beta",
         kind: "note",
         tags: ["planning", "team"],
-        degree: 2,
+        degree: 3,
         folder: "",
       },
       {
@@ -124,7 +140,7 @@ describe("graph utils", () => {
         title: "Gamma",
         kind: "note",
         tags: ["team"],
-        degree: 2,
+        degree: 3,
         folder: "projects",
       },
       {
@@ -139,8 +155,8 @@ describe("graph utils", () => {
   });
 
   it("calculates average degree and density for the visible graph", () => {
-    expect(calculateAverageDegree(graph)).toBe(1.2);
-    expect(calculateGraphDensity(graph)).toBe(0.3);
+    expect(calculateAverageDegree(graph)).toBeCloseTo(10 / 7);
+    expect(calculateGraphDensity(graph)).toBeCloseTo(5 / 21);
   });
 
   it("parses graph route state from URL params", () => {

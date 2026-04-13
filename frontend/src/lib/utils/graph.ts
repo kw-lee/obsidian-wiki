@@ -19,6 +19,18 @@ export function isUnresolvedGraphNode(node: GraphNode | null | undefined): boole
   return node?.kind === "unresolved";
 }
 
+export function isAttachmentGraphNode(node: GraphNode | null | undefined): boolean {
+  return node?.kind === "attachment";
+}
+
+export function isAmbiguousGraphNode(node: GraphNode | null | undefined): boolean {
+  return node?.kind === "ambiguous";
+}
+
+export function isNavigableGraphNode(node: GraphNode | null | undefined): boolean {
+  return node ? node.kind !== "ambiguous" : false;
+}
+
 export interface GraphRouteState {
   focusPath: string | null;
   selectedNodeId: string | null;

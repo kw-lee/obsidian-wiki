@@ -52,6 +52,7 @@ class AppSettings(Base):
     webdav_verify_tls: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    default_theme: Mapped[str] = mapped_column(Text, nullable=False, default="system", server_default="system")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -63,6 +64,9 @@ class AppSettings(Base):
         ),
         CheckConstraint(
             "sync_interval_seconds >= 60", name="ck_app_settings_sync_interval_seconds"
+        ),
+        CheckConstraint(
+            "default_theme IN ('light', 'dark', 'system')", name="ck_app_settings_default_theme"
         ),
     )
 

@@ -22,6 +22,7 @@ class SyncRuntimeSettings:
     webdav_password_enc: str
     webdav_remote_root: str
     webdav_verify_tls: bool
+    default_theme: str
 
 
 _settings_cache: SyncRuntimeSettings | None = None
@@ -40,6 +41,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         webdav_password_enc=row.webdav_password_enc,
         webdav_remote_root=row.webdav_remote_root,
         webdav_verify_tls=row.webdav_verify_tls,
+        default_theme=row.default_theme,
     )
 
 
@@ -60,6 +62,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         webdav_password_enc="",
         webdav_remote_root="/",
         webdav_verify_tls=True,
+        default_theme="system",
     )
     db.add(row)
     await db.commit()

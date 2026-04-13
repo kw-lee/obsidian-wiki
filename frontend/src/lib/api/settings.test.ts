@@ -6,11 +6,14 @@ vi.mock('./client', () => ({
 
 import { api } from './client';
 import {
+	fetchAppearanceSettings,
 	fetchProfileSettings,
+	fetchPublicAppearanceSettings,
 	fetchSyncSettings,
 	fetchVaultSettings,
 	rebuildVaultIndex,
 	testSyncConnection,
+	updateAppearanceSettings,
 	updateProfileSettings,
 	updateSyncSettings
 } from './settings';
@@ -119,5 +122,26 @@ describe('Settings API functions', () => {
 		expect(mockApi).toHaveBeenCalledWith('/settings/vault/rebuild-index', {
 			method: 'POST'
 		});
+	});
+
+	it('fetchAppearanceSettings calls the appearance endpoint', async () => {
+		mockApi.mockResolvedValueOnce({ default_theme: 'system' });
+		await fetchAppearanceSettings();
+		expect(mockApi).toHaveBeenCalledWith('/settings/appearance');
+	});
+
+	it('updateAppearanceSettings sends PUT payload', async () => {
+		mockApi.mockResolvedValueOnce({ default_theme: 'dark' });
+		await updateAppearanceSettings({ default_theme: 'dark' });
+		expect(mockApi).toHaveBeenCalledWith('/settings/appearance', {
+			method: 'PUT',
+			body: JSON.stringify({ default_theme: 'dark' })
+		});
+	});
+
+	it('fetchPublicAppearanceSettings calls the public appearance endpoint', async () => {
+		mockApi.mockResolvedValueOnce({ default_theme: 'light' });
+		await fetchPublicAppearanceSettings();
+		expect(mockApi).toHaveBeenCalledWith('/settings/appearance/public');
 	});
 });

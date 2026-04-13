@@ -11,6 +11,8 @@ from app.config import settings as app_settings
 from app.db.models import Attachment, Document, Tag, User
 from app.db.session import get_db
 from app.schemas import (
+    AppearanceSettingsResponse,
+    AppearanceSettingsUpdateRequest,
     AuthTokenPair,
     ProfileSettingsResponse,
     ProfileSettingsUpdateRequest,
@@ -208,6 +210,7 @@ async def test_sync_settings(
         ),
         webdav_remote_root=_normalize_remote_root(body.webdav_remote_root),
         webdav_verify_tls=body.webdav_verify_tls,
+        default_theme=runtime.default_theme,
     )
     return await test_sync_backend(db, runtime_override=runtime)
 
@@ -237,3 +240,33 @@ async def rebuild_vault_index(
 ) -> RebuildIndexResponse:
     count = await full_reindex(db)
     return RebuildIndexResponse(indexed_documents=count)
+
+
+@router.get("/appearance", response_model=AppearanceSettingsResponse)
+async def get_appearance_settings(
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AppearanceSettingsResponse:
+    row = await ensure_app_settings(db)
+    return AppearanceSettingsResponse(default_theme=row.default_theme)
+
+
+@router.put("/appearance", response_model=AppearanceSettingsResponse)
+async def update_appearance_settings(
+    body: AppearanceSettingsUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _username: str = Depends(get_current_user),
+) -> AppearanceSettingsResponse:
+    row = await ensure_app_settings(db)
+    row.default_theme = body.default_theme
+    await db.commit()
+    invalidate_settings_cache()
+    return AppearanceSettingsResponse(default_theme=row.default_theme)
+
+
+@router.get("/appearance/public", response_model=AppearanceSettingsResponse)
+async def get_public_appearance_settings(
+    db: AsyncSession = Depends(get_db),
+) -> AppearanceSettingsResponse:
+    row = await ensure_app_settings(db)
+    return AppearanceSettingsResponse(default_theme=row.default_theme)

@@ -215,6 +215,33 @@ async def test_sync_test_endpoint_uses_webdav_backend(client, auth_headers, monk
     assert resp.json()["detail"] == "WebDAV connection successful"
 
 
+@pytest.mark.asyncio
+async def test_get_appearance_settings_defaults_to_system(client, auth_headers, setup_vault):
+    resp = await client.get("/api/settings/appearance", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json() == {"default_theme": "system"}
+
+
+@pytest.mark.asyncio
+async def test_update_appearance_settings_persists_and_is_public(client, auth_headers, setup_vault):
+    resp = await client.put(
+        "/api/settings/appearance",
+        json={"default_theme": "light"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"default_theme": "light"}
+
+    public_resp = await client.get("/api/settings/appearance/public")
+    assert public_resp.status_code == 200
+    assert public_resp.json() == {"default_theme": "light"}
+
+    async with session_mod.async_session() as session:
+        row = await session.get(AppSettings, 1)
+        assert row is not None
+        assert row.default_theme == "light"
+
+
 def test_encrypt_secret_roundtrip():
     encrypted = encrypt_secret("secret")
     assert encrypted != "secret"

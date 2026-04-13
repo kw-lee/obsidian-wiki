@@ -163,3 +163,11 @@ class VaultSettingsResponse(BaseModel):
 
 class RebuildIndexResponse(BaseModel):
     indexed_documents: int
+
+
+class AppearanceSettingsResponse(BaseModel):
+    default_theme: Literal["light", "dark", "system"]
+
+
+class AppearanceSettingsUpdateRequest(BaseModel):
+    default_theme: Literal["light", "dark", "system"]

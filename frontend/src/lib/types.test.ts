@@ -7,6 +7,7 @@ import type {
 	BacklinkItem,
 	TagInfo,
 	GraphData,
+	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
 	SyncSettings,
@@ -151,6 +152,11 @@ describe('Type contracts', () => {
 	it('RebuildIndexResult has expected shape', () => {
 		const result: RebuildIndexResult = { indexed_documents: 12 };
 		expect(result.indexed_documents).toBe(12);
+	});
+
+	it('AppearanceSettings has expected shape', () => {
+		const appearance: AppearanceSettings = { default_theme: 'system' };
+		expect(appearance.default_theme).toBe('system');
 	});
 
 	it('BacklinkItem has expected shape', () => {

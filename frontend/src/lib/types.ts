@@ -110,3 +110,9 @@ export interface VaultSettings {
 export interface RebuildIndexResult {
 	indexed_documents: number;
 }
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export interface AppearanceSettings {
+	default_theme: ThemePreference;
+}

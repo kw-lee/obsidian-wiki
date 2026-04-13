@@ -27,6 +27,8 @@ CREATE TABLE app_settings (
     webdav_password_enc   TEXT NOT NULL DEFAULT '',
     webdav_remote_root    TEXT NOT NULL DEFAULT '/',
     webdav_verify_tls     BOOLEAN NOT NULL DEFAULT TRUE,
+    default_theme         TEXT NOT NULL DEFAULT 'system'
+                          CHECK (default_theme IN ('light', 'dark', 'system')),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_app_settings_single_row CHECK (id = 1)
 );

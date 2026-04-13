@@ -1,6 +1,7 @@
 import { api } from './client';
 import type {
 	AuthTokenPair,
+	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
 	SyncSettings,
@@ -61,3 +62,14 @@ export const rebuildVaultIndex = () =>
 	api<RebuildIndexResult>('/settings/vault/rebuild-index', {
 		method: 'POST'
 	});
+
+export const fetchAppearanceSettings = () => api<AppearanceSettings>('/settings/appearance');
+
+export const updateAppearanceSettings = (payload: AppearanceSettings) =>
+	api<AppearanceSettings>('/settings/appearance', {
+		method: 'PUT',
+		body: JSON.stringify(payload)
+	});
+
+export const fetchPublicAppearanceSettings = () =>
+	api<AppearanceSettings>('/settings/appearance/public');

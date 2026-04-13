@@ -8,7 +8,7 @@
 
 	onMount(() => {
 		initAuth();
-		initTheme();
+		void initTheme();
 	});
 </script>
 

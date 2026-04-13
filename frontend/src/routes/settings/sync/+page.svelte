@@ -20,6 +20,7 @@
 	let saving = $state(false);
 	let actionBusy = $state<'pull' | 'push' | null>(null);
 	let testing = $state(false);
+	let pendingBackend = $state<SyncBackend | null>(null);
 	let error = $state('');
 	let success = $state('');
 
@@ -124,6 +125,25 @@
 			testing = false;
 		}
 	}
+
+	function requestBackendChange(nextBackend: SyncBackend) {
+		if (syncBackend === nextBackend) return;
+		const requiresWarning =
+			(syncBackend === 'git' && nextBackend === 'webdav') ||
+			(syncBackend === 'webdav' && nextBackend === 'git');
+		if (requiresWarning) {
+			pendingBackend = nextBackend;
+			return;
+		}
+		syncBackend = nextBackend;
+	}
+
+	function confirmBackendChange() {
+		if (pendingBackend) {
+			syncBackend = pendingBackend;
+		}
+		pendingBackend = null;
+	}
 </script>
 
 <section class="panel">
@@ -143,21 +163,21 @@
 				<button
 					type="button"
 					class:active={syncBackend === 'git'}
-					onclick={() => (syncBackend = 'git')}
+					onclick={() => requestBackendChange('git')}
 				>
 					Git
 				</button>
 				<button
 					type="button"
 					class:active={syncBackend === 'webdav'}
-					onclick={() => (syncBackend = 'webdav')}
+					onclick={() => requestBackendChange('webdav')}
 				>
 					WebDAV
 				</button>
 				<button
 					type="button"
 					class:active={syncBackend === 'none'}
-					onclick={() => (syncBackend = 'none')}
+					onclick={() => requestBackendChange('none')}
 				>
 					None
 				</button>
@@ -266,6 +286,22 @@
 		{/if}
 	{/if}
 </section>
+
+{#if pendingBackend}
+	<div class="modal-backdrop">
+		<div class="modal">
+			<h3>백엔드 전환 확인</h3>
+			<p>
+				Git과 WebDAV 전환은 기존 데이터를 자동으로 옮기지 않습니다. 데스크톱 Obsidian과 서버가 같은
+				원격 저장소를 보도록 직접 맞춰 주세요.
+			</p>
+			<div class="modal-actions">
+				<button class="secondary" type="button" onclick={() => (pendingBackend = null)}>취소</button>
+				<button type="button" onclick={confirmBackendChange}>계속</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.panel {
@@ -450,5 +486,38 @@
 			display: grid;
 			grid-template-columns: 1fr;
 		}
+	}
+
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		display: grid;
+		place-items: center;
+		padding: 1rem;
+		z-index: 40;
+	}
+
+	.modal {
+		width: min(100%, 480px);
+		padding: 1.5rem;
+		border-radius: 20px;
+		border: 1px solid var(--border);
+		background: var(--bg-secondary);
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+		display: grid;
+		gap: 1rem;
+	}
+
+	.modal p {
+		margin: 0;
+		color: var(--text-secondary);
+		line-height: 1.6;
+	}
+
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
 	}
 </style>

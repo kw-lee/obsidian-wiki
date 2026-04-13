@@ -1,6 +1,13 @@
 import pytest
 
-from app.services.vault import build_tree, content_hash, delete_doc, read_doc, write_doc
+from app.services.vault import (
+    VaultPathPolicyError,
+    build_tree,
+    content_hash,
+    delete_doc,
+    read_doc,
+    write_doc,
+)
 
 
 @pytest.mark.asyncio
@@ -43,5 +50,18 @@ def test_build_tree(setup_vault):
 def test_path_traversal(setup_vault):
     from app.services.vault import resolve
 
-    with pytest.raises(ValueError, match="Path traversal"):
+    with pytest.raises(ValueError, match="Dot path segments are not allowed|Path traversal"):
         resolve("../../etc/passwd")
+
+
+def test_resolve_rejects_git_paths(setup_vault):
+    from app.services.vault import resolve
+
+    with pytest.raises(VaultPathPolicyError, match=".git"):
+        resolve(".git/config")
+
+
+@pytest.mark.asyncio
+async def test_write_rejects_obsidian_paths(setup_vault):
+    with pytest.raises(VaultPathPolicyError, match=".obsidian"):
+        await write_doc(".obsidian/workspace.json", "{}")

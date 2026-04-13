@@ -8,13 +8,42 @@ import aiofiles
 from app.config import settings
 
 
+class VaultPathPolicyError(ValueError):
+    """Raised when a vault path violates application-level policy."""
+
+
 def vault_path() -> Path:
     return Path(settings.vault_local_path)
 
 
-def resolve(relative: str) -> Path:
+def _normalized_parts(relative: str) -> tuple[str, tuple[str, ...]]:
+    normalized = relative.strip().replace("\\", "/").strip("/")
+    if not normalized:
+        raise VaultPathPolicyError("Path is required")
+    if normalized.startswith("/"):
+        raise VaultPathPolicyError("Absolute paths are not allowed")
+
+    parts = tuple(part for part in normalized.split("/") if part)
+    if not parts:
+        raise VaultPathPolicyError("Path is required")
+    if any(part in {".", ".."} for part in parts):
+        raise VaultPathPolicyError("Dot path segments are not allowed")
+    return normalized, parts
+
+
+def _validate_policy(parts: tuple[str, ...], *, for_write: bool) -> None:
+    if ".git" in parts:
+        raise VaultPathPolicyError("Paths inside .git are not allowed")
+    if for_write and ".obsidian" in parts:
+        raise VaultPathPolicyError(".obsidian is read-only from the web")
+
+
+def resolve(relative: str, *, for_write: bool = False) -> Path:
     """Resolve a relative vault path, ensuring it stays within the vault."""
-    full = (vault_path() / relative).resolve()
+    normalized, parts = _normalized_parts(relative)
+    _validate_policy(parts, for_write=for_write)
+
+    full = (vault_path() / normalized).resolve()
     if not str(full).startswith(str(vault_path().resolve())):
         raise ValueError("Path traversal detected")
     return full
@@ -28,7 +57,7 @@ async def read_doc(relative: str) -> str:
 
 async def write_doc(relative: str, content: str) -> str:
     """Write content and return its sha256 hash."""
-    path = resolve(relative)
+    path = resolve(relative, for_write=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(path, "w", encoding="utf-8") as f:
         await f.write(content)
@@ -37,7 +66,7 @@ async def write_doc(relative: str, content: str) -> str:
 
 async def create_folder(relative: str) -> str:
     """Create a folder and a hidden placeholder so git can track it."""
-    path = resolve(relative)
+    path = resolve(relative, for_write=True)
     path.mkdir(parents=True, exist_ok=False)
     placeholder = path / ".gitkeep"
     async with aiofiles.open(placeholder, "w", encoding="utf-8") as f:
@@ -47,7 +76,7 @@ async def create_folder(relative: str) -> str:
 
 async def move_path(source_relative: str, destination_relative: str) -> str:
     source = resolve(source_relative)
-    destination = resolve(destination_relative)
+    destination = resolve(destination_relative, for_write=True)
 
     if not source.exists():
         raise FileNotFoundError(source_relative)
@@ -68,7 +97,7 @@ async def move_path(source_relative: str, destination_relative: str) -> str:
 
 
 async def delete_doc(relative: str) -> None:
-    path = resolve(relative)
+    path = resolve(relative, for_write=True)
     path.unlink(missing_ok=True)
 
 

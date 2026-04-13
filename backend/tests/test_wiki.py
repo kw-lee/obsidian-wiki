@@ -104,6 +104,28 @@ async def test_create_doc_auto_md_extension(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_create_doc_rejects_obsidian_path(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.post(
+        "/api/wiki/doc",
+        json={"path": ".obsidian/workspace.json", "content": "{}"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_create_doc_rejects_git_path(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.post(
+        "/api/wiki/doc",
+        json={"path": ".git/config", "content": "[core]"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_create_folder(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     resp = await client.post("/api/wiki/folder", json={"path": "notes/subfolder"}, headers=auth_headers)
@@ -117,6 +139,13 @@ async def test_create_folder_conflict(client, auth_headers, setup_vault):
     (setup_vault / "notes").mkdir()
     resp = await client.post("/api/wiki/folder", json={"path": "notes"}, headers=auth_headers)
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_create_folder_rejects_obsidian_path(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.post("/api/wiki/folder", json={"path": ".obsidian/plugins"}, headers=auth_headers)
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio
@@ -271,6 +300,13 @@ async def test_get_doc_not_found(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_get_doc_rejects_git_path(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.get("/api/wiki/doc/.git/config", headers=auth_headers)
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_save_doc(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     await write_doc("edit-me.md", "original")
@@ -306,6 +342,13 @@ async def test_delete_doc(client, auth_headers, setup_vault):
         assert resp.status_code in (204, 500)
     except (FileNotFoundError, Exception):
         pass  # Git may fail on deleted files in test env
+
+
+@pytest.mark.asyncio
+async def test_delete_doc_rejects_obsidian_path(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    resp = await client.delete("/api/wiki/doc/.obsidian/workspace.json", headers=auth_headers)
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio

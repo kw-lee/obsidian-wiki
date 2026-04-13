@@ -45,6 +45,17 @@ from app.services.wiki_links import (
 router = APIRouter()
 
 
+def _invalid_path(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _resolve_or_400(path: str, *, for_write: bool = False):
+    try:
+        return vault.resolve(path, for_write=for_write)
+    except ValueError as exc:
+        raise _invalid_path(str(exc)) from exc
+
+
 def _normalize_tags(value: object) -> list[str]:
     if value is None:
         return []
@@ -271,6 +282,8 @@ async def get_doc(
 ) -> DocDetail:
     try:
         content = await vault.read_doc(path)
+    except ValueError as exc:
+        raise _invalid_path(str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found") from exc
     row = await db.execute(select(Document).where(Document.path == path))
@@ -296,6 +309,7 @@ async def save_doc(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> DocDetail:
+    _resolve_or_400(path, for_write=True)
     current_head = head_commit_sha()
 
     # Conflict check
@@ -310,7 +324,10 @@ async def save_doc(
             base_content = read_file_at_commit(path, body.base_commit)
         except Exception:
             base_content = ""
-        current_content = await vault.read_doc(path)
+        try:
+            current_content = await vault.read_doc(path)
+        except ValueError as exc:
+            raise _invalid_path(str(exc)) from exc
         merged, diff = three_way_merge(base_content, body.content, current_content)
         if merged is None:
             raise HTTPException(
@@ -337,7 +354,7 @@ async def create_doc(
     path = body.path
     if not path.endswith(".md"):
         path += ".md"
-    full = vault.resolve(path)
+    full = _resolve_or_400(path, for_write=True)
     if full.exists():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Document already exists")
 
@@ -359,7 +376,7 @@ async def create_folder(
     if not path:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Folder path is required")
 
-    full = vault.resolve(path)
+    full = _resolve_or_400(path, for_write=True)
     if full.exists():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Folder already exists")
 
@@ -388,8 +405,8 @@ async def move_path(
     if destination_path.startswith(f"{source_path}/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot move a folder into itself")
 
-    source_full = vault.resolve(source_path)
-    destination_full = vault.resolve(destination_path)
+    source_full = _resolve_or_400(source_path)
+    destination_full = _resolve_or_400(destination_path, for_write=True)
     if not source_full.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source path does not exist")
     if destination_full.exists():
@@ -419,6 +436,7 @@ async def delete_doc(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> None:
+    _resolve_or_400(path, for_write=True)
     await vault.delete_doc(path)
     git_add_and_commit([path], f"web: delete {path}")
 

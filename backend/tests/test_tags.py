@@ -63,6 +63,11 @@ async def test_graph_resolves_note_targets_and_includes_unresolved_nodes(
     from app.db.session import async_session
 
     (setup_vault / "notes").mkdir()
+    (setup_vault / "assets").mkdir()
+    (setup_vault / "other").mkdir()
+    (setup_vault / "assets" / "photo.png").write_bytes(b"photo")
+    (setup_vault / "assets" / "shared.png").write_bytes(b"shared-1")
+    (setup_vault / "other" / "shared.png").write_bytes(b"shared-2")
 
     async with async_session() as session:
         for path, title, tags in (
@@ -83,9 +88,28 @@ async def test_graph_resolves_note_targets_and_includes_unresolved_nodes(
                 },
             )
 
+        for path, mime_type, size_bytes in (
+            ("assets/photo.png", "image/png", 5),
+            ("assets/shared.png", "image/png", 8),
+            ("other/shared.png", "image/png", 8),
+        ):
+            await session.execute(
+                text("""
+                    INSERT INTO attachments (path, mime_type, size_bytes)
+                    VALUES (:path, :mime_type, :size_bytes)
+                """),
+                {
+                    "path": path,
+                    "mime_type": mime_type,
+                    "size_bytes": size_bytes,
+                },
+            )
+
         for source_path, target_path in (
             ("notes/source.md", "target"),
             ("notes/source.md", "missing-note"),
+            ("notes/source.md", "photo.png"),
+            ("notes/source.md", "shared.png"),
         ):
             await session.execute(
                 text("""
@@ -113,5 +137,13 @@ async def test_graph_resolves_note_targets_and_includes_unresolved_nodes(
     assert nodes["notes/target.md"]["kind"] == "note"
     assert nodes["notes/missing-note.md"]["kind"] == "unresolved"
     assert nodes["notes/missing-note.md"]["tags"] == []
+    assert nodes["assets/photo.png"]["kind"] == "attachment"
+    assert nodes["assets/photo.png"]["title"] == "photo"
+    ambiguous_nodes = [node for node in nodes.values() if node["kind"] == "ambiguous"]
+    assert len(ambiguous_nodes) == 1
+    assert ambiguous_nodes[0]["id"].startswith("graph:ambiguous:")
+    assert ambiguous_nodes[0]["title"] == "shared.png"
     assert ("notes/source.md", "notes/target.md") in edges
     assert ("notes/source.md", "notes/missing-note.md") in edges
+    assert ("notes/source.md", "assets/photo.png") in edges
+    assert ("notes/source.md", ambiguous_nodes[0]["id"]) in edges

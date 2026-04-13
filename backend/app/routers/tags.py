@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends
@@ -31,6 +32,51 @@ def _normalize_tags(value: object) -> list[str]:
 def _graph_title_for_path(path: str) -> str:
     pure_path = PurePosixPath(path)
     return pure_path.stem or pure_path.name or path
+
+
+def _graph_pseudo_id(kind: str, source_path: str, raw_target: str, *parts: str) -> str:
+    digest_input = "\0".join((kind, source_path, raw_target, *parts))
+    digest = hashlib.sha256(digest_input.encode("utf-8")).hexdigest()[:16]
+    return f"graph:{kind}:{digest}"
+
+
+def _graph_node_for_resolved_link(
+    resolved_kind: str,
+    source_path: str,
+    raw_target: str,
+    display_text: str,
+    vault_path: str | None,
+    ambiguous_paths: list[str] | None = None,
+) -> GraphNode:
+    if resolved_kind == "attachment":
+        node_id = vault_path or _graph_pseudo_id(
+            "attachment",
+            source_path,
+            raw_target,
+            display_text,
+        )
+        return GraphNode(
+            id=node_id,
+            title=_graph_title_for_path(vault_path or display_text or raw_target),
+            tags=[],
+            kind="attachment",
+        )
+
+    if resolved_kind == "ambiguous":
+        node_id = _graph_pseudo_id(
+            "ambiguous",
+            source_path,
+            raw_target,
+            *(ambiguous_paths or []),
+        )
+        return GraphNode(
+            id=node_id,
+            title=display_text or raw_target,
+            tags=[],
+            kind="ambiguous",
+        )
+
+    raise ValueError(f"Unsupported graph node kind: {resolved_kind}")
 
 
 @router.get("/tags", response_model=list[TagInfo])
@@ -75,25 +121,48 @@ async def get_graph(
             source_path,
             catalog,
         )
-
-        if resolved.kind in {"attachment", "ambiguous"} or not resolved.vault_path:
-            continue
-
-        target_path = resolved.vault_path
         if resolved.kind == "unresolved":
+            if not resolved.vault_path:
+                continue
             nodes_by_id.setdefault(
-                target_path,
+                resolved.vault_path,
                 GraphNode(
-                    id=target_path,
-                    title=_graph_title_for_path(target_path),
+                    id=resolved.vault_path,
+                    title=_graph_title_for_path(resolved.vault_path),
                     tags=[],
                     kind="unresolved",
                 ),
             )
-        elif target_path not in nodes_by_id:
+            edge_pairs.add((source_path, resolved.vault_path))
             continue
 
-        edge_pairs.add((source_path, target_path))
+        if resolved.kind == "note":
+            if not resolved.vault_path or resolved.vault_path not in nodes_by_id:
+                continue
+            edge_pairs.add((source_path, resolved.vault_path))
+            continue
+
+        if resolved.kind in {"attachment", "ambiguous"}:
+            if resolved.kind == "attachment":
+                target_node = _graph_node_for_resolved_link(
+                    resolved_kind="attachment",
+                    source_path=source_path,
+                    raw_target=resolved.raw_target,
+                    display_text=resolved.display_text,
+                    vault_path=resolved.vault_path,
+                )
+            else:
+                target_node = _graph_node_for_resolved_link(
+                    resolved_kind="ambiguous",
+                    source_path=source_path,
+                    raw_target=resolved.raw_target,
+                    display_text=resolved.display_text,
+                    vault_path=resolved.vault_path,
+                    ambiguous_paths=resolved.ambiguous_paths,
+                )
+
+            nodes_by_id.setdefault(target_node.id, target_node)
+            edge_pairs.add((source_path, target_node.id))
 
     nodes = list(nodes_by_id.values())
     edges = [GraphEdge(source=source, target=target) for source, target in sorted(edge_pairs)]

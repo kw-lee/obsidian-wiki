@@ -26,13 +26,18 @@
     onselect: (path: string) => void | Promise<void>;
     oncreateNote: (path: string) => void | Promise<void>;
     oncreateFolder: (path: string) => void | Promise<void>;
-    onmove: (sourcePath: string, destinationPath: string) => void | Promise<void>;
+    onmove: (
+      sourcePath: string,
+      destinationPath: string,
+      rewriteLinks: boolean,
+    ) => void | Promise<void>;
     oninvalidmove?: (sourcePath: string, targetFolderPath: string) => void;
     onexpandedchange?: (paths: string[]) => void;
     onsortmodechange?: (mode: WorkspaceTreeSortMode) => void;
   } = $props();
 
   let localExpandedPaths = $state<Set<string>>(new Set<string>());
+  let rewriteLinksEnabled = $state(false);
   let draggedPath = $state("");
   let dropTargetPath = $state("");
   const sortedNodes = $derived.by(() => sortNodes(nodes, sortMode));
@@ -166,11 +171,15 @@
     const destinationPath = buildDestinationPath(sourcePath, targetFolderPath);
     draggedPath = "";
     dropTargetPath = "";
-    if (!destinationPath || destinationPath === sourcePath || destinationPath.startsWith(`${sourcePath}/`)) {
+    if (
+      !destinationPath ||
+      destinationPath === sourcePath ||
+      destinationPath.startsWith(`${sourcePath}/`)
+    ) {
       oninvalidmove?.(sourcePath, targetFolderPath);
       return;
     }
-    await onmove(sourcePath, destinationPath);
+    await onmove(sourcePath, destinationPath, rewriteLinksEnabled);
   }
 
   function updateExpandedPaths(next: Set<string>) {
@@ -220,6 +229,10 @@
     <button onclick={handleCreateNote} title={t("fileExplorer.newNote")}>＋</button>
     <button onclick={handleCreateFolder} title={t("fileExplorer.newFolder")}>▣</button>
     <button onclick={toggleSortMode} title={t(`fileExplorer.sort.${sortMode}`)}>⇅</button>
+    <label class="rewrite-toggle" title={t("fileExplorer.rewriteLinks")}>
+      <input bind:checked={rewriteLinksEnabled} type="checkbox" />
+      <span>{t("fileExplorer.rewriteLinks")}</span>
+    </label>
     <button onclick={expandAll} title={t("fileExplorer.expandAll")}>⤢</button>
     <button onclick={collapseAll} title={t("fileExplorer.collapseAll")}>⤡</button>
     <button onclick={revealSelected} title={t("fileExplorer.revealCurrent")}>◎</button>
@@ -232,6 +245,7 @@
     onselect={onselect}
     ontoggle={toggleFolder}
     onmove={handleMove}
+    {rewriteLinksEnabled}
     {draggedPath}
     {dropTargetPath}
     ondragstatechange={(path) => {
@@ -251,12 +265,13 @@
   }
 
   .toolbar {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.35rem;
   }
 
   .toolbar button {
+    flex: 1 1 2.5rem;
     border: 1px solid var(--border);
     background: var(--bg-primary);
     color: var(--text-secondary);
@@ -264,6 +279,31 @@
     padding: 0.45rem 0.2rem;
     cursor: pointer;
     font-size: 0.95rem;
+  }
+
+  .rewrite-toggle {
+    flex: 1 1 8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 0.45rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    user-select: none;
+  }
+
+  .rewrite-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .rewrite-toggle input {
+    margin: 0;
+    accent-color: var(--accent);
   }
 
   .toolbar button:hover {

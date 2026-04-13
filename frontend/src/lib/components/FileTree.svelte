@@ -9,6 +9,7 @@
 		onselect,
 		ontoggle,
 		onmove,
+		rewriteLinksEnabled = false,
 		draggedPath = '',
 		dropTargetPath = '',
 		ondragstatechange = undefined,
@@ -19,7 +20,12 @@
 		expandedPaths: Set<string>;
 		onselect: (path: string) => void;
 		ontoggle: (path: string, open: boolean) => void;
-		onmove: (sourcePath: string, targetFolderPath: string) => void | Promise<void>;
+		onmove: (
+			sourcePath: string,
+			targetFolderPath: string,
+			rewriteLinks: boolean
+		) => void | Promise<void>;
+		rewriteLinksEnabled?: boolean;
 		draggedPath?: string;
 		dropTargetPath?: string;
 		ondragstatechange?: (path: string) => void;
@@ -30,7 +36,7 @@
 		event.preventDefault();
 		const sourcePath = event.dataTransfer?.getData('text/plain') ?? '';
 		if (!sourcePath) return;
-		void onmove(sourcePath, folderPath);
+		void onmove(sourcePath, folderPath, rewriteLinksEnabled);
 	}
 </script>
 
@@ -80,6 +86,7 @@
 						{onselect}
 						{ontoggle}
 						{onmove}
+						{rewriteLinksEnabled}
 						{draggedPath}
 						{dropTargetPath}
 						{ondragstatechange}

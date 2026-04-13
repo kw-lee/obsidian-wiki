@@ -7,6 +7,7 @@
   import { getAuth } from "$lib/stores/auth.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
   import type { DocDetail, TreeNode } from "$lib/types";
+  import { describeMoveToast } from "$lib/utils/move";
   import { buildWikiRoute, isNotePath } from "$lib/utils/routes";
   import {
     getWorkspaceState,
@@ -210,9 +211,13 @@
     }
   }
 
-  async function handleMovePath(sourcePath: string, destinationPath: string) {
+  async function handleMovePath(
+    sourcePath: string,
+    destinationPath: string,
+    rewriteLinks: boolean,
+  ) {
     try {
-      const moved = await movePath(sourcePath, destinationPath);
+      const moved = await movePath(sourcePath, destinationPath, rewriteLinks);
       await loadTree();
 
       if (selectedPath === sourcePath || selectedPath.startsWith(`${sourcePath}/`)) {
@@ -220,12 +225,8 @@
         await navigateTo(nextPath);
       }
 
-      showToast(
-        t("fileExplorer.moveSuccess", {
-          source: sourcePath,
-          destination: moved.path,
-        }),
-      );
+      const summary = describeMoveToast(sourcePath, moved.path, moved);
+      showToast(t(summary.key, summary.values));
     } catch (error) {
       showToast(error instanceof Error ? error.message : t("fileExplorer.moveFailed"));
     }

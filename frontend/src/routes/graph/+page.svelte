@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { getAuth } from '$lib/stores/auth.svelte';
 	import { fetchGraph } from '$lib/api/wiki';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { GraphData } from '$lib/types';
 	import * as d3 from 'd3';
 
@@ -138,11 +139,11 @@
 
 <div class="graph-page">
 	<header class="graph-header">
-		<a href="/" class="back">← Wiki</a>
-		<h1>그래프 뷰</h1>
+		<a href="/" class="back">{t('graph.back')}</a>
+		<h1>{t('graph.title')}</h1>
 		<span class="count">
 			{#if graphData}
-				{graphData.nodes.length} 문서, {graphData.edges.length} 링크
+				{t('graph.count', { nodes: graphData.nodes.length, edges: graphData.edges.length })}
 			{/if}
 		</span>
 	</header>

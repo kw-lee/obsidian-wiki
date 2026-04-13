@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchProfileSettings, updateProfileSettings } from '$lib/api/settings';
+	import { t } from '$lib/i18n/index.svelte';
 	import { updateSession } from '$lib/stores/auth.svelte';
 	import type { ProfileSettings } from '$lib/types';
 
@@ -25,7 +26,7 @@
 			profile = await fetchProfileSettings();
 			newUsername = profile.username;
 		} catch (err) {
-			error = err instanceof Error ? err.message : '프로필을 불러오지 못했습니다.';
+			error = err instanceof Error ? err.message : t('profile.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -38,7 +39,7 @@
 
 		if (!profile) return;
 		if (newPassword && newPassword !== confirmPassword) {
-			error = '새 비밀번호가 일치하지 않습니다.';
+			error = t('profile.passwordMismatch');
 			return;
 		}
 
@@ -54,9 +55,9 @@
 			currentPassword = '';
 			newPassword = '';
 			confirmPassword = '';
-			success = '프로필이 업데이트되었습니다.';
+			success = t('profile.saveSuccess');
 		} catch (err) {
-			error = err instanceof Error ? err.message : '프로필 저장에 실패했습니다.';
+			error = err instanceof Error ? err.message : t('profile.saveFailed');
 		} finally {
 			saving = false;
 		}
@@ -67,39 +68,39 @@
 	<div class="panel-header">
 		<div>
 			<p class="eyebrow">Profile</p>
-			<h2>계정 정보</h2>
+			<h2>{t('profile.title')}</h2>
 		</div>
 		{#if profile}
-			<p class="meta">현재 사용자명: <strong>{profile.username}</strong></p>
+			<p class="meta">{t('profile.currentUsername', { username: profile.username })}</p>
 		{/if}
 	</div>
 
 	{#if loading}
-		<p class="state">불러오는 중...</p>
+		<p class="state">{t('common.loading')}</p>
 	{:else if profile}
 		<form class="form" onsubmit={handleSubmit}>
 			<label>
-				<span>새 사용자명</span>
+				<span>{t('profile.newUsername')}</span>
 				<input type="text" bind:value={newUsername} autocomplete="username" required />
 			</label>
 
 			<label>
-				<span>현재 비밀번호</span>
+				<span>{t('profile.currentPassword')}</span>
 				<input type="password" bind:value={currentPassword} autocomplete="current-password" required />
 			</label>
 
 			<label>
-				<span>새 비밀번호</span>
+				<span>{t('profile.newPassword')}</span>
 				<input
 					type="password"
 					bind:value={newPassword}
 					autocomplete="new-password"
-					placeholder="변경하지 않으려면 비워두세요"
+					placeholder={t('profile.newPasswordPlaceholder')}
 				/>
 			</label>
 
 			<label>
-				<span>새 비밀번호 확인</span>
+				<span>{t('profile.newPasswordConfirm')}</span>
 				<input type="password" bind:value={confirmPassword} autocomplete="new-password" />
 			</label>
 
@@ -112,7 +113,7 @@
 
 			<div class="actions">
 				<button type="submit" disabled={saving}>
-					{saving ? '저장 중...' : '저장'}
+					{saving ? t('common.saving') : t('common.save')}
 				</button>
 			</div>
 		</form>

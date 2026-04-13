@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchSyncSettings, testSyncConnection, updateSyncSettings } from '$lib/api/settings';
+	import { t } from '$lib/i18n/index.svelte';
 	import { syncPull, syncPush } from '$lib/api/wiki';
 	import type { SyncBackend, SyncSettings } from '$lib/types';
 
@@ -49,7 +50,7 @@
 		try {
 			hydrate(await fetchSyncSettings());
 		} catch (err) {
-			error = err instanceof Error ? err.message : '동기화 설정을 불러오지 못했습니다.';
+			error = err instanceof Error ? err.message : t('sync.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -75,9 +76,9 @@
 				webdav_verify_tls: webdavVerifyTls
 			});
 			hydrate(updated);
-			success = '동기화 설정이 저장되었습니다.';
+			success = t('sync.saveSuccess');
 		} catch (err) {
-			error = err instanceof Error ? err.message : '동기화 설정 저장에 실패했습니다.';
+			error = err instanceof Error ? err.message : t('sync.saveFailed');
 		} finally {
 			saving = false;
 		}
@@ -90,14 +91,14 @@
 		try {
 			if (kind === 'pull') {
 				const result = await syncPull();
-				success = `Pull 완료: ${result.changed_files}개 파일 변경`;
+				success = t('sync.pullSuccess', { count: result.changed_files });
 			} else {
 				await syncPush();
-				success = 'Push 완료';
+				success = t('sync.pushSuccess');
 			}
 			await loadSettings();
 		} catch (err) {
-			error = err instanceof Error ? err.message : `${kind} 실행에 실패했습니다.`;
+			error = err instanceof Error ? err.message : t('sync.actionFailed', { kind });
 		} finally {
 			actionBusy = null;
 		}
@@ -120,7 +121,7 @@
 			});
 			success = result.detail;
 		} catch (err) {
-			error = err instanceof Error ? err.message : '연결 테스트에 실패했습니다.';
+			error = err instanceof Error ? err.message : t('sync.testFailed');
 		} finally {
 			testing = false;
 		}
@@ -150,13 +151,13 @@
 	<div class="panel-header">
 		<div>
 			<p class="eyebrow">Sync</p>
-			<h2>동기화 설정</h2>
-			<p class="copy">Git과 WebDAV 설정을 여기서 전환하고, 저장 전 연결 테스트까지 바로 확인할 수 있습니다.</p>
+			<h2>{t('sync.title')}</h2>
+			<p class="copy">{t('sync.description')}</p>
 		</div>
 	</div>
 
 	{#if loading}
-		<p class="state">불러오는 중...</p>
+		<p class="state">{t('common.loading')}</p>
 	{:else}
 		<form class="form" onsubmit={handleSave}>
 			<div class="segmented">
@@ -184,32 +185,32 @@
 			</div>
 
 			<label class="toggle">
-				<span>자동 동기화</span>
+				<span>{t('sync.auto')}</span>
 				<input type="checkbox" bind:checked={syncAutoEnabled} />
 			</label>
 
 			<label>
-				<span>동기화 주기 (초)</span>
+				<span>{t('sync.interval')}</span>
 				<input type="number" min="60" step="60" bind:value={syncIntervalSeconds} />
 			</label>
 
 			{#if syncBackend === 'git'}
 				<div class="subpanel">
-					<h3>Git 설정</h3>
+					<h3>{t('sync.gitSettings')}</h3>
 					<label>
-						<span>Remote URL</span>
+						<span>{t('sync.remoteUrl')}</span>
 						<input type="text" bind:value={gitRemoteUrl} placeholder="git@github.com:user/vault.git" />
 					</label>
 					<label>
-						<span>Branch</span>
+						<span>{t('sync.branch')}</span>
 						<input type="text" bind:value={gitBranch} />
 					</label>
 				</div>
 			{:else if syncBackend === 'webdav'}
 				<div class="subpanel">
-					<h3>WebDAV 설정</h3>
+					<h3>{t('sync.webdavSettings')}</h3>
 					<label>
-						<span>Server URL</span>
+						<span>{t('sync.serverUrl')}</span>
 						<input
 							type="text"
 							bind:value={webdavUrl}
@@ -217,31 +218,31 @@
 						/>
 					</label>
 					<label>
-						<span>Username</span>
+						<span>{t('sync.username')}</span>
 						<input type="text" bind:value={webdavUsername} />
 					</label>
 					<label>
-						<span>Password / App Token</span>
+						<span>{t('sync.passwordToken')}</span>
 						<input
 							type="password"
 							bind:value={webdavPassword}
-							placeholder={hasWebdavPassword ? '저장된 값 유지 또는 새 값 입력' : '새 비밀번호 또는 앱 토큰'}
+							placeholder={hasWebdavPassword ? t('sync.passwordPlaceholderSaved') : t('sync.passwordPlaceholderNew')}
 						/>
 					</label>
 					<label>
-						<span>Remote Root</span>
+						<span>{t('sync.remoteRoot')}</span>
 						<input type="text" bind:value={webdavRemoteRoot} placeholder="/vault" />
 					</label>
 					<label class="toggle">
-						<span>TLS 검증</span>
+						<span>{t('sync.tlsVerify')}</span>
 						<input type="checkbox" bind:checked={webdavVerifyTls} />
 					</label>
 					<p class="notice">
-						WebDAV는 현재 연결 테스트와 설정 저장까지 지원합니다. 실제 pull/push 동기화 엔진은 다음 단계에서 이어집니다.
+						{t('sync.webdavNotice')}
 					</p>
 				</div>
 			{:else if syncBackend === 'none'}
-				<p class="notice">자동/수동 동기화가 비활성화됩니다. 로컬 vault는 그대로 유지됩니다.</p>
+				<p class="notice">{t('sync.noneNotice')}</p>
 			{/if}
 
 			{#if error}
@@ -253,16 +254,16 @@
 
 			<div class="actions">
 				<button type="submit" disabled={saving}>
-					{saving ? '저장 중...' : '설정 저장'}
+					{saving ? t('common.saving') : t('sync.saveButton')}
 				</button>
 				<button type="button" class="secondary" disabled={testing} onclick={handleTestConnection}>
-					{testing ? '테스트 중...' : '연결 테스트'}
+					{testing ? t('sync.testingButton') : t('sync.testButton')}
 				</button>
 				<button type="button" class="secondary" disabled={actionBusy !== null} onclick={() => runSyncAction('pull')}>
-					{actionBusy === 'pull' ? 'Pull 중...' : 'Pull'}
+					{actionBusy === 'pull' ? t('sync.pullingButton') : t('sync.pullButton')}
 				</button>
 				<button type="button" class="secondary" disabled={actionBusy !== null} onclick={() => runSyncAction('push')}>
-					{actionBusy === 'push' ? 'Push 중...' : 'Push'}
+					{actionBusy === 'push' ? t('sync.pushingButton') : t('sync.pushButton')}
 				</button>
 			</div>
 		</form>
@@ -270,14 +271,14 @@
 		{#if settings}
 			<section class="status-card">
 				<div class="status-header">
-					<h3>Status</h3>
+					<h3>{t('sync.statusTitle')}</h3>
 					<span class="pill">{settings.status.backend ?? settings.sync_backend}</span>
 				</div>
 				<div class="status-grid">
-					<p><span>HEAD</span><strong>{settings.status.head ?? '-'}</strong></p>
-					<p><span>Last sync</span><strong>{settings.status.last_sync ?? '-'}</strong></p>
-					<p><span>Ahead / Behind</span><strong>{settings.status.ahead} / {settings.status.behind}</strong></p>
-					<p><span>Dirty</span><strong>{settings.status.dirty ? 'Yes' : 'No'}</strong></p>
+					<p><span>{t('sync.status.head')}</span><strong>{settings.status.head ?? '-'}</strong></p>
+					<p><span>{t('sync.status.lastSync')}</span><strong>{settings.status.last_sync ?? '-'}</strong></p>
+					<p><span>{t('sync.status.aheadBehind')}</span><strong>{settings.status.ahead} / {settings.status.behind}</strong></p>
+					<p><span>{t('sync.status.dirty')}</span><strong>{settings.status.dirty ? t('sync.status.yes') : t('sync.status.no')}</strong></p>
 				</div>
 				{#if settings.status.message}
 					<p class="notice">{settings.status.message}</p>
@@ -290,14 +291,11 @@
 {#if pendingBackend}
 	<div class="modal-backdrop">
 		<div class="modal">
-			<h3>백엔드 전환 확인</h3>
-			<p>
-				Git과 WebDAV 전환은 기존 데이터를 자동으로 옮기지 않습니다. 데스크톱 Obsidian과 서버가 같은
-				원격 저장소를 보도록 직접 맞춰 주세요.
-			</p>
+			<h3>{t('sync.switchTitle')}</h3>
+			<p>{t('sync.switchDescription')}</p>
 			<div class="modal-actions">
-				<button class="secondary" type="button" onclick={() => (pendingBackend = null)}>취소</button>
-				<button type="button" onclick={confirmBackendChange}>계속</button>
+				<button class="secondary" type="button" onclick={() => (pendingBackend = null)}>{t('common.cancel')}</button>
+				<button type="button" onclick={confirmBackendChange}>{t('common.continue')}</button>
 			</div>
 		</div>
 	</div>

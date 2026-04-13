@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchSystemLogs, fetchSystemSettings } from '$lib/api/settings';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { SystemLogEntry, SystemSettings } from '$lib/types';
 
 	let system = $state<SystemSettings | null>(null);
@@ -41,7 +42,7 @@
 			system = systemData;
 			logs = logData.entries;
 		} catch (err) {
-			error = err instanceof Error ? err.message : '시스템 정보를 불러오지 못했습니다.';
+			error = err instanceof Error ? err.message : t('system.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -61,50 +62,50 @@
 	<div class="panel-header">
 		<div>
 			<p class="eyebrow">System</p>
-			<h2>서버 상태</h2>
-			<p class="copy">애플리케이션 버전, 의존 서비스 연결 상태, 로컬 vault git 상태를 확인합니다.</p>
+			<h2>{t('system.title')}</h2>
+			<p class="copy">{t('system.description')}</p>
 		</div>
 		<button type="button" onclick={handleRefresh} disabled={loading || refreshing}>
-			{refreshing ? '새로고침 중...' : '새로고침'}
+			{refreshing ? t('common.refreshing') : t('common.refresh')}
 		</button>
 	</div>
 
 	{#if loading}
-		<p class="state">불러오는 중...</p>
+		<p class="state">{t('common.loading')}</p>
 	{:else if system}
 		<div class="stats-grid">
 			<article>
-				<span>Version</span>
+				<span>{t('system.version')}</span>
 				<strong>{system.version}</strong>
 			</article>
 			<article>
-				<span>Uptime</span>
+				<span>{t('system.uptime')}</span>
 				<strong>{formatDuration(system.uptime_seconds)}</strong>
 			</article>
 			<article>
-				<span>Started At</span>
+				<span>{t('system.startedAt')}</span>
 				<strong>{new Date(system.started_at).toLocaleString()}</strong>
 			</article>
 			<article>
-				<span>Sync Backend</span>
+				<span>{t('system.syncBackend')}</span>
 				<strong>{system.sync_backend}</strong>
-				<small>{system.sync_auto_enabled ? 'Auto sync on' : 'Auto sync off'}</small>
+				<small>{system.sync_auto_enabled ? t('system.autoOn') : t('system.autoOff')}</small>
 			</article>
 		</div>
 
 		<div class="service-grid">
 			<article class={`service-card ${statusTone(system.database.ok)}`}>
 				<div class="service-head">
-					<span>Database</span>
-					<strong>{system.database.ok ? 'Healthy' : 'Unavailable'}</strong>
+					<span>{t('system.database')}</span>
+					<strong>{system.database.ok ? t('system.healthy') : t('system.unavailable')}</strong>
 				</div>
 				<p>{system.database.detail}</p>
 			</article>
 
 			<article class={`service-card ${statusTone(system.redis.ok)}`}>
 				<div class="service-head">
-					<span>Redis</span>
-					<strong>{system.redis.ok ? 'Healthy' : 'Unavailable'}</strong>
+					<span>{t('system.redis')}</span>
+					<strong>{system.redis.ok ? t('system.healthy') : t('system.unavailable')}</strong>
 				</div>
 				<p>{system.redis.detail}</p>
 			</article>
@@ -113,27 +114,27 @@
 		<div class="details-grid">
 			<article class="detail-card">
 				<div class="detail-head">
-					<span>Sync Status</span>
-					<strong>{system.sync_status.message ?? 'Ready'}</strong>
+					<span>{t('system.syncStatus')}</span>
+					<strong>{system.sync_status.message ?? t('system.ready')}</strong>
 				</div>
 				<ul>
-					<li>Ahead: {system.sync_status.ahead}</li>
-					<li>Behind: {system.sync_status.behind}</li>
-					<li>Dirty: {system.sync_status.dirty ? 'Yes' : 'No'}</li>
-					<li>Head: {system.sync_status.head ?? 'n/a'}</li>
+					<li>{t('system.ahead')}: {system.sync_status.ahead}</li>
+					<li>{t('system.behind')}: {system.sync_status.behind}</li>
+					<li>{t('system.dirty')}: {system.sync_status.dirty ? t('sync.status.yes') : t('sync.status.no')}</li>
+					<li>{t('system.head')}: {system.sync_status.head ?? t('system.na')}</li>
 				</ul>
 			</article>
 
 			<article class="detail-card">
 				<div class="detail-head">
-					<span>Vault Git</span>
-					<strong>{system.vault_git.available ? 'Available' : 'Not initialized'}</strong>
+					<span>{t('system.vaultGit')}</span>
+					<strong>{system.vault_git.available ? t('system.available') : t('system.notInitialized')}</strong>
 				</div>
 				<ul>
-					<li>Branch: {system.vault_git.branch ?? 'n/a'}</li>
-					<li>Head: {system.vault_git.head ?? 'n/a'}</li>
-					<li>Dirty: {system.vault_git.dirty ? 'Yes' : 'No'}</li>
-					<li>Origin: {system.vault_git.has_origin ? 'Configured' : 'Missing'}</li>
+					<li>{t('system.branch')}: {system.vault_git.branch ?? t('system.na')}</li>
+					<li>{t('system.head')}: {system.vault_git.head ?? t('system.na')}</li>
+					<li>{t('system.dirty')}: {system.vault_git.dirty ? t('sync.status.yes') : t('sync.status.no')}</li>
+					<li>{t('system.origin')}: {system.vault_git.has_origin ? t('system.configured') : t('system.missing')}</li>
 				</ul>
 				{#if system.vault_git.message}
 					<p class="detail-note">{system.vault_git.message}</p>
@@ -143,12 +144,12 @@
 
 		<article class="log-card">
 			<div class="detail-head">
-				<span>Recent Logs</span>
-				<strong>{logs.length} entries</strong>
+				<span>{t('system.logs')}</span>
+				<strong>{t('system.logCount', { count: logs.length })}</strong>
 			</div>
 
 			{#if logs.length === 0}
-				<p class="detail-note">표시할 로그가 아직 없습니다.</p>
+				<p class="detail-note">{t('system.noLogs')}</p>
 			{:else}
 				<ul class="log-list">
 					{#each logs as entry}

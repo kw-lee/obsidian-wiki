@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchVaultSettings, rebuildVaultIndex } from '$lib/api/settings';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { VaultSettings } from '$lib/types';
 
 	let vault = $state<VaultSettings | null>(null);
@@ -32,7 +33,7 @@
 		try {
 			vault = await fetchVaultSettings();
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Vault 정보를 불러오지 못했습니다.';
+			error = err instanceof Error ? err.message : t('vault.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -44,10 +45,10 @@
 		success = '';
 		try {
 			const result = await rebuildVaultIndex();
-			success = `인덱스를 다시 만들었습니다. ${result.indexed_documents}개 문서를 반영했습니다.`;
+			success = t('vault.rebuildSuccess', { count: result.indexed_documents });
 			await loadVault();
 		} catch (err) {
-			error = err instanceof Error ? err.message : '인덱스 재생성에 실패했습니다.';
+			error = err instanceof Error ? err.message : t('vault.rebuildFailed');
 		} finally {
 			rebuilding = false;
 		}
@@ -58,37 +59,37 @@
 	<div class="panel-header">
 		<div>
 			<p class="eyebrow">Vault</p>
-			<h2>Vault 상태</h2>
-			<p class="copy">현재 서버가 바라보는 vault 용량과 인덱스 상태를 확인합니다.</p>
+			<h2>{t('vault.title')}</h2>
+			<p class="copy">{t('vault.description')}</p>
 		</div>
 		<button type="button" onclick={handleRebuild} disabled={rebuilding}>
-			{rebuilding ? '재생성 중...' : 'Rebuild Index'}
+			{rebuilding ? t('vault.rebuildingButton') : t('vault.rebuildButton')}
 		</button>
 	</div>
 
 	{#if loading}
-		<p class="state">불러오는 중...</p>
+		<p class="state">{t('common.loading')}</p>
 	{:else if vault}
 		<div class="path-card">
-			<span>Vault Path</span>
+			<span>{t('vault.path')}</span>
 			<strong>{vault.vault_path}</strong>
 		</div>
 
 		<div class="stats-grid">
 			<article>
-				<span>Disk Usage</span>
+				<span>{t('vault.diskUsage')}</span>
 				<strong>{formatBytes(vault.disk_usage_bytes)}</strong>
 			</article>
 			<article>
-				<span>Documents</span>
+				<span>{t('vault.documents')}</span>
 				<strong>{vault.document_count}</strong>
 			</article>
 			<article>
-				<span>Attachments</span>
+				<span>{t('vault.attachments')}</span>
 				<strong>{vault.attachment_count}</strong>
 			</article>
 			<article>
-				<span>Tags</span>
+				<span>{t('vault.tags')}</span>
 				<strong>{vault.tag_count}</strong>
 			</article>
 		</div>

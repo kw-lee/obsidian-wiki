@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import frontmatter
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import delete, func, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,19 +25,54 @@ def _extract_links(content: str) -> list[tuple[str, str | None]]:
     return [(m.group(1).strip(), m.group(2)) for m in WIKILINK_RE.finditer(content)]
 
 
-def _extract_tags(content: str, fm_tags: list[str]) -> list[str]:
+def _normalize_frontmatter_tags(fm_tags: object) -> list[str]:
+    if fm_tags is None:
+        return []
+    if isinstance(fm_tags, str):
+        return [tag.strip() for tag in fm_tags.split(",") if tag.strip()]
+    if isinstance(fm_tags, (list, tuple, set)):
+        normalized: list[str] = []
+        for tag in fm_tags:
+            if tag is None:
+                continue
+            text = str(tag).strip()
+            if text:
+                normalized.append(text)
+        return normalized
+    text = str(fm_tags).strip()
+    return [text] if text else []
+
+
+def _extract_tags(content: str, fm_tags: object) -> list[str]:
     """Extract tags from both frontmatter and inline #tags."""
     inline = {m.group(1) for m in TAG_RE.finditer(content)}
-    return sorted(set(fm_tags) | inline)
+    return sorted(set(_normalize_frontmatter_tags(fm_tags)) | inline)
+
+
+def _resolve_title(relative_path: str, metadata: dict[object, object]) -> str:
+    fallback = Path(relative_path).stem
+    raw_title = metadata.get("title")
+
+    if raw_title is None:
+        return fallback
+    if isinstance(raw_title, str):
+        normalized = raw_title.strip()
+        return normalized or fallback
+
+    normalized = str(raw_title).strip()
+    return normalized or fallback
+
+
+def _serialize_frontmatter(metadata: dict[object, object]) -> dict[str, object]:
+    """Convert parsed YAML metadata into JSON-safe values for JSONB storage."""
+    return jsonable_encoder(metadata)
 
 
 async def index_file(session: AsyncSession, relative_path: str, content: str) -> None:
     """Index a single markdown file."""
     fm = frontmatter.loads(content)
-    title = fm.metadata.get("title", Path(relative_path).stem)
+    title = _resolve_title(relative_path, dict(fm.metadata))
     fm_tags = fm.metadata.get("tags", [])
-    if isinstance(fm_tags, str):
-        fm_tags = [t.strip() for t in fm_tags.split(",")]
     tags = _extract_tags(fm.content, fm_tags)
     chash = hashlib.sha256(content.encode()).hexdigest()
 
@@ -45,7 +81,7 @@ async def index_file(session: AsyncSession, relative_path: str, content: str) ->
         path=relative_path,
         title=title,
         content_hash=chash,
-        frontmatter=dict(fm.metadata),
+        frontmatter=_serialize_frontmatter(dict(fm.metadata)),
         tags=tags,
     )
     stmt = stmt.on_conflict_do_update(

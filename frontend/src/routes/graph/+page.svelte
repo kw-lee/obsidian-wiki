@@ -421,6 +421,18 @@
     goto(buildWikiRoute(effectiveFocusPath));
   }
 
+  function selectNode(nodeId: string) {
+    selectedNodeId = nodeId;
+    hoveredNodeId = null;
+    if (depth === "all") {
+      depth = "2";
+    }
+  }
+
+  function openNode(nodeId: string) {
+    goto(buildWikiRoute(nodeId));
+  }
+
   function toggleLabels() {
     showLabels = !showLabels;
   }
@@ -549,16 +561,32 @@
       {#if topConnectedNodes.length > 0}
         <div class="ranked-list">
           {#each topConnectedNodes as node}
-            <div class="ranked-item">
+            <button class="ranked-item" type="button" onclick={() => selectNode(node.id)}>
               <span>{node.title}</span>
               <span class="ranked-degree">
                 {t("graph.metrics.degreeShort", { count: node.degree })}
               </span>
-            </div>
+            </button>
           {/each}
         </div>
       {:else}
         <span class="meta-path">{t("graph.selection.none")}</span>
+      {/if}
+    </div>
+
+    <div class="meta-card">
+      <span class="meta-label">{t("graph.preview.neighbors")}</span>
+      {#if visibleSelectedNeighbors.length > 0}
+        <div class="neighbor-actions">
+          {#each visibleSelectedNeighbors as neighbor}
+            <button class="neighbor-action" type="button" onclick={() => selectNode(neighbor.id)}>
+              <span>{neighbor.title}</span>
+              <span class="ranked-degree">{neighbor.id}</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <span class="meta-path">{t("graph.preview.emptyNeighbors")}</span>
       {/if}
     </div>
   </section>
@@ -589,12 +617,23 @@
             {#if hoveredNeighbors.length > 0}
               <div class="neighbor-chips">
                 {#each hoveredNeighbors as neighbor}
-                  <span class="neighbor-chip">{neighbor.title}</span>
+                  <button class="neighbor-chip" type="button" onclick={() => selectNode(neighbor.id)}>
+                    {neighbor.title}
+                  </button>
                 {/each}
               </div>
             {:else}
               <span class="meta-path">{t("graph.preview.emptyNeighbors")}</span>
             {/if}
+          </div>
+
+          <div class="hover-actions">
+            <button class="meta-action" type="button" onclick={() => selectNode(hoveredNode.id)}>
+              {t("graph.selection.selected")}
+            </button>
+            <button class="meta-action" type="button" onclick={() => openNode(hoveredNode.id)}>
+              {t("graph.openNote")}
+            </button>
           </div>
         </aside>
       {/if}
@@ -742,10 +781,41 @@
     justify-content: space-between;
     gap: 0.75rem;
     font-size: 0.9rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .ranked-item:hover,
+  .neighbor-action:hover,
+  .neighbor-chip:hover {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
   }
 
   .ranked-degree {
     color: var(--text-muted);
+  }
+
+  .neighbor-actions {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .neighbor-action {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
   }
 
   .graph-stage {
@@ -779,6 +849,13 @@
     padding-top: 0.25rem;
   }
 
+  .hover-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+  }
+
   .neighbor-chips {
     display: flex;
     flex-wrap: wrap;
@@ -787,10 +864,12 @@
 
   .neighbor-chip {
     padding: 0.2rem 0.55rem;
+    border: 1px solid transparent;
     border-radius: 999px;
     background: color-mix(in srgb, var(--accent) 14%, var(--bg-secondary));
     color: var(--text-secondary);
     font-size: 0.78rem;
+    cursor: pointer;
   }
 
   .state {

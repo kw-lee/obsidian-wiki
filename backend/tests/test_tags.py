@@ -139,10 +139,15 @@ async def test_graph_resolves_note_targets_and_includes_unresolved_nodes(
     assert nodes["notes/missing-note.md"]["tags"] == []
     assert nodes["assets/photo.png"]["kind"] == "attachment"
     assert nodes["assets/photo.png"]["title"] == "photo"
+    assert nodes["assets/photo.png"]["mime_type"] == "image/png"
     ambiguous_nodes = [node for node in nodes.values() if node["kind"] == "ambiguous"]
     assert len(ambiguous_nodes) == 1
     assert ambiguous_nodes[0]["id"].startswith("graph:ambiguous:")
     assert ambiguous_nodes[0]["title"] == "shared.png"
+    assert ambiguous_nodes[0]["candidate_paths"] == [
+        "assets/shared.png",
+        "other/shared.png",
+    ]
     assert ("notes/source.md", "notes/target.md") in edges
     assert ("notes/source.md", "notes/missing-note.md") in edges
     assert ("notes/source.md", "assets/photo.png") in edges

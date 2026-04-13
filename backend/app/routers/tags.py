@@ -47,6 +47,7 @@ def _graph_node_for_resolved_link(
     display_text: str,
     vault_path: str | None,
     ambiguous_paths: list[str] | None = None,
+    mime_type: str | None = None,
 ) -> GraphNode:
     if resolved_kind == "attachment":
         node_id = vault_path or _graph_pseudo_id(
@@ -60,6 +61,7 @@ def _graph_node_for_resolved_link(
             title=_graph_title_for_path(vault_path or display_text or raw_target),
             tags=[],
             kind="attachment",
+            mime_type=mime_type,
         )
 
     if resolved_kind == "ambiguous":
@@ -74,6 +76,7 @@ def _graph_node_for_resolved_link(
             title=display_text or raw_target,
             tags=[],
             kind="ambiguous",
+            candidate_paths=ambiguous_paths or [],
         )
 
     raise ValueError(f"Unsupported graph node kind: {resolved_kind}")
@@ -150,6 +153,7 @@ async def get_graph(
                     raw_target=resolved.raw_target,
                     display_text=resolved.display_text,
                     vault_path=resolved.vault_path,
+                    mime_type=resolved.mime_type,
                 )
             else:
                 target_node = _graph_node_for_resolved_link(

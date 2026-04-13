@@ -103,6 +103,8 @@ class GraphNode(BaseModel):
     title: str
     tags: list[str] = []
     kind: Literal["note", "unresolved", "attachment", "ambiguous"] = "note"
+    candidate_paths: list[str] = []
+    mime_type: str | None = None
 
 
 class GraphEdge(BaseModel):

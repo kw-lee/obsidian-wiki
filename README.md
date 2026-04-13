@@ -109,7 +109,9 @@ nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 
 
 ## 문서
 
-- [`CLAUDE.md`](CLAUDE.md) — 프로젝트 전반 규칙 (AI/기여자용)
+- [`AGENTS.md`](AGENTS.md) — 프로젝트 전반 규칙 (Claude/Codex 공통)
+- [`CLAUDE.md`](CLAUDE.md) — Claude용 포인터 문서
+- [`CODEX.md`](CODEX.md) — Codex용 포인터 문서
 - [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — 시스템 아키텍처 / 기술 결정
 - [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — 코드 스타일 / Git / CI
 - [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) — Docker 빌드·배포

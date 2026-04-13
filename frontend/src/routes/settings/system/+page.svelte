@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchSystemSettings } from '$lib/api/settings';
-	import type { SystemSettings } from '$lib/types';
+	import { fetchSystemLogs, fetchSystemSettings } from '$lib/api/settings';
+	import type { SystemLogEntry, SystemSettings } from '$lib/types';
 
 	let system = $state<SystemSettings | null>(null);
+	let logs = $state<SystemLogEntry[]>([]);
 	let loading = $state(true);
 	let refreshing = $state(false);
 	let error = $state('');
@@ -33,7 +34,12 @@
 		loading = true;
 		error = '';
 		try {
-			system = await fetchSystemSettings();
+			const [systemData, logData] = await Promise.all([
+				fetchSystemSettings(),
+				fetchSystemLogs(40)
+			]);
+			system = systemData;
+			logs = logData.entries;
 		} catch (err) {
 			error = err instanceof Error ? err.message : '시스템 정보를 불러오지 못했습니다.';
 		} finally {
@@ -134,6 +140,30 @@
 				{/if}
 			</article>
 		</div>
+
+		<article class="log-card">
+			<div class="detail-head">
+				<span>Recent Logs</span>
+				<strong>{logs.length} entries</strong>
+			</div>
+
+			{#if logs.length === 0}
+				<p class="detail-note">표시할 로그가 아직 없습니다.</p>
+			{:else}
+				<ul class="log-list">
+					{#each logs as entry}
+						<li>
+							<div class="log-meta">
+								<strong>{entry.level}</strong>
+								<span>{new Date(entry.timestamp).toLocaleString()}</span>
+								<code>{entry.logger}</code>
+							</div>
+							<p>{entry.message}</p>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</article>
 	{/if}
 
 	{#if error}
@@ -151,7 +181,8 @@
 	.panel-header,
 	.stats-grid article,
 	.service-card,
-	.detail-card {
+	.detail-card,
+	.log-card {
 		padding: 1.5rem;
 		border: 1px solid var(--border);
 		border-radius: 20px;
@@ -220,7 +251,8 @@
 
 	.stats-grid article,
 	.service-card,
-	.detail-card {
+	.detail-card,
+	.log-card {
 		display: grid;
 		gap: 0.55rem;
 	}
@@ -267,6 +299,40 @@
 		color: var(--text-secondary);
 		display: grid;
 		gap: 0.35rem;
+	}
+
+	.log-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 0.75rem;
+		max-height: 420px;
+		overflow: auto;
+	}
+
+	.log-list li {
+		padding: 0.9rem 1rem;
+		border-radius: 14px;
+		background: color-mix(in srgb, var(--bg-tertiary) 78%, transparent);
+		display: grid;
+		gap: 0.45rem;
+	}
+
+	.log-meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		align-items: center;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+	}
+
+	.log-list p {
+		margin: 0;
+		color: var(--text-secondary);
+		white-space: pre-wrap;
+		word-break: break-word;
 	}
 
 	.feedback {

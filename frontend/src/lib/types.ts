@@ -142,3 +142,14 @@ export interface SystemSettings {
 	redis: SystemDependencyStatus;
 	vault_git: VaultGitStatus;
 }
+
+export interface SystemLogEntry {
+	timestamp: string;
+	level: string;
+	logger: string;
+	message: string;
+}
+
+export interface SystemLogs {
+	entries: SystemLogEntry[];
+}

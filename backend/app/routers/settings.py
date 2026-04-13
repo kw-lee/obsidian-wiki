@@ -23,11 +23,14 @@ from app.schemas import (
     SyncSettingsUpdateRequest,
     SyncTestResult,
     SystemDependencyStatus,
+    SystemLogEntry,
+    SystemLogsResponse,
     SystemSettingsResponse,
     VaultGitStatus,
     VaultSettingsResponse,
 )
 from app.services.indexer import full_reindex
+from app.services.log_buffer import get_recent_logs
 from app.services.settings import ensure_app_settings, get_runtime_sync_settings, invalidate_settings_cache
 from app.services.system_status import (
     get_app_version,
@@ -307,3 +310,13 @@ async def get_system_settings(
         redis=SystemDependencyStatus(ok=redis_ok, detail=redis_detail),
         vault_git=VaultGitStatus(**get_vault_git_status()),
     )
+
+
+@router.get("/system/logs", response_model=SystemLogsResponse)
+async def get_system_logs(
+    limit: int = 50,
+    _username: str = Depends(get_current_user),
+) -> SystemLogsResponse:
+    bounded_limit = max(1, min(limit, 200))
+    entries = [SystemLogEntry(**entry) for entry in get_recent_logs(bounded_limit)]
+    return SystemLogsResponse(entries=entries)

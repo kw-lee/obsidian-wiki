@@ -4,6 +4,7 @@ import type {
 	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
+	SystemLogs,
 	SystemSettings,
 	SyncSettings,
 	SyncBackend,
@@ -76,3 +77,6 @@ export const fetchPublicAppearanceSettings = () =>
 	api<AppearanceSettings>('/settings/appearance/public');
 
 export const fetchSystemSettings = () => api<SystemSettings>('/settings/system');
+
+export const fetchSystemLogs = (limit = 50) =>
+	api<SystemLogs>(`/settings/system/logs?limit=${limit}`);

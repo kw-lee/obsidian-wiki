@@ -197,3 +197,14 @@ class SystemSettingsResponse(BaseModel):
     database: SystemDependencyStatus
     redis: SystemDependencyStatus
     vault_git: VaultGitStatus
+
+
+class SystemLogEntry(BaseModel):
+    timestamp: datetime
+    level: str
+    logger: str
+    message: str
+
+
+class SystemLogsResponse(BaseModel):
+    entries: list[SystemLogEntry]

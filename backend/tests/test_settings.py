@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 import bcrypt
@@ -282,6 +283,17 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     assert data["vault_git"]["branch"] == "main"
     assert data["vault_git"]["has_origin"] is True
     assert data["uptime_seconds"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_get_system_logs(client, auth_headers, setup_vault):
+    logger = logging.getLogger("tests.system")
+    logger.warning("System log tail smoke test")
+
+    resp = await client.get("/api/settings/system/logs?limit=20", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert any(entry["message"] == "System log tail smoke test" for entry in data["entries"])
 
 
 def test_encrypt_secret_roundtrip():

@@ -10,6 +10,7 @@ import type {
 	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
+	SystemLogs,
 	SystemSettings,
 	SyncSettings,
 	SyncTestResult,
@@ -188,6 +189,20 @@ describe('Type contracts', () => {
 			}
 		};
 		expect(system.vault_git.has_origin).toBe(true);
+	});
+
+	it('SystemLogs has expected shape', () => {
+		const logs: SystemLogs = {
+			entries: [
+				{
+					timestamp: '2026-04-13T02:00:00Z',
+					level: 'WARNING',
+					logger: 'tests.system',
+					message: 'System log tail smoke test'
+				}
+			]
+		};
+		expect(logs.entries[0].level).toBe('WARNING');
 	});
 
 	it('BacklinkItem has expected shape', () => {

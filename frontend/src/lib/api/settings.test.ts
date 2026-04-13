@@ -9,6 +9,7 @@ import {
 	fetchAppearanceSettings,
 	fetchProfileSettings,
 	fetchPublicAppearanceSettings,
+	fetchSystemLogs,
 	fetchSyncSettings,
 	fetchSystemSettings,
 	fetchVaultSettings,
@@ -150,5 +151,11 @@ describe('Settings API functions', () => {
 		mockApi.mockResolvedValueOnce({ version: '0.1.0' });
 		await fetchSystemSettings();
 		expect(mockApi).toHaveBeenCalledWith('/settings/system');
+	});
+
+	it('fetchSystemLogs calls the system logs endpoint', async () => {
+		mockApi.mockResolvedValueOnce({ entries: [] });
+		await fetchSystemLogs(25);
+		expect(mockApi).toHaveBeenCalledWith('/settings/system/logs?limit=25');
 	});
 });

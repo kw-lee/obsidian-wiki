@@ -11,6 +11,7 @@ from app.config import settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
 from app.routers import attachments, auth, search, settings as settings_router, sync, tags, wiki
+from app.services.log_buffer import install_log_buffer
 from app.services.settings import ensure_app_settings
 from app.services.sync_scheduler import SyncScheduler
 
@@ -46,6 +47,7 @@ async def _ensure_initial_admin() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # startup: create tables (dev only; prod uses alembic)
+    install_log_buffer()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await _ensure_initial_admin()

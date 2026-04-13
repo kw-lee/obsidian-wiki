@@ -13,7 +13,9 @@
     setWorkspaceExpandedPaths,
     setWorkspaceLinksTab,
     setWorkspaceSidebarOpen,
+    setWorkspaceTreeSortMode,
     type WorkspaceLinksTab,
+    type WorkspaceTreeSortMode,
   } from "$lib/utils/workspace";
   import BacklinksPanel from "./BacklinksPanel.svelte";
   import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
@@ -37,6 +39,7 @@
   let sidebarOpen = $state(true);
   let explorerExpandedPaths = $state<string[]>([]);
   let linksTab = $state<WorkspaceLinksTab>("backlinks");
+  let treeSortMode = $state<WorkspaceTreeSortMode>("folders-first");
   let toast = $state("");
   let ready = $state(false);
   let workspaceReady = $state(false);
@@ -61,6 +64,7 @@
     sidebarOpen = workspaceState.sidebarOpen;
     explorerExpandedPaths = workspaceState.expandedPaths;
     linksTab = workspaceState.linksTab;
+    treeSortMode = workspaceState.treeSortMode;
     workspaceReady = true;
     ready = true;
     void loadTree();
@@ -117,6 +121,13 @@
       return;
     }
     setWorkspaceLinksTab(linksTab);
+  });
+
+  $effect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+    setWorkspaceTreeSortMode(treeSortMode);
   });
 
   async function loadTree() {
@@ -287,10 +298,14 @@
           nodes={tree}
           selectedPath={selectedPath}
           expandedPaths={explorerExpandedPaths}
+          sortMode={treeSortMode}
           {revealNonce}
           onselect={navigateTo}
           onexpandedchange={(paths) => {
             explorerExpandedPaths = paths;
+          }}
+          onsortmodechange={(mode) => {
+            treeSortMode = mode;
           }}
           oncreateNote={async (path) => {
             const newDoc = await createDoc(path);

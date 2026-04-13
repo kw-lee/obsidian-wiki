@@ -1,29 +1,35 @@
 <script lang="ts">
   import { t } from "$lib/i18n/index.svelte";
   import type { TreeNode } from "$lib/types";
+  import type { WorkspaceTreeSortMode } from "$lib/utils/workspace";
   import FileTree from "./FileTree.svelte";
 
   let {
     nodes,
     selectedPath,
     expandedPaths = [],
+    sortMode = "folders-first",
     revealNonce = 0,
     onselect,
     oncreateNote,
     oncreateFolder,
     onexpandedchange = undefined,
+    onsortmodechange = undefined,
   }: {
     nodes: TreeNode[];
     selectedPath: string;
     expandedPaths?: string[];
+    sortMode?: WorkspaceTreeSortMode;
     revealNonce?: number;
     onselect: (path: string) => void | Promise<void>;
     oncreateNote: (path: string) => void | Promise<void>;
     oncreateFolder: (path: string) => void | Promise<void>;
     onexpandedchange?: (paths: string[]) => void;
+    onsortmodechange?: (mode: WorkspaceTreeSortMode) => void;
   } = $props();
 
   let localExpandedPaths = $state<Set<string>>(new Set<string>());
+  const sortedNodes = $derived.by(() => sortNodes(nodes, sortMode));
 
   $effect(() => {
     const next = new Set(expandedPaths);
@@ -146,6 +152,10 @@
     return value.replace(/["\\]/g, "\\$&");
   }
 
+  function toggleSortMode() {
+    onsortmodechange?.(sortMode === "folders-first" ? "name" : "folders-first");
+  }
+
   function updateExpandedPaths(next: Set<string>) {
     if (samePathSet(localExpandedPaths, next)) {
       return;
@@ -165,19 +175,36 @@
     }
     return true;
   }
+
+  function sortNodes(items: TreeNode[], mode: WorkspaceTreeSortMode): TreeNode[] {
+    return items
+      .map((node) => ({
+        ...node,
+        children: sortNodes(node.children, mode),
+      }))
+      .sort((left, right) => compareNodes(left, right, mode));
+  }
+
+  function compareNodes(left: TreeNode, right: TreeNode, mode: WorkspaceTreeSortMode) {
+    if (mode === "folders-first" && left.is_dir !== right.is_dir) {
+      return left.is_dir ? -1 : 1;
+    }
+    return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+  }
 </script>
 
 <div class="explorer">
   <div class="toolbar">
     <button onclick={handleCreateNote} title={t("fileExplorer.newNote")}>＋</button>
     <button onclick={handleCreateFolder} title={t("fileExplorer.newFolder")}>▣</button>
+    <button onclick={toggleSortMode} title={t(`fileExplorer.sort.${sortMode}`)}>⇅</button>
     <button onclick={expandAll} title={t("fileExplorer.expandAll")}>⤢</button>
     <button onclick={collapseAll} title={t("fileExplorer.collapseAll")}>⤡</button>
     <button onclick={revealSelected} title={t("fileExplorer.revealCurrent")}>◎</button>
   </div>
 
   <FileTree
-    {nodes}
+    nodes={sortedNodes}
     {selectedPath}
     expandedPaths={localExpandedPaths}
     onselect={onselect}
@@ -194,7 +221,7 @@
 
   .toolbar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 0.35rem;
   }
 

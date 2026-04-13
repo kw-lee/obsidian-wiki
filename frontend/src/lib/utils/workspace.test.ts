@@ -7,6 +7,7 @@ import {
   setWorkspaceExpandedPaths,
   setWorkspaceLinksTab,
   setWorkspaceSidebarOpen,
+  setWorkspaceTreeSortMode,
 } from "./workspace";
 
 describe("workspace utils", () => {
@@ -24,6 +25,7 @@ describe("workspace utils", () => {
       sidebarOpen: true,
       expandedPaths: [],
       linksTab: "backlinks",
+      treeSortMode: "folders-first",
     });
   });
 
@@ -31,11 +33,13 @@ describe("workspace utils", () => {
     setWorkspaceSidebarOpen(false);
     setWorkspaceExpandedPaths(["projects", "projects/demo"]);
     setWorkspaceLinksTab("frontlinks");
+    setWorkspaceTreeSortMode("name");
 
     expect(getWorkspaceState()).toEqual({
       sidebarOpen: false,
       expandedPaths: ["projects", "projects/demo"],
       linksTab: "frontlinks",
+      treeSortMode: "name",
     });
   });
 
@@ -46,6 +50,7 @@ describe("workspace utils", () => {
       sidebarOpen: true,
       expandedPaths: [],
       linksTab: "backlinks",
+      treeSortMode: "folders-first",
     });
   });
 });

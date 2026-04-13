@@ -2,17 +2,20 @@ const LAST_WIKI_PATH_KEY = "last_wiki_path";
 const WORKSPACE_STATE_KEY = "workspace_state_v1";
 
 export type WorkspaceLinksTab = "backlinks" | "frontlinks";
+export type WorkspaceTreeSortMode = "folders-first" | "name";
 
 interface WorkspaceState {
   sidebarOpen: boolean;
   expandedPaths: string[];
   linksTab: WorkspaceLinksTab;
+  treeSortMode: WorkspaceTreeSortMode;
 }
 
 const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   sidebarOpen: true,
   expandedPaths: [],
   linksTab: "backlinks",
+  treeSortMode: "folders-first",
 };
 
 export function getLastWikiPath(): string | null {
@@ -53,6 +56,10 @@ export function getWorkspaceState(): WorkspaceState {
         parsed.linksTab === "frontlinks" || parsed.linksTab === "backlinks"
           ? parsed.linksTab
           : DEFAULT_WORKSPACE_STATE.linksTab,
+      treeSortMode:
+        parsed.treeSortMode === "name" || parsed.treeSortMode === "folders-first"
+          ? parsed.treeSortMode
+          : DEFAULT_WORKSPACE_STATE.treeSortMode,
     };
   } catch {
     return { ...DEFAULT_WORKSPACE_STATE };
@@ -69,6 +76,10 @@ export function setWorkspaceExpandedPaths(expandedPaths: string[]): void {
 
 export function setWorkspaceLinksTab(linksTab: WorkspaceLinksTab): void {
   writeWorkspaceState({ linksTab });
+}
+
+export function setWorkspaceTreeSortMode(treeSortMode: WorkspaceTreeSortMode): void {
+  writeWorkspaceState({ treeSortMode });
 }
 
 function writeWorkspaceState(patch: Partial<WorkspaceState>): void {

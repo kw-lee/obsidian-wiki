@@ -36,6 +36,7 @@
   let depth = $state<GraphDepth>("all");
   let folder = $state("__all__");
   let showLabels = $state(true);
+  let physicsEnabled = $state(true);
   let currentPath = $state<string | null>(null);
   let selectedNodeId = $state<string | null>(null);
   let hoveredNodeId = $state<string | null>(null);
@@ -238,8 +239,10 @@
         if (hoveredNodeId === graphNode.id) {
           hoveredNodeId = null;
         }
-      })
-      .call(
+      });
+
+    if (physicsEnabled) {
+      node.call(
         d3
           .drag<SVGCircleElement, SimNode>()
           .on("start", (event, graphNode) => {
@@ -257,6 +260,7 @@
             graphNode.fy = null;
           }),
       );
+    }
 
     const label = graphGroup
       .append("g")
@@ -286,7 +290,7 @@
 
     node.append("title").text((graphNode) => graphNode.title);
 
-    simulation.on("tick", () => {
+    function updatePositions() {
       link
         .attr("x1", (graphEdge) => (graphEdge.source as SimNode).x!)
         .attr("y1", (graphEdge) => (graphEdge.source as SimNode).y!)
@@ -294,7 +298,17 @@
         .attr("y2", (graphEdge) => (graphEdge.target as SimNode).y!);
       node.attr("cx", (graphNode) => graphNode.x!).attr("cy", (graphNode) => graphNode.y!);
       label.attr("x", (graphNode) => graphNode.x!).attr("y", (graphNode) => graphNode.y!);
-    });
+    }
+
+    if (physicsEnabled) {
+      simulation.on("tick", updatePositions);
+    } else {
+      simulation.stop();
+      for (let index = 0; index < 220; index += 1) {
+        simulation.tick();
+      }
+      updatePositions();
+    }
 
     svg.call(
       zoomBehavior.transform as never,
@@ -411,6 +425,10 @@
     showLabels = !showLabels;
   }
 
+  function togglePhysics() {
+    physicsEnabled = !physicsEnabled;
+  }
+
   function formatFolder(path: string | null) {
     if (!path) {
       return t("graph.folder.none");
@@ -476,6 +494,9 @@
       <button class="tool-btn" onclick={toggleLabels} aria-pressed={showLabels}>
         {showLabels ? t("graph.labels.hide") : t("graph.labels.show")}
       </button>
+      <button class="tool-btn" onclick={togglePhysics} aria-pressed={physicsEnabled}>
+        {physicsEnabled ? t("graph.physics.disable") : t("graph.physics.enable")}
+      </button>
       <button class="tool-btn" onclick={focusCurrentNote} disabled={!currentPath}>
         {t("graph.focusCurrent")}
       </button>
@@ -516,6 +537,9 @@
       <strong>{t("graph.metrics.avgDegreeValue", { value: visibleAverageDegree.toFixed(1) })}</strong>
       <span class="meta-path">
         {t("graph.metrics.densityValue", { value: visibleDensity.toFixed(2) })}
+      </span>
+      <span class="meta-path">
+        {physicsEnabled ? t("graph.metrics.physicsOn") : t("graph.metrics.physicsOff")}
       </span>
       <span class="meta-path">{t("graph.neighbors", { count: visibleSelectedNeighbors.length })}</span>
     </div>

@@ -101,6 +101,7 @@ class TagInfo(BaseModel):
 class GraphNode(BaseModel):
     id: str
     title: str
+    tags: list[str] = []
 
 
 class GraphEdge(BaseModel):

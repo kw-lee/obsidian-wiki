@@ -7,6 +7,8 @@ These tests pass in Docker with real PostgreSQL.
 import pytest
 from sqlalchemy.exc import OperationalError
 
+from app.routers.tags import _normalize_tags
+
 
 @pytest.mark.asyncio
 async def test_list_tags_empty(client, auth_headers, setup_vault):
@@ -42,3 +44,10 @@ async def test_tags_requires_auth(client, setup_vault):
 async def test_graph_requires_auth(client, setup_vault):
     resp = await client.get("/api/graph")
     assert resp.status_code in (401, 403)
+
+
+def test_normalize_tags_handles_postgres_and_plain_text_shapes():
+    assert _normalize_tags(["graph", "wiki"]) == ["graph", "wiki"]
+    assert _normalize_tags("{graph,wiki}") == ["graph", "wiki"]
+    assert _normalize_tags("graph, wiki") == ["graph", "wiki"]
+    assert _normalize_tags(None) == []

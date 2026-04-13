@@ -10,6 +10,21 @@ from app.schemas import GraphData, GraphEdge, GraphNode, TagInfo
 router = APIRouter()
 
 
+def _normalize_tags(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(tag) for tag in value]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("{") and text.endswith("}"):
+            return [tag.strip().strip('"') for tag in text.strip("{}").split(",") if tag.strip()]
+        return [tag.strip() for tag in text.split(",") if tag.strip()]
+    return [str(value)]
+
+
 @router.get("/tags", response_model=list[TagInfo])
 async def list_tags(
     db: AsyncSession = Depends(get_db),
@@ -24,8 +39,8 @@ async def get_graph(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> GraphData:
-    docs = await db.execute(select(Document.path, Document.title))
-    nodes = [GraphNode(id=r[0], title=r[1]) for r in docs.all()]
+    docs = await db.execute(select(Document.path, Document.title, Document.tags))
+    nodes = [GraphNode(id=row[0], title=row[1], tags=_normalize_tags(row[2])) for row in docs.all()]
 
     links = await db.execute(select(Link.source_path, Link.target_path))
     edges = [GraphEdge(source=r[0], target=r[1]) for r in links.all()]

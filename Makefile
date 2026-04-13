@@ -2,10 +2,14 @@
 
 # ── Build ────────────────────────────────────────────
 build:
+	docker compose down 
 	docker compose build
+	docker compose up -d
 
 build-no-cache:
+	docker compose down
 	docker compose build --no-cache
+	docker compose up -d
 
 # 볼륨/컨테이너 모두 제거하고 no-cache 로 재빌드 후 기동 (완전 초기화)
 rebuild:

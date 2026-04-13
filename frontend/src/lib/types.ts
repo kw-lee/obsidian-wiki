@@ -23,6 +23,9 @@ export interface FolderCreateResult {
 
 export interface MovePathResult {
   path: string;
+  rewrite_links: boolean;
+  rewritten_paths: string[];
+  rewritten_links: number;
 }
 
 export interface SearchResult {

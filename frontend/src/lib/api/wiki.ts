@@ -40,10 +40,18 @@ export const createFolder = (path: string) =>
     body: JSON.stringify({ path }),
   });
 
-export const movePath = (sourcePath: string, destinationPath: string) =>
+export const movePath = (
+  sourcePath: string,
+  destinationPath: string,
+  rewriteLinks = false,
+) =>
   api<MovePathResult>("/wiki/move", {
     method: "POST",
-    body: JSON.stringify({ source_path: sourcePath, destination_path: destinationPath }),
+    body: JSON.stringify({
+      source_path: sourcePath,
+      destination_path: destinationPath,
+      rewrite_links: rewriteLinks,
+    }),
   });
 
 export const deleteDoc = (path: string) =>

@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
+from app.services.indexer import index_file
 from app.services.vault import write_doc
 
 
@@ -34,6 +35,15 @@ def _git_init(vault_path):
         capture_output=True,
         check=True,
     )
+
+
+async def _write_and_index_doc(path: str, content: str) -> None:
+    from app.db.session import async_session
+
+    await write_doc(path, content)
+    async with async_session() as session:
+        await index_file(session, path, content)
+        await session.commit()
 
 
 @pytest.mark.asyncio
@@ -126,6 +136,87 @@ async def test_move_doc(client, auth_headers, setup_vault):
     assert resp.json()["path"] == "archive/move-me.md"
     assert not (setup_vault / "notes" / "move-me.md").exists()
     assert (setup_vault / "archive" / "move-me.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_move_folder_rewrites_wikilinks_when_requested(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "projects").mkdir()
+    (setup_vault / "reference").mkdir()
+    (setup_vault / "archive").mkdir()
+
+    await _write_and_index_doc(
+        "notes/source.md",
+        "# Source\nSee [[../reference/guide]] and [[child]].",
+    )
+    await _write_and_index_doc("notes/child.md", "# Child")
+    await _write_and_index_doc("reference/guide.md", "# Guide")
+    await _write_and_index_doc("projects/ref.md", "See [[notes/source]] from here.")
+
+    resp = await client.post(
+        "/api/wiki/move",
+        json={
+            "source_path": "notes",
+            "destination_path": "archive/notes",
+            "rewrite_links": True,
+        },
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rewrite_links"] is True
+    assert data["rewritten_links"] == 2
+    assert set(data["rewritten_paths"]) == {"archive/notes/source.md", "projects/ref.md"}
+    assert (setup_vault / "archive" / "notes" / "source.md").read_text(encoding="utf-8") == (
+        "# Source\nSee [[../../reference/guide]] and [[child]]."
+    )
+    assert (setup_vault / "projects" / "ref.md").read_text(encoding="utf-8") == (
+        "See [[../archive/notes/source]] from here."
+    )
+    assert (setup_vault / "archive" / "notes" / "child.md").read_text(encoding="utf-8") == "# Child"
+
+
+@pytest.mark.asyncio
+async def test_move_folder_without_rewrite_leaves_links_unchanged(
+    client, auth_headers, setup_vault
+):
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "projects").mkdir()
+    (setup_vault / "reference").mkdir()
+    (setup_vault / "archive").mkdir()
+
+    await _write_and_index_doc(
+        "notes/source.md",
+        "# Source\nSee [[../reference/guide]] and [[child]].",
+    )
+    await _write_and_index_doc("notes/child.md", "# Child")
+    await _write_and_index_doc("reference/guide.md", "# Guide")
+    await _write_and_index_doc("projects/ref.md", "See [[notes/source]] from here.")
+
+    resp = await client.post(
+        "/api/wiki/move",
+        json={
+            "source_path": "notes",
+            "destination_path": "archive/notes",
+            "rewrite_links": False,
+        },
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rewrite_links"] is False
+    assert data["rewritten_links"] == 0
+    assert data["rewritten_paths"] == []
+    assert (setup_vault / "archive" / "notes" / "source.md").read_text(encoding="utf-8") == (
+        "# Source\nSee [[../reference/guide]] and [[child]]."
+    )
+    assert (setup_vault / "projects" / "ref.md").read_text(encoding="utf-8") == (
+        "See [[notes/source]] from here."
+    )
 
 
 @pytest.mark.asyncio

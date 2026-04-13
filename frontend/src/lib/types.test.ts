@@ -54,8 +54,15 @@ describe("Type contracts", () => {
   });
 
   it("MovePathResult has expected shape", () => {
-    const result: MovePathResult = { path: "archive/note.md" };
+    const result: MovePathResult = {
+      path: "archive/note.md",
+      rewrite_links: true,
+      rewritten_paths: ["archive/note.md", "projects/ref.md"],
+      rewritten_links: 2,
+    };
     expect(result.path).toBe("archive/note.md");
+    expect(result.rewrite_links).toBe(true);
+    expect(result.rewritten_links).toBe(2);
   });
 
   it("TaskItem has expected shape", () => {

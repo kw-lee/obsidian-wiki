@@ -82,13 +82,37 @@ describe("Wiki API functions", () => {
   });
 
   it("movePath sends POST", async () => {
-    mockApi.mockResolvedValueOnce({ path: "archive/note.md" });
+    mockApi.mockResolvedValueOnce({
+      path: "archive/note.md",
+      rewrite_links: false,
+      rewritten_paths: [],
+      rewritten_links: 0,
+    });
     await movePath("notes/note.md", "archive/note.md");
     expect(mockApi).toHaveBeenCalledWith("/wiki/move", {
       method: "POST",
       body: JSON.stringify({
         source_path: "notes/note.md",
         destination_path: "archive/note.md",
+        rewrite_links: false,
+      }),
+    });
+  });
+
+  it("movePath can request link rewriting", async () => {
+    mockApi.mockResolvedValueOnce({
+      path: "archive/note.md",
+      rewrite_links: true,
+      rewritten_paths: ["archive/note.md", "projects/ref.md"],
+      rewritten_links: 2,
+    });
+    await movePath("notes/note.md", "archive/note.md", true);
+    expect(mockApi).toHaveBeenCalledWith("/wiki/move", {
+      method: "POST",
+      body: JSON.stringify({
+        source_path: "notes/note.md",
+        destination_path: "archive/note.md",
+        rewrite_links: true,
       }),
     });
   });

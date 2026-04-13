@@ -41,10 +41,14 @@ class FolderCreateResponse(BaseModel):
 class MovePathRequest(BaseModel):
     source_path: str
     destination_path: str
+    rewrite_links: bool = False
 
 
 class MovePathResponse(BaseModel):
     path: str
+    rewrite_links: bool = False
+    rewritten_paths: list[str] = []
+    rewritten_links: int = 0
 
 
 # ── Tree ──────────────────────────────────────────────

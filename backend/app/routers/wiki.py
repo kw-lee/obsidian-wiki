@@ -1,5 +1,8 @@
 import json
 from collections import defaultdict
+import posixpath
+import re
+from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete as sql_delete
@@ -24,6 +27,7 @@ from app.services import vault
 from app.services.conflict import three_way_merge
 from app.services.git_ops import (
     file_changed_between,
+    git_add_all_and_commit,
     git_add_and_commit,
     git_stage_move_and_commit,
     head_commit_sha,
@@ -92,6 +96,165 @@ def _extract_backlink_snippet(source_content: str, source_path: str, target_path
         if line:
             return _normalize_snippet(line)
     return None
+
+
+def _translate_moved_path(path: str, source_root: str, destination_root: str) -> str:
+    if path == source_root:
+        return destination_root
+    source_prefix = f"{source_root}/"
+    if path.startswith(source_prefix):
+        return f"{destination_root}/{path.removeprefix(source_prefix)}"
+    return path
+
+
+def _reverse_translate_moved_path(path: str, source_root: str, destination_root: str) -> str:
+    if path == destination_root:
+        return source_root
+    destination_prefix = f"{destination_root}/"
+    if path.startswith(destination_prefix):
+        return f"{source_root}/{path.removeprefix(destination_prefix)}"
+    return path
+
+
+def _split_subpath(raw_target: str) -> tuple[str, str | None, str | None]:
+    if raw_target.startswith("#"):
+        return "", raw_target[1:].strip() or None, "#"
+    if raw_target.startswith("^"):
+        return "", raw_target[1:].strip() or None, "^"
+
+    heading_index = raw_target.find("#")
+    block_index = raw_target.find("^")
+    indexes = [(index, marker) for index, marker in ((heading_index, "#"), (block_index, "^")) if index >= 0]
+    if not indexes:
+        return raw_target.strip(), None, None
+
+    index, marker = min(indexes, key=lambda item: item[0])
+    path = raw_target[:index].strip()
+    subpath = raw_target[index + 1 :].strip() or None
+    return path, subpath, marker
+
+
+def _rewrite_wikilink_target(
+    current_path: str,
+    target_path: str,
+    resolved_path: str,
+    subpath: str | None,
+    subpath_marker: str | None,
+) -> str:
+    relative_target = posixpath.relpath(
+        resolved_path,
+        start=PurePosixPath(current_path).parent.as_posix() or ".",
+    )
+    original_suffix = PurePosixPath(target_path).suffix.lower()
+    if original_suffix not in (".md", ".mdx") and PurePosixPath(resolved_path).suffix.lower() in (".md", ".mdx"):
+        note_suffix = PurePosixPath(relative_target).suffix
+        if note_suffix.lower() in (".md", ".mdx"):
+            relative_target = relative_target[: -len(note_suffix)]
+
+    if subpath:
+        relative_target = f"{relative_target}{subpath_marker or '#'}{subpath}"
+    return relative_target
+
+
+def _rewrite_wikilinks_for_move(
+    content: str,
+    *,
+    current_path: str,
+    previous_path: str,
+    source_root: str,
+    destination_root: str,
+    catalog,
+) -> tuple[str, int]:
+    rewritten = 0
+    parts: list[str] = []
+    last_index = 0
+
+    for match in re.finditer(r"(?P<embed>!)?\[\[(?P<body>[^\]]+)\]\]", content):
+        parts.append(content[last_index : match.start()])
+        body = match.group("body")
+        target_part, separator, alias_part = body.partition("|")
+        target_text = target_part.strip()
+        if not target_text:
+            parts.append(match.group(0))
+            last_index = match.end()
+            continue
+
+        target_path, subpath, subpath_marker = _split_subpath(target_text)
+        if not target_path:
+            parts.append(match.group(0))
+            last_index = match.end()
+            continue
+
+        parsed = ParsedWikiLink(
+            raw_target=target_text,
+            display_text=alias_part.strip() if alias_part.strip() else target_text,
+            embed=bool(match.group("embed")),
+        )
+        resolved = resolve_wikilink(parsed, previous_path, catalog)
+        if not resolved.exists or resolved.kind == "ambiguous" or not resolved.vault_path:
+            parts.append(match.group(0))
+            last_index = match.end()
+            continue
+
+        translated_path = _translate_moved_path(resolved.vault_path, source_root, destination_root)
+        if current_path == previous_path and translated_path == resolved.vault_path:
+            parts.append(match.group(0))
+            last_index = match.end()
+            continue
+
+        rewritten_target = _rewrite_wikilink_target(
+            current_path=current_path,
+            target_path=target_path,
+            resolved_path=translated_path,
+            subpath=subpath,
+            subpath_marker=subpath_marker,
+        )
+        if rewritten_target == target_text:
+            parts.append(match.group(0))
+            last_index = match.end()
+            continue
+
+        leading_ws = target_part[: len(target_part) - len(target_part.lstrip())]
+        trailing_ws = target_part[len(target_part.rstrip()) :]
+        rewritten_target_part = f"{leading_ws}{rewritten_target}{trailing_ws}"
+        rewritten_body = f"{rewritten_target_part}{separator}{alias_part}" if separator else rewritten_target_part
+        parts.append(f"{'!' if match.group('embed') else ''}[[{rewritten_body}]]")
+        rewritten += 1
+        last_index = match.end()
+
+    parts.append(content[last_index:])
+    return "".join(parts), rewritten
+
+
+async def _rewrite_links_after_move(
+    source_root: str,
+    destination_root: str,
+    catalog,
+) -> tuple[list[str], int]:
+    rewritten_paths: list[str] = []
+    rewritten_links = 0
+    vault_root = vault.vault_path()
+
+    for md_file in vault_root.rglob("*.md"):
+        if md_file.name.startswith(".") or ".obsidian" in md_file.parts:
+            continue
+        current_path = md_file.relative_to(vault_root).as_posix()
+        previous_path = _reverse_translate_moved_path(current_path, source_root, destination_root)
+        content = await vault.read_doc(current_path)
+        rewritten_content, count = _rewrite_wikilinks_for_move(
+            content,
+            current_path=current_path,
+            previous_path=previous_path,
+            source_root=source_root,
+            destination_root=destination_root,
+            catalog=catalog,
+        )
+        if count:
+            await vault.write_doc(current_path, rewritten_content)
+            rewritten_paths.append(current_path)
+            rewritten_links += count
+
+    return rewritten_paths, rewritten_links
 
 
 @router.get("/tree", response_model=list[TreeNode])
@@ -232,10 +395,22 @@ async def move_path(
     if destination_full.exists():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Destination already exists")
 
+    catalog = await load_resolver_catalog(db)
     moved_path = await vault.move_path(source_path, destination_path)
-    git_stage_move_and_commit(source_path, moved_path, f"web: move {source_path} -> {moved_path}")
+    rewritten_paths: list[str] = []
+    rewritten_links = 0
+    if body.rewrite_links:
+        rewritten_paths, rewritten_links = await _rewrite_links_after_move(source_path, moved_path, catalog)
+        git_add_all_and_commit(f"web: move {source_path} -> {moved_path}")
+    else:
+        git_stage_move_and_commit(source_path, moved_path, f"web: move {source_path} -> {moved_path}")
     await full_reindex(db)
-    return MovePathResponse(path=moved_path)
+    return MovePathResponse(
+        path=moved_path,
+        rewrite_links=body.rewrite_links,
+        rewritten_paths=rewritten_paths,
+        rewritten_links=rewritten_links,
+    )
 
 
 @router.delete("/doc/{path:path}", status_code=status.HTTP_204_NO_CONTENT)

@@ -10,6 +10,7 @@ import {
 	fetchProfileSettings,
 	fetchPublicAppearanceSettings,
 	fetchSyncSettings,
+	fetchSystemSettings,
 	fetchVaultSettings,
 	rebuildVaultIndex,
 	testSyncConnection,
@@ -143,5 +144,11 @@ describe('Settings API functions', () => {
 		mockApi.mockResolvedValueOnce({ default_theme: 'light' });
 		await fetchPublicAppearanceSettings();
 		expect(mockApi).toHaveBeenCalledWith('/settings/appearance/public');
+	});
+
+	it('fetchSystemSettings calls the system endpoint', async () => {
+		mockApi.mockResolvedValueOnce({ version: '0.1.0' });
+		await fetchSystemSettings();
+		expect(mockApi).toHaveBeenCalledWith('/settings/system');
 	});
 });

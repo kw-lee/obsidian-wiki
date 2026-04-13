@@ -4,6 +4,7 @@ import type {
 	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
+	SystemSettings,
 	SyncSettings,
 	SyncBackend,
 	SyncTestResult,
@@ -73,3 +74,5 @@ export const updateAppearanceSettings = (payload: AppearanceSettings) =>
 
 export const fetchPublicAppearanceSettings = () =>
 	api<AppearanceSettings>('/settings/appearance/public');
+
+export const fetchSystemSettings = () => api<SystemSettings>('/settings/system');

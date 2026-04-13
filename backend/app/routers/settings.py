@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -21,10 +22,20 @@ from app.schemas import (
     SyncSettingsTestRequest,
     SyncSettingsUpdateRequest,
     SyncTestResult,
+    SystemDependencyStatus,
+    SystemSettingsResponse,
+    VaultGitStatus,
     VaultSettingsResponse,
 )
 from app.services.indexer import full_reindex
 from app.services.settings import ensure_app_settings, get_runtime_sync_settings, invalidate_settings_cache
+from app.services.system_status import (
+    get_app_version,
+    get_process_started_at,
+    get_vault_git_status,
+    ping_database,
+    ping_redis,
+)
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync.crypto import encrypt_secret
 from app.services.sync_service import get_active_sync_status, test_sync_backend
@@ -270,3 +281,29 @@ async def get_public_appearance_settings(
 ) -> AppearanceSettingsResponse:
     row = await ensure_app_settings(db)
     return AppearanceSettingsResponse(default_theme=row.default_theme)
+
+
+@router.get("/system", response_model=SystemSettingsResponse)
+async def get_system_settings(
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SystemSettingsResponse:
+    runtime = await get_runtime_sync_settings(db)
+    sync_status = await get_active_sync_status(db)
+    database_ok, database_detail = await ping_database(db)
+    redis_ok, redis_detail = await ping_redis()
+    started_at = get_process_started_at()
+    now = datetime.now(timezone.utc)
+    uptime_seconds = max(0, int((now - started_at).total_seconds()))
+
+    return SystemSettingsResponse(
+        version=get_app_version(),
+        started_at=started_at,
+        uptime_seconds=uptime_seconds,
+        sync_backend=runtime.sync_backend,
+        sync_auto_enabled=runtime.sync_auto_enabled,
+        sync_status=sync_status,
+        database=SystemDependencyStatus(ok=database_ok, detail=database_detail),
+        redis=SystemDependencyStatus(ok=redis_ok, detail=redis_detail),
+        vault_git=VaultGitStatus(**get_vault_git_status()),
+    )

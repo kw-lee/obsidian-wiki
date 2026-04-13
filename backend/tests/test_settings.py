@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 import bcrypt
 import pytest
@@ -240,6 +241,47 @@ async def test_update_appearance_settings_persists_and_is_public(client, auth_he
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.default_theme == "light"
+
+
+@pytest.mark.asyncio
+async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vault):
+    started_at = datetime(2026, 4, 13, 1, 0, tzinfo=timezone.utc)
+
+    async def fake_database_ping(db):
+        del db
+        return True, "Database connection successful"
+
+    async def fake_redis_ping():
+        return False, "Connection refused"
+
+    monkeypatch.setattr("app.routers.settings.get_app_version", lambda: "0.1.0")
+    monkeypatch.setattr("app.routers.settings.get_process_started_at", lambda: started_at)
+    monkeypatch.setattr("app.routers.settings.ping_database", fake_database_ping)
+    monkeypatch.setattr("app.routers.settings.ping_redis", fake_redis_ping)
+    monkeypatch.setattr(
+        "app.routers.settings.get_vault_git_status",
+        lambda: {
+            "available": True,
+            "branch": "main",
+            "head": "abc123",
+            "dirty": False,
+            "has_origin": True,
+            "message": None,
+        },
+    )
+
+    resp = await client.get("/api/settings/system", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["version"] == "0.1.0"
+    assert data["started_at"] == "2026-04-13T01:00:00Z"
+    assert data["sync_backend"] == "git"
+    assert data["sync_auto_enabled"] is True
+    assert data["database"] == {"ok": True, "detail": "Database connection successful"}
+    assert data["redis"] == {"ok": False, "detail": "Connection refused"}
+    assert data["vault_git"]["branch"] == "main"
+    assert data["vault_git"]["has_origin"] is True
+    assert data["uptime_seconds"] >= 0
 
 
 def test_encrypt_secret_roundtrip():

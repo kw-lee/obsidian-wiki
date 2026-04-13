@@ -171,3 +171,29 @@ class AppearanceSettingsResponse(BaseModel):
 
 class AppearanceSettingsUpdateRequest(BaseModel):
     default_theme: Literal["light", "dark", "system"]
+
+
+class SystemDependencyStatus(BaseModel):
+    ok: bool
+    detail: str
+
+
+class VaultGitStatus(BaseModel):
+    available: bool
+    branch: str | None = None
+    head: str | None = None
+    dirty: bool = False
+    has_origin: bool = False
+    message: str | None = None
+
+
+class SystemSettingsResponse(BaseModel):
+    version: str
+    started_at: datetime
+    uptime_seconds: int = Field(ge=0)
+    sync_backend: Literal["git", "webdav", "none"]
+    sync_auto_enabled: bool
+    sync_status: SyncStatus
+    database: SystemDependencyStatus
+    redis: SystemDependencyStatus
+    vault_git: VaultGitStatus

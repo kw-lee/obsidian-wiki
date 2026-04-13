@@ -10,6 +10,7 @@ import type {
 	AppearanceSettings,
 	ProfileSettings,
 	RebuildIndexResult,
+	SystemSettings,
 	SyncSettings,
 	SyncTestResult,
 	SyncStatus,
@@ -157,6 +158,36 @@ describe('Type contracts', () => {
 	it('AppearanceSettings has expected shape', () => {
 		const appearance: AppearanceSettings = { default_theme: 'system' };
 		expect(appearance.default_theme).toBe('system');
+	});
+
+	it('SystemSettings has expected shape', () => {
+		const system: SystemSettings = {
+			version: '0.1.0',
+			started_at: '2026-04-13T02:00:00Z',
+			uptime_seconds: 42,
+			sync_backend: 'git',
+			sync_auto_enabled: true,
+			sync_status: {
+				last_sync: null,
+				ahead: 0,
+				behind: 0,
+				dirty: false,
+				backend: 'git',
+				head: 'abc123',
+				message: 'Idle'
+			},
+			database: { ok: true, detail: 'Database connection successful' },
+			redis: { ok: false, detail: 'Connection refused' },
+			vault_git: {
+				available: true,
+				branch: 'main',
+				head: 'abc123',
+				dirty: false,
+				has_origin: true,
+				message: null
+			}
+		};
+		expect(system.vault_git.has_origin).toBe(true);
 	});
 
 	it('BacklinkItem has expected shape', () => {

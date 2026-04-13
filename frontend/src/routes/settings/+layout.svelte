@@ -10,7 +10,8 @@
 		{ href: '/settings/profile', label: 'Profile' },
 		{ href: '/settings/sync', label: 'Sync' },
 		{ href: '/settings/vault', label: 'Vault' },
-		{ href: '/settings/appearance', label: 'Appearance' }
+		{ href: '/settings/appearance', label: 'Appearance' },
+		{ href: '/settings/system', label: 'System' }
 	];
 
 	onMount(() => {

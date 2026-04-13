@@ -116,3 +116,29 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export interface AppearanceSettings {
 	default_theme: ThemePreference;
 }
+
+export interface SystemDependencyStatus {
+	ok: boolean;
+	detail: string;
+}
+
+export interface VaultGitStatus {
+	available: boolean;
+	branch: string | null;
+	head: string | null;
+	dirty: boolean;
+	has_origin: boolean;
+	message?: string | null;
+}
+
+export interface SystemSettings {
+	version: string;
+	started_at: string;
+	uptime_seconds: number;
+	sync_backend: SyncBackend;
+	sync_auto_enabled: boolean;
+	sync_status: SyncStatus;
+	database: SystemDependencyStatus;
+	redis: SystemDependencyStatus;
+	vault_git: VaultGitStatus;
+}

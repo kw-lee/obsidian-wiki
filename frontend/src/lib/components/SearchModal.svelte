@@ -17,6 +17,17 @@
 	let results = $state<SearchResult[]>([]);
 	let loading = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	let inputEl = $state<HTMLInputElement | null>(null);
+
+	$effect(() => {
+		if (!open) {
+			return;
+		}
+
+		queueMicrotask(() => {
+			inputEl?.focus();
+		});
+	});
 
 	function handleInput() {
 		clearTimeout(debounceTimer);
@@ -57,11 +68,11 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
 			<input
+				bind:this={inputEl}
 				type="text"
 				placeholder={t('search.placeholder')}
 				bind:value={query}
 				oninput={handleInput}
-				autofocus
 			/>
 			{#if loading}
 				<div class="status">{t('search.loading')}</div>

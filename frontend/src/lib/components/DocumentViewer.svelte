@@ -23,6 +23,7 @@
   let error = $state("");
 
   const viewerKind = $derived(getViewerKind(path));
+  const emptyCaptionsTrack = "data:text/vtt;charset=utf-8,WEBVTT%0A%0A";
 
   async function loadAttachmentUrl(targetPath: string): Promise<string> {
     const token = localStorage.getItem("access_token");
@@ -96,7 +97,14 @@
       <iframe src={objectUrl} title={path}></iframe>
     {:else if objectUrl && viewerKind === "media"}
       {#if isVideoPath(path)}
-        <video src={objectUrl} controls></video>
+        <video src={objectUrl} controls>
+          <track
+            kind="captions"
+            label="Captions unavailable"
+            srclang="und"
+            src={emptyCaptionsTrack}
+          />
+        </video>
       {:else}
         <audio src={objectUrl} controls></audio>
       {/if}

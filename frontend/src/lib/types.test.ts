@@ -8,9 +8,11 @@ import type {
 	TagInfo,
 	GraphData,
 	ProfileSettings,
+	RebuildIndexResult,
 	SyncSettings,
 	SyncTestResult,
-	SyncStatus
+	SyncStatus,
+	VaultSettings
 } from './types';
 
 describe('Type contracts', () => {
@@ -133,6 +135,22 @@ describe('Type contracts', () => {
 			detail: 'WebDAV connection successful'
 		};
 		expect(result.ok).toBe(true);
+	});
+
+	it('VaultSettings has expected shape', () => {
+		const vault: VaultSettings = {
+			vault_path: '/data/vault',
+			disk_usage_bytes: 1024,
+			document_count: 10,
+			attachment_count: 2,
+			tag_count: 5
+		};
+		expect(vault.document_count).toBe(10);
+	});
+
+	it('RebuildIndexResult has expected shape', () => {
+		const result: RebuildIndexResult = { indexed_documents: 12 };
+		expect(result.indexed_documents).toBe(12);
 	});
 
 	it('BacklinkItem has expected shape', () => {

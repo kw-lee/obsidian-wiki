@@ -8,7 +8,8 @@
 
 	const tabs = [
 		{ href: '/settings/profile', label: 'Profile' },
-		{ href: '/settings/sync', label: 'Sync' }
+		{ href: '/settings/sync', label: 'Sync' },
+		{ href: '/settings/vault', label: 'Vault' }
 	];
 
 	onMount(() => {

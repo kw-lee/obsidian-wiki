@@ -2,9 +2,11 @@ import { api } from './client';
 import type {
 	AuthTokenPair,
 	ProfileSettings,
+	RebuildIndexResult,
 	SyncSettings,
 	SyncBackend,
-	SyncTestResult
+	SyncTestResult,
+	VaultSettings
 } from '$lib/types';
 
 export const fetchProfileSettings = () => api<ProfileSettings>('/settings/profile');
@@ -51,4 +53,11 @@ export const testSyncConnection = (payload: {
 	api<SyncTestResult>('/settings/sync/test', {
 		method: 'POST',
 		body: JSON.stringify(payload)
+	});
+
+export const fetchVaultSettings = () => api<VaultSettings>('/settings/vault');
+
+export const rebuildVaultIndex = () =>
+	api<RebuildIndexResult>('/settings/vault/rebuild-index', {
+		method: 'POST'
 	});

@@ -4,10 +4,11 @@ import bcrypt
 import pytest
 
 import app.db.session as session_mod
-from app.db.models import AppSettings, User
+from app.db.models import AppSettings, Attachment, Document, Tag, User
 from app.schemas import SyncStatus, SyncTestResult
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync.crypto import decrypt_secret, encrypt_secret
+from app.services.vault import write_doc
 
 
 @pytest.mark.asyncio
@@ -252,3 +253,47 @@ async def test_sync_scheduler_reload_restarts_task():
     await scheduler.stop()
     await asyncio.sleep(0)
     assert starts.count("cancel") >= 2
+
+
+@pytest.mark.asyncio
+async def test_get_vault_settings(client, auth_headers, setup_vault):
+    await write_doc("notes/test.md", "# Test\n#tag")
+    (setup_vault / "assets").mkdir(parents=True, exist_ok=True)
+    (setup_vault / "assets" / "image.png").write_bytes(b"pngdata")
+
+    async with session_mod.async_session() as session:
+        session.add(
+            Document(
+                path="notes/test.md",
+                title="test",
+                content_hash="hash",
+                frontmatter="{}",
+                tags="{tag}",
+            )
+        )
+        session.add(Tag(name="tag", doc_count=1))
+        session.add(Attachment(path="assets/image.png", mime_type="image/png", size_bytes=7))
+        await session.commit()
+
+    resp = await client.get("/api/settings/vault", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["vault_path"] == str(setup_vault)
+    assert data["disk_usage_bytes"] >= len(b"pngdata")
+    assert data["document_count"] >= 1
+    assert data["tag_count"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_rebuild_vault_index(client, auth_headers, monkeypatch, setup_vault):
+    await write_doc("alpha.md", "# Alpha")
+    await write_doc("beta.md", "# Beta")
+
+    async def fake_full_reindex(session):  # noqa: ANN001
+        del session
+        return 2
+
+    monkeypatch.setattr("app.routers.settings.full_reindex", fake_full_reindex)
+    resp = await client.post("/api/settings/vault/rebuild-index", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["indexed_documents"] == 2

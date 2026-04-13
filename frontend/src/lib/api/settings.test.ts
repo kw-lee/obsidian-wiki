@@ -8,6 +8,8 @@ import { api } from './client';
 import {
 	fetchProfileSettings,
 	fetchSyncSettings,
+	fetchVaultSettings,
+	rebuildVaultIndex,
 	testSyncConnection,
 	updateProfileSettings,
 	updateSyncSettings
@@ -102,6 +104,20 @@ describe('Settings API functions', () => {
 				webdav_remote_root: '/vault',
 				webdav_verify_tls: true
 			})
+		});
+	});
+
+	it('fetchVaultSettings calls the vault endpoint', async () => {
+		mockApi.mockResolvedValueOnce({ vault_path: '/data/vault' });
+		await fetchVaultSettings();
+		expect(mockApi).toHaveBeenCalledWith('/settings/vault');
+	});
+
+	it('rebuildVaultIndex sends POST', async () => {
+		mockApi.mockResolvedValueOnce({ indexed_documents: 4 });
+		await rebuildVaultIndex();
+		expect(mockApi).toHaveBeenCalledWith('/settings/vault/rebuild-index', {
+			method: 'POST'
 		});
 	});
 });

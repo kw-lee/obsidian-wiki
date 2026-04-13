@@ -98,3 +98,15 @@ export interface SyncTestResult {
 	backend: string;
 	detail: string;
 }
+
+export interface VaultSettings {
+	vault_path: string;
+	disk_usage_bytes: number;
+	document_count: number;
+	attachment_count: number;
+	tag_count: number;
+}
+
+export interface RebuildIndexResult {
+	indexed_documents: number;
+}

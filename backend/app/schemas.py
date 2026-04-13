@@ -151,3 +151,15 @@ class SyncTestResult(BaseModel):
     ok: bool
     backend: str
     detail: str
+
+
+class VaultSettingsResponse(BaseModel):
+    vault_path: str
+    disk_usage_bytes: int
+    document_count: int
+    attachment_count: int
+    tag_count: int
+
+
+class RebuildIndexResponse(BaseModel):
+    indexed_documents: int

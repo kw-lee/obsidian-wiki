@@ -1,21 +1,27 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_token, get_current_user, hash_password, verify_password
-from app.db.models import User
+from app.config import settings as app_settings
+from app.db.models import Attachment, Document, Tag, User
 from app.db.session import get_db
 from app.schemas import (
     AuthTokenPair,
     ProfileSettingsResponse,
     ProfileSettingsUpdateRequest,
+    RebuildIndexResponse,
     SyncSettingsResponse,
     SyncSettingsTestRequest,
     SyncSettingsUpdateRequest,
     SyncTestResult,
+    VaultSettingsResponse,
 )
+from app.services.indexer import full_reindex
 from app.services.settings import ensure_app_settings, get_runtime_sync_settings, invalidate_settings_cache
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync.crypto import encrypt_secret
@@ -38,6 +44,16 @@ def _normalize_remote_root(value: str) -> str:
     if not normalized.startswith("/"):
         normalized = f"/{normalized}"
     return normalized.rstrip("/") or "/"
+
+
+def _vault_disk_usage_bytes(root: Path) -> int:
+    total = 0
+    if not root.exists():
+        return total
+    for path in root.rglob("*"):
+        if path.is_file():
+            total += path.stat().st_size
+    return total
 
 
 @router.get("/profile", response_model=ProfileSettingsResponse)
@@ -194,3 +210,30 @@ async def test_sync_settings(
         webdav_verify_tls=body.webdav_verify_tls,
     )
     return await test_sync_backend(db, runtime_override=runtime)
+
+
+@router.get("/vault", response_model=VaultSettingsResponse)
+async def get_vault_settings(
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> VaultSettingsResponse:
+    vault_path = Path(app_settings.vault_local_path)
+    document_count = await db.scalar(select(func.count(Document.id)))
+    attachment_count = await db.scalar(select(func.count(Attachment.id)))
+    tag_count = await db.scalar(select(func.count(Tag.id)))
+    return VaultSettingsResponse(
+        vault_path=str(vault_path),
+        disk_usage_bytes=_vault_disk_usage_bytes(vault_path),
+        document_count=document_count or 0,
+        attachment_count=attachment_count or 0,
+        tag_count=tag_count or 0,
+    )
+
+
+@router.post("/vault/rebuild-index", response_model=RebuildIndexResponse)
+async def rebuild_vault_index(
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RebuildIndexResponse:
+    count = await full_reindex(db)
+    return RebuildIndexResponse(indexed_documents=count)

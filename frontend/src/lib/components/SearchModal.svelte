@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { search } from '$lib/api/wiki';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { SearchResult } from '$lib/types';
 
 	let {
@@ -57,13 +58,13 @@
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
 			<input
 				type="text"
-				placeholder="문서 검색..."
+				placeholder={t('search.placeholder')}
 				bind:value={query}
 				oninput={handleInput}
 				autofocus
 			/>
 			{#if loading}
-				<div class="status">검색 중...</div>
+				<div class="status">{t('search.loading')}</div>
 			{:else if results.length > 0}
 				<ul class="results">
 					{#each results as r}
@@ -76,7 +77,7 @@
 					{/each}
 				</ul>
 			{:else if query.length >= 2}
-				<div class="status">검색 결과가 없습니다.</div>
+				<div class="status">{t('search.empty')}</div>
 			{/if}
 		</div>
 	</div>

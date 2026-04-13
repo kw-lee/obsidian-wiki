@@ -9,6 +9,7 @@
 	import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 	import { tags } from '@lezer/highlight';
+	import { t } from '$lib/i18n/index.svelte';
 
 	interface Props {
 		content: string;
@@ -65,7 +66,7 @@
 					}
 				}
 			]),
-			placeholder('내용을 입력하세요...'),
+			placeholder(t('editor.placeholder')),
 			EditorView.updateListener.of((update) => {
 				if (update.docChanged) {
 					onchange?.(update.state.doc.toString());

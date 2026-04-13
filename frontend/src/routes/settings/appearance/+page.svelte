@@ -1,16 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchAppearanceSettings, updateAppearanceSettings } from '$lib/api/settings';
+	import { getLocale, setLocale, t } from '$lib/i18n/index.svelte';
+	import type { Locale } from '$lib/i18n/messages';
 	import type { ThemePreference } from '$lib/types';
 	import { initTheme } from '$lib/stores/theme.svelte';
 
 	let defaultTheme = $state<ThemePreference>('system');
+	let locale = $state<Locale>('ko');
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state('');
 	let success = $state('');
 
 	onMount(async () => {
+		locale = getLocale();
 		await loadAppearance();
 	});
 
@@ -21,7 +25,7 @@
 			const data = await fetchAppearanceSettings();
 			defaultTheme = data.default_theme;
 		} catch (err) {
-			error = err instanceof Error ? err.message : '테마 설정을 불러오지 못했습니다.';
+			error = err instanceof Error ? err.message : t('appearance.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -34,12 +38,17 @@
 		try {
 			await updateAppearanceSettings({ default_theme: defaultTheme });
 			await initTheme();
-			success = '기본 테마 설정을 저장했습니다.';
+			success = t('appearance.saveSuccess');
 		} catch (err) {
-			error = err instanceof Error ? err.message : '테마 설정 저장에 실패했습니다.';
+			error = err instanceof Error ? err.message : t('appearance.saveFailed');
 		} finally {
 			saving = false;
 		}
+	}
+
+	function handleLocaleChange() {
+		setLocale(locale);
+		success = t('appearance.language.saved');
 	}
 </script>
 
@@ -47,40 +56,57 @@
 	<div class="panel-header">
 		<div>
 			<p class="eyebrow">Appearance</p>
-			<h2>기본 테마</h2>
-			<p class="copy">로컬에 개인 테마 선택이 없을 때 사용할 서버 기본 테마입니다.</p>
+			<h2>{t('appearance.title')}</h2>
+			<p class="copy">{t('appearance.description')}</p>
 		</div>
 		<button type="button" onclick={handleSave} disabled={saving || loading}>
-			{saving ? '저장 중...' : '저장'}
+			{saving ? t('common.saving') : t('common.save')}
 		</button>
 	</div>
 
 	{#if loading}
-		<p class="state">불러오는 중...</p>
+		<p class="state">{t('common.loading')}</p>
 	{:else}
 		<div class="choices">
 			<label class:active={defaultTheme === 'system'}>
 				<input type="radio" bind:group={defaultTheme} value="system" />
 				<div>
-					<strong>System</strong>
-					<span>브라우저 시스템 테마를 따릅니다.</span>
+					<strong>{t('appearance.theme.system')}</strong>
+					<span>{t('appearance.theme.systemHelp')}</span>
 				</div>
 			</label>
 			<label class:active={defaultTheme === 'dark'}>
 				<input type="radio" bind:group={defaultTheme} value="dark" />
 				<div>
-					<strong>Dark</strong>
-					<span>다크 테마를 기본으로 사용합니다.</span>
+					<strong>{t('appearance.theme.dark')}</strong>
+					<span>{t('appearance.theme.darkHelp')}</span>
 				</div>
 			</label>
 			<label class:active={defaultTheme === 'light'}>
 				<input type="radio" bind:group={defaultTheme} value="light" />
 				<div>
-					<strong>Light</strong>
-					<span>라이트 테마를 기본으로 사용합니다.</span>
+					<strong>{t('appearance.theme.light')}</strong>
+					<span>{t('appearance.theme.lightHelp')}</span>
 				</div>
 			</label>
 		</div>
+
+		<section class="locale-card">
+			<div>
+				<p class="eyebrow">{t('common.language')}</p>
+				<h3>{t('appearance.language.title')}</h3>
+				<p class="copy">{t('appearance.language.description')}</p>
+			</div>
+			<div class="locale-row">
+				<select bind:value={locale}>
+					<option value="ko">{t('locale.ko')}</option>
+					<option value="en">{t('locale.en')}</option>
+				</select>
+				<button type="button" class="secondary" onclick={handleLocaleChange}>
+					{t('common.save')}
+				</button>
+			</div>
+		</section>
 	{/if}
 
 	{#if error}
@@ -99,7 +125,8 @@
 	}
 
 	.panel-header,
-	.choices label {
+	.choices label,
+	.locale-card {
 		padding: 1.5rem;
 		border: 1px solid var(--border);
 		border-radius: 20px;
@@ -148,9 +175,35 @@
 		cursor: not-allowed;
 	}
 
+	button.secondary {
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
+	}
+
 	.choices {
 		display: grid;
 		gap: 1rem;
+	}
+
+	.locale-card {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.locale-row {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+	}
+
+	select {
+		flex: 1;
+		padding: 0.85rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: var(--bg-primary);
+		color: var(--text-primary);
+		font: inherit;
 	}
 
 	.choices label {
@@ -193,6 +246,10 @@
 
 	@media (max-width: 720px) {
 		.panel-header {
+			flex-direction: column;
+		}
+
+		.locale-row {
 			flex-direction: column;
 		}
 

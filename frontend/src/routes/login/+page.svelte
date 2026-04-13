@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/i18n/index.svelte';
 	import { login } from '$lib/stores/auth.svelte';
 
 	let username = $state('');
@@ -20,7 +21,7 @@
 				goto('/');
 			}
 		} else {
-			error = '로그인 실패: 아이디 또는 비밀번호를 확인하세요.';
+			error = t('auth.login.error');
 		}
 	}
 </script>
@@ -46,7 +47,7 @@
 			<p class="error">{error}</p>
 		{/if}
 		<button type="submit" disabled={loading}>
-			{loading ? '로그인 중...' : '로그인'}
+			{loading ? t('auth.login.submitting') : t('auth.login.submit')}
 		</button>
 	</form>
 </div>

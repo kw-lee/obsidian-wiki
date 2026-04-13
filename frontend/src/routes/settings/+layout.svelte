@@ -2,17 +2,18 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { t } from '$lib/i18n/index.svelte';
 	import { getAuth } from '$lib/stores/auth.svelte';
 
 	let { children } = $props();
 
-	const tabs = [
-		{ href: '/settings/profile', label: 'Profile' },
-		{ href: '/settings/sync', label: 'Sync' },
-		{ href: '/settings/vault', label: 'Vault' },
-		{ href: '/settings/appearance', label: 'Appearance' },
-		{ href: '/settings/system', label: 'System' }
-	];
+	const tabs = $derived.by(() => [
+		{ href: '/settings/profile', label: t('settings.tabs.profile') },
+		{ href: '/settings/sync', label: t('settings.tabs.sync') },
+		{ href: '/settings/vault', label: t('settings.tabs.vault') },
+		{ href: '/settings/appearance', label: t('settings.tabs.appearance') },
+		{ href: '/settings/system', label: t('settings.tabs.system') }
+	]);
 
 	onMount(() => {
 		const auth = getAuth();
@@ -30,8 +31,8 @@
 	<aside class="settings-nav">
 		<div>
 			<p class="eyebrow">Settings</p>
-			<h1>관리자 설정</h1>
-			<p class="copy">런타임 설정과 계정 정보를 여기서 관리합니다.</p>
+			<h1>{t('settings.title')}</h1>
+			<p class="copy">{t('settings.description')}</p>
 		</div>
 
 		<nav>

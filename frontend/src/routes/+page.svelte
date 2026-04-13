@@ -11,6 +11,7 @@
 	import BacklinksPanel from '$lib/components/BacklinksPanel.svelte';
 	import SearchModal from '$lib/components/SearchModal.svelte';
 	import CommandPalette from '$lib/components/CommandPalette.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { toggleTheme } from '$lib/stores/theme.svelte';
 	import { createDoc } from '$lib/api/wiki';
 
@@ -86,7 +87,7 @@
 			doc = await saveDoc(doc.path, editContent, doc.base_commit);
 			editing = false;
 		} catch (e) {
-			alert(e instanceof Error ? e.message : '저장 실패');
+			alert(e instanceof Error ? e.message : t('home.saveFailed'));
 		}
 		saving = false;
 	}
@@ -111,14 +112,14 @@
 			showToast(payload ?? '');
 		} else if (action === 'new-doc') {
 			commandOpen = false;
-			const name = prompt('새 문서 경로 (예: folder/note.md)');
+			const name = prompt(t('home.newDocPrompt'));
 			if (!name) return;
 			try {
 				const newDoc = await createDoc(name);
 				await loadTree();
 				selectDoc(newDoc.path);
 			} catch (e) {
-				showToast(e instanceof Error ? e.message : '문서 생성 실패');
+				showToast(e instanceof Error ? e.message : t('home.newDocFailed'));
 			}
 		}
 	}
@@ -146,13 +147,13 @@
 					<div class="doc-actions">
 						{#if editing}
 							<button class="btn" onclick={handleSave} disabled={saving}>
-								{saving ? '저장 중...' : '저장'}
+								{saving ? t('home.buttonSaving') : t('home.buttonSave')}
 							</button>
 							<button class="btn secondary" onclick={() => (editing = false)}>
-								취소
+								{t('home.buttonCancel')}
 							</button>
 						{:else}
-							<button class="btn" onclick={startEdit}>편집</button>
+							<button class="btn" onclick={startEdit}>{t('home.buttonEdit')}</button>
 						{/if}
 					</div>
 				</div>
@@ -174,8 +175,8 @@
 				{/if}
 			{:else}
 				<div class="empty-state">
-					<p>좌측 파일 트리에서 문서를 선택하세요.</p>
-					<p class="hint">⌘K로 빠른 검색</p>
+					<p>{t('home.empty')}</p>
+					<p class="hint">{t('home.hint')}</p>
 				</div>
 			{/if}
 		</main>

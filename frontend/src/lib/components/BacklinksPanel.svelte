@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fetchBacklinks } from '$lib/api/wiki';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { BacklinkItem } from '$lib/types';
 
 	let {
@@ -22,9 +23,9 @@
 </script>
 
 <div class="panel">
-	<h3>백링크</h3>
+	<h3>{t('backlinks.title')}</h3>
 	{#if backlinks.length === 0}
-		<p class="empty">이 문서를 참조하는 문서가 없습니다.</p>
+		<p class="empty">{t('backlinks.empty')}</p>
 	{:else}
 		<ul>
 			{#each backlinks as link}

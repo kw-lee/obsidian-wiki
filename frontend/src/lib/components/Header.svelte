@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/i18n/index.svelte';
 	import { logout } from '$lib/stores/auth.svelte';
 	import { toggleTheme, getTheme } from '$lib/stores/theme.svelte';
 
@@ -13,20 +14,20 @@
 
 <header class="header">
 	<div class="header-left">
-		<a href="/" class="logo">Obsidian Wiki</a>
+		<a href="/" class="logo">{t('common.appName')}</a>
 	</div>
 	<div class="header-center">
 		<button class="search-trigger" onclick={onsearch}>
 			<span class="search-icon">⌘K</span>
-			<span>검색...</span>
+			<span>{t('header.search')}</span>
 		</button>
 	</div>
 	<div class="header-right">
-		<a href="/graph" class="icon-btn" title="그래프 뷰">◉</a>
-		<button class="icon-btn" onclick={toggleTheme} title="테마 전환">
+		<a href="/graph" class="icon-btn" title={t('header.graph')}>◉</a>
+		<button class="icon-btn" onclick={toggleTheme} title={t('header.toggleTheme')}>
 			{getTheme() === 'dark' ? '☀' : '☾'}
 		</button>
-		<button class="icon-btn" onclick={handleLogout} title="로그아웃">⏻</button>
+		<button class="icon-btn" onclick={handleLogout} title={t('header.logout')}>⏻</button>
 	</div>
 </header>
 

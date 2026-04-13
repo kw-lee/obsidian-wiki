@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { getAuth, changeCredentials } from '$lib/stores/auth.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let newUsername = $state('');
 	let newPassword = $state('');
@@ -26,11 +27,11 @@
 		error = '';
 
 		if (newPassword !== confirmPassword) {
-			error = '비밀번호가 일치하지 않습니다.';
+			error = t('auth.setup.passwordMismatch');
 			return;
 		}
 		if (newPassword.length < 4) {
-			error = '비밀번호는 4자 이상이어야 합니다.';
+			error = t('auth.setup.passwordTooShort');
 			return;
 		}
 
@@ -41,32 +42,32 @@
 		if (ok) {
 			goto('/');
 		} else {
-			error = '계정 설정 실패. 다시 시도해주세요.';
+			error = t('auth.setup.failed');
 		}
 	}
 </script>
 
 <div class="setup-container">
 	<form class="setup-form" onsubmit={handleSubmit}>
-		<h1>계정 설정</h1>
-		<p class="description">초기 계정입니다. 새 사용자명과 비밀번호를 설정해주세요.</p>
+		<h1>{t('auth.setup.title')}</h1>
+		<p class="description">{t('auth.setup.description')}</p>
 		<input
 			type="text"
-			placeholder="새 사용자명"
+			placeholder={t('auth.setup.username')}
 			bind:value={newUsername}
 			required
 			autocomplete="username"
 		/>
 		<input
 			type="password"
-			placeholder="새 비밀번호"
+			placeholder={t('auth.setup.password')}
 			bind:value={newPassword}
 			required
 			autocomplete="new-password"
 		/>
 		<input
 			type="password"
-			placeholder="비밀번호 확인"
+			placeholder={t('auth.setup.confirmPassword')}
 			bind:value={confirmPassword}
 			required
 			autocomplete="new-password"
@@ -75,7 +76,7 @@
 			<p class="error">{error}</p>
 		{/if}
 		<button type="submit" disabled={loading}>
-			{loading ? '설정 중...' : '계정 설정 완료'}
+			{loading ? t('auth.setup.submitting') : t('auth.setup.submit')}
 		</button>
 	</form>
 </div>

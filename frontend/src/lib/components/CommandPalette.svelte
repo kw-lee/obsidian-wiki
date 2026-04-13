@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/i18n/index.svelte';
 	import { syncPull, syncPush } from '$lib/api/wiki';
 
 	let {
@@ -21,60 +22,62 @@
 
 	let query = $state('');
 
-	const commands: Command[] = [
-		{ id: 'new', label: '새 문서 만들기', shortcut: '', action: () => onaction('new-doc') },
-		{ id: 'search', label: '문서 검색', shortcut: '⌘K', action: () => onaction('search') },
-		{
-			id: 'graph',
-			label: '그래프 뷰 열기',
-			action: () => {
-				onclose();
-				goto('/graph');
-			}
-		},
-		{
-			id: 'settings',
-			label: '설정 열기',
-			action: () => {
-				onclose();
-				goto('/settings/profile');
-			}
-		},
-		{
-			id: 'pull',
-			label: 'Git Pull (동기화)',
-			action: async () => {
-				onclose();
-				try {
-					const result = await syncPull();
-					onaction('toast', `Pull 완료: ${result.changed_files}개 파일 변경`);
-				} catch {
-					onaction('toast', 'Pull 실패');
+	const commands = $derived.by(
+		(): Command[] => [
+			{ id: 'new', label: t('commandPalette.newDoc'), shortcut: '', action: () => onaction('new-doc') },
+			{ id: 'search', label: t('commandPalette.search'), shortcut: '⌘K', action: () => onaction('search') },
+			{
+				id: 'graph',
+				label: t('commandPalette.graph'),
+				action: () => {
+					onclose();
+					goto('/graph');
+				}
+			},
+			{
+				id: 'settings',
+				label: t('commandPalette.settings'),
+				action: () => {
+					onclose();
+					goto('/settings/profile');
+				}
+			},
+			{
+				id: 'pull',
+				label: t('commandPalette.pull'),
+				action: async () => {
+					onclose();
+					try {
+						const result = await syncPull();
+						onaction('toast', t('commandPalette.pullSuccess', { count: result.changed_files }));
+					} catch {
+						onaction('toast', t('commandPalette.pullFailed'));
+					}
+				}
+			},
+			{
+				id: 'push',
+				label: t('commandPalette.push'),
+				action: async () => {
+					onclose();
+					try {
+						await syncPush();
+						onaction('toast', t('commandPalette.pushSuccess'));
+					} catch {
+						onaction('toast', t('commandPalette.pushFailed'));
+					}
+				}
+			},
+			{
+				id: 'theme',
+				label: t('commandPalette.theme'),
+				action: () => {
+					onclose();
+					onaction('toggle-theme');
 				}
 			}
-		},
-		{
-			id: 'push',
-			label: 'Git Push',
-			action: async () => {
-				onclose();
-				try {
-					await syncPush();
-					onaction('toast', 'Push 완료');
-				} catch {
-					onaction('toast', 'Push 실패');
-				}
-			}
-		},
-		{
-			id: 'theme',
-			label: '테마 전환 (다크/라이트)',
-			action: () => {
-				onclose();
-				onaction('toggle-theme');
-			}
-		}
-	];
+		]
+	);
 
 	let filtered = $derived(
 		query
@@ -97,7 +100,7 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<input type="text" placeholder="명령어 입력..." bind:value={query} autofocus />
+			<input type="text" placeholder={t('commandPalette.input')} bind:value={query} autofocus />
 			<ul class="commands">
 				{#each filtered as cmd}
 					<li>

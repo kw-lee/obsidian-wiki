@@ -102,6 +102,7 @@ class GraphNode(BaseModel):
     id: str
     title: str
     tags: list[str] = []
+    kind: Literal["note", "unresolved"] = "note"
 
 
 class GraphEdge(BaseModel):

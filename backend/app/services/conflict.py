@@ -1,6 +1,7 @@
 """3-way merge conflict detection and resolution."""
 
 import difflib
+from dataclasses import dataclass
 
 
 def three_way_merge(base: str, ours: str, theirs: str) -> tuple[str | None, str | None]:
@@ -49,3 +50,31 @@ def _changed_line_numbers(base: list[str], modified: list[str]) -> set[int]:
         if tag != "equal":
             changed.update(range(i1, i2))
     return changed
+
+
+@dataclass(frozen=True)
+class MergeResult:
+    merged_content: bytes | None
+    diff: str | None
+
+
+def merge_text_bytes(base: str | None, ours: bytes, theirs: bytes) -> MergeResult:
+    """Attempt a UTF-8 text merge using a stored base snapshot.
+
+    Returns a merged byte string when all inputs are valid UTF-8 text and the
+    merge succeeds. If contents are binary/undecodable or the edits overlap, the
+    diff field contains a best-effort explanation.
+    """
+    if base is None:
+        return MergeResult(None, "No base content available for automatic merge")
+
+    try:
+        ours_text = ours.decode("utf-8")
+        theirs_text = theirs.decode("utf-8")
+    except UnicodeDecodeError:
+        return MergeResult(None, "Automatic merge is only supported for UTF-8 text files")
+
+    merged, diff = three_way_merge(base, ours_text, theirs_text)
+    if merged is None:
+        return MergeResult(None, diff)
+    return MergeResult(merged.encode("utf-8"), None)

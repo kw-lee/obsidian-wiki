@@ -141,5 +141,6 @@ class WebDAVManifest(Base):
     etag: Mapped[str | None] = mapped_column(Text, nullable=True)
     mtime: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    base_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("idx_webdav_manifest_path", "path"),)

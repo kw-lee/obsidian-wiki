@@ -5,7 +5,7 @@ import pytest
 
 import app.db.session as session_mod
 from app.db.models import AppSettings, User
-from app.schemas import SyncTestResult
+from app.schemas import SyncStatus, SyncTestResult
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync.crypto import decrypt_secret, encrypt_secret
 
@@ -142,7 +142,15 @@ async def test_sync_status_reflects_disabled_backend(client, auth_headers, setup
 
 
 @pytest.mark.asyncio
-async def test_sync_settings_redact_and_persist_webdav_password(client, auth_headers, setup_vault):
+async def test_sync_settings_redact_and_persist_webdav_password(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    async def fake_status(self, db) -> SyncStatus:
+        del db
+        return SyncStatus(backend="webdav", message="WebDAV backend configured")
+
+    monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.status", fake_status)
+
     resp = await client.put(
         "/api/settings/sync",
         json={

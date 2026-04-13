@@ -1,4 +1,4 @@
-from app.services.conflict import three_way_merge
+from app.services.conflict import merge_text_bytes, three_way_merge
 
 
 def test_no_change():
@@ -42,3 +42,22 @@ def test_overlapping_conflict():
     merged, diff = three_way_merge(base, ours, theirs)
     assert merged is None
     assert diff is not None
+
+
+def test_merge_text_bytes_non_overlapping():
+    result = merge_text_bytes(
+        "line1\nline2\nline3\n",
+        b"line1\nlocal\nline3\n",
+        b"line1\nline2\nremote\n",
+    )
+    assert result.diff is None
+    assert result.merged_content is not None
+    merged_text = result.merged_content.decode("utf-8")
+    assert "local" in merged_text
+    assert "remote" in merged_text
+
+
+def test_merge_text_bytes_requires_base_content():
+    result = merge_text_bytes(None, b"ours", b"theirs")
+    assert result.merged_content is None
+    assert result.diff == "No base content available for automatic merge"

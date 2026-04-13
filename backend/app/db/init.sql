@@ -78,7 +78,8 @@ CREATE TABLE webdav_manifest (
     path  TEXT UNIQUE NOT NULL,
     etag  TEXT,
     mtime TIMESTAMPTZ,
-    sha256 TEXT NOT NULL
+    sha256 TEXT NOT NULL,
+    base_content TEXT
 );
 
 CREATE INDEX idx_documents_search ON documents USING GIN(search_vector);

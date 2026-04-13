@@ -9,7 +9,12 @@ from app.db.session import get_db
 from app.schemas import BacklinkItem, DocCreateRequest, DocDetail, DocSaveRequest, TreeNode
 from app.services import vault
 from app.services.conflict import three_way_merge
-from app.services.git_ops import file_changed_between, git_add_and_commit, head_commit_sha
+from app.services.git_ops import (
+    file_changed_between,
+    git_add_and_commit,
+    head_commit_sha,
+    read_file_at_commit,
+)
 from app.services.indexer import index_file
 
 router = APIRouter()
@@ -60,8 +65,8 @@ async def save_doc(
     ):
         # Attempt 3-way merge
         try:
-            base_content = await vault.read_doc(path)
-        except FileNotFoundError:
+            base_content = read_file_at_commit(path, body.base_commit)
+        except Exception:
             base_content = ""
         current_content = await vault.read_doc(path)
         merged, diff = three_way_merge(base_content, body.content, current_content)

@@ -39,6 +39,11 @@ def changed_files_since(old_sha: str, new_sha: str, *, git_remote_url: str = "")
     return [d.a_path or d.b_path for d in diff]
 
 
+def read_file_at_commit(path: str, commit_sha: str, *, git_remote_url: str = "") -> str:
+    repo = get_repo(git_remote_url=git_remote_url)
+    return repo.git.show(f"{commit_sha}:{path}")
+
+
 def file_changed_between(
     path: str, old_sha: str, new_sha: str, *, git_remote_url: str = ""
 ) -> bool:

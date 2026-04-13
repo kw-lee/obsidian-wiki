@@ -2,8 +2,9 @@
   import { goto } from "$app/navigation";
   import { t } from "$lib/i18n/index.svelte";
   import { logout } from "$lib/stores/auth.svelte";
-  import { getSyncMonitor, isSyncJobActive } from "$lib/stores/sync.svelte";
+  import { getSyncMonitor } from "$lib/stores/sync.svelte";
   import { toggleTheme, getTheme } from "$lib/stores/theme.svelte";
+  import { getSyncIndicatorState } from "$lib/utils/sync-indicator";
 
   let { onsearch }: { onsearch: () => void } = $props();
   const syncMonitor = getSyncMonitor();
@@ -13,19 +14,19 @@
     goto("/login");
   }
 
+  const syncIndicator = $derived(
+    getSyncIndicatorState({
+      currentJob: syncMonitor.currentJob,
+      error: syncMonitor.error,
+      status: syncMonitor.status,
+    }),
+  );
+
   function syncPillLabel() {
-    const job = syncMonitor.currentJob;
-    if (!job) return "";
-    if (isSyncJobActive(job)) {
-      return job.message || t("sync.header.running");
+    if (syncMonitor.currentJob?.message && syncIndicator.tone === "running") {
+      return syncMonitor.currentJob.message;
     }
-    if (job.status === "succeeded") {
-      return t("sync.header.success");
-    }
-    if (job.status === "conflict") {
-      return t("sync.header.conflict");
-    }
-    return t("sync.header.failed");
+    return t(syncIndicator.messageKey);
   }
 </script>
 
@@ -40,11 +41,16 @@
     </button>
   </div>
   <div class="header-right">
-    {#if syncMonitor.currentJob}
+    {#if syncMonitor.initialized}
       <a
         href="/settings/sync"
         class="sync-pill"
-        class:active={isSyncJobActive(syncMonitor.currentJob)}
+        class:running={syncIndicator.tone === "running"}
+        class:success={syncIndicator.tone === "success"}
+        class:conflict={syncIndicator.tone === "conflict"}
+        class:error={syncIndicator.tone === "error"}
+        class:warning={syncIndicator.tone === "warning"}
+        class:disabled={syncIndicator.tone === "disabled"}
       >
         <span class="sync-dot"></span>
         <span>{syncPillLabel()}</span>
@@ -131,9 +137,22 @@
     font-size: 0.8rem;
     max-width: 260px;
   }
-  .sync-pill.active {
+  .sync-pill.running,
+  .sync-pill.success {
     color: var(--text-primary);
     border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  .sync-pill.warning {
+    border-color: color-mix(in srgb, #d97706 40%, var(--border));
+    color: var(--text-primary);
+  }
+  .sync-pill.conflict,
+  .sync-pill.error {
+    border-color: color-mix(in srgb, #dc2626 40%, var(--border));
+    color: var(--text-primary);
+  }
+  .sync-pill.disabled {
+    opacity: 0.8;
   }
   .sync-pill span:last-child {
     overflow: hidden;
@@ -146,5 +165,15 @@
     border-radius: 999px;
     background: var(--accent);
     flex: 0 0 auto;
+  }
+  .sync-pill.warning .sync-dot {
+    background: #d97706;
+  }
+  .sync-pill.conflict .sync-dot,
+  .sync-pill.error .sync-dot {
+    background: #dc2626;
+  }
+  .sync-pill.disabled .sync-dot {
+    background: var(--text-muted);
   }
 </style>

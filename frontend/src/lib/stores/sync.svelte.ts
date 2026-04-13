@@ -1,5 +1,5 @@
-import { fetchCurrentSyncJob, startSyncJob } from "$lib/api/wiki";
-import type { SyncJob } from "$lib/types";
+import { fetchCurrentSyncJob, fetchSyncStatus, startSyncJob } from "$lib/api/wiki";
+import type { SyncJob, SyncStatus } from "$lib/types";
 import { getAuth } from "$lib/stores/auth.svelte";
 
 const POLL_INTERVAL_MS = 1500;
@@ -12,12 +12,14 @@ const FINAL_STATUSES = new Set<SyncJob["status"]>([
 
 interface SyncMonitorState {
   currentJob: SyncJob | null;
+  status: SyncStatus | null;
   initialized: boolean;
   error: string | null;
 }
 
 let state = $state<SyncMonitorState>({
   currentJob: null,
+  status: null,
   initialized: false,
   error: null,
 });
@@ -40,6 +42,7 @@ export function initSyncMonitor() {
   pollHandle = window.setInterval(() => {
     if (!getAuth().isAuthenticated) {
       state.currentJob = null;
+      state.status = null;
       state.initialized = true;
       return;
     }
@@ -50,17 +53,40 @@ export function initSyncMonitor() {
 export async function refreshSyncJob() {
   if (!getAuth().isAuthenticated) {
     state.currentJob = null;
+    state.status = null;
     state.initialized = true;
     return;
   }
 
   try {
-    const job = await fetchCurrentSyncJob();
-    state.currentJob = shouldShowJob(job) ? job : null;
-    state.error = null;
+    const [jobResult, statusResult] = await Promise.allSettled([
+      fetchCurrentSyncJob(),
+      fetchSyncStatus(),
+    ]);
+
+    if (jobResult.status === "fulfilled") {
+      state.currentJob = shouldShowJob(jobResult.value) ? jobResult.value : null;
+    }
+
+    if (statusResult.status === "fulfilled") {
+      state.status = statusResult.value;
+    }
+
+    if (jobResult.status === "rejected" || statusResult.status === "rejected") {
+      const reason =
+        jobResult.status === "rejected"
+          ? jobResult.reason
+          : statusResult.status === "rejected"
+            ? statusResult.reason
+            : null;
+      state.error =
+        reason instanceof Error ? reason.message : "Failed to fetch sync status";
+    } else {
+      state.error = null;
+    }
   } catch (err) {
     state.error =
-      err instanceof Error ? err.message : "Failed to fetch sync job";
+      err instanceof Error ? err.message : "Failed to fetch sync status";
   } finally {
     state.initialized = true;
   }

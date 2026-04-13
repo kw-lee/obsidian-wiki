@@ -6,27 +6,38 @@
   let {
     nodes,
     selectedPath,
+    expandedPaths = [],
     revealNonce = 0,
     onselect,
     oncreateNote,
     oncreateFolder,
+    onexpandedchange = undefined,
   }: {
     nodes: TreeNode[];
     selectedPath: string;
+    expandedPaths?: string[];
     revealNonce?: number;
     onselect: (path: string) => void | Promise<void>;
     oncreateNote: (path: string) => void | Promise<void>;
     oncreateFolder: (path: string) => void | Promise<void>;
+    onexpandedchange?: (paths: string[]) => void;
   } = $props();
 
-  let expandedPaths = $state<Set<string>>(new Set());
+  let localExpandedPaths = $state<Set<string>>(new Set<string>());
 
   $effect(() => {
     const next = new Set(expandedPaths);
+    if (!samePathSet(localExpandedPaths, next)) {
+      localExpandedPaths = next;
+    }
+  });
+
+  $effect(() => {
+    const next = new Set(localExpandedPaths);
     for (const ancestor of ancestorFolders(selectedPath)) {
       next.add(ancestor);
     }
-    expandedPaths = next;
+    updateExpandedPaths(next);
   });
 
   $effect(() => {
@@ -37,17 +48,17 @@
   });
 
   function setExpanded(paths: Iterable<string>) {
-    expandedPaths = new Set(paths);
+    updateExpandedPaths(new Set(paths));
   }
 
   function toggleFolder(path: string, open: boolean) {
-    const next = new Set(expandedPaths);
+    const next = new Set(localExpandedPaths);
     if (open) {
       next.add(path);
     } else {
       next.delete(path);
     }
-    expandedPaths = next;
+    updateExpandedPaths(next);
   }
 
   function handleCreateNote() {
@@ -134,6 +145,26 @@
     }
     return value.replace(/["\\]/g, "\\$&");
   }
+
+  function updateExpandedPaths(next: Set<string>) {
+    if (samePathSet(localExpandedPaths, next)) {
+      return;
+    }
+    localExpandedPaths = next;
+    onexpandedchange?.([...next]);
+  }
+
+  function samePathSet(left: Set<string>, right: Set<string>) {
+    if (left.size !== right.size) {
+      return false;
+    }
+    for (const value of left) {
+      if (!right.has(value)) {
+        return false;
+      }
+    }
+    return true;
+  }
 </script>
 
 <div class="explorer">
@@ -148,7 +179,7 @@
   <FileTree
     {nodes}
     {selectedPath}
-    {expandedPaths}
+    expandedPaths={localExpandedPaths}
     onselect={onselect}
     ontoggle={toggleFolder}
   />

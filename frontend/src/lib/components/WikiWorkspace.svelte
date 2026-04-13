@@ -7,7 +7,14 @@
   import { toggleTheme } from "$lib/stores/theme.svelte";
   import type { DocDetail, TreeNode } from "$lib/types";
   import { buildWikiRoute, isNotePath } from "$lib/utils/routes";
-  import { setLastWikiPath } from "$lib/utils/workspace";
+  import {
+    getWorkspaceState,
+    setLastWikiPath,
+    setWorkspaceExpandedPaths,
+    setWorkspaceLinksTab,
+    setWorkspaceSidebarOpen,
+    type WorkspaceLinksTab,
+  } from "$lib/utils/workspace";
   import BacklinksPanel from "./BacklinksPanel.svelte";
   import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
   import CommandPalette from "./CommandPalette.svelte";
@@ -28,8 +35,11 @@
   let editContent = $state("");
   let saving = $state(false);
   let sidebarOpen = $state(true);
+  let explorerExpandedPaths = $state<string[]>([]);
+  let linksTab = $state<WorkspaceLinksTab>("backlinks");
   let toast = $state("");
   let ready = $state(false);
+  let workspaceReady = $state(false);
   let openedPath = $state<string | null>(null);
   let revealNonce = $state(0);
 
@@ -47,6 +57,11 @@
       return;
     }
 
+    const workspaceState = getWorkspaceState();
+    sidebarOpen = workspaceState.sidebarOpen;
+    explorerExpandedPaths = workspaceState.expandedPaths;
+    linksTab = workspaceState.linksTab;
+    workspaceReady = true;
     ready = true;
     void loadTree();
 
@@ -81,6 +96,27 @@
     if (selectedPath && isNotePath(selectedPath)) {
       setLastWikiPath(selectedPath);
     }
+  });
+
+  $effect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+    setWorkspaceSidebarOpen(sidebarOpen);
+  });
+
+  $effect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+    setWorkspaceExpandedPaths(explorerExpandedPaths);
+  });
+
+  $effect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+    setWorkspaceLinksTab(linksTab);
   });
 
   async function loadTree() {
@@ -250,8 +286,12 @@
         <FileExplorer
           nodes={tree}
           selectedPath={selectedPath}
+          expandedPaths={explorerExpandedPaths}
           {revealNonce}
           onselect={navigateTo}
+          onexpandedchange={(paths) => {
+            explorerExpandedPaths = paths;
+          }}
           oncreateNote={async (path) => {
             const newDoc = await createDoc(path);
             await loadTree();
@@ -313,6 +353,10 @@
         <BacklinksPanel
           docPath={doc.path}
           outgoingLinks={doc.outgoing_links}
+          selectedTab={linksTab}
+          ontabchange={(tab) => {
+            linksTab = tab;
+          }}
           onnavigate={navigateTo}
         />
       {/if}

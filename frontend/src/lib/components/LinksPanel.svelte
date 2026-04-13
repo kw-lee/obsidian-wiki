@@ -6,19 +6,29 @@
   let {
     docPath,
     outgoingLinks,
+    selectedTab = "backlinks",
     onnavigate,
+    ontabchange = undefined,
   }: {
     docPath: string;
     outgoingLinks: ResolvedWikiLink[];
+    selectedTab?: "backlinks" | "frontlinks";
     onnavigate: (path: string) => void;
+    ontabchange?: (tab: "backlinks" | "frontlinks") => void;
   } = $props();
 
   let backlinks = $state<BacklinkItem[]>([]);
-  let selectedTab = $state<"backlinks" | "frontlinks">("backlinks");
+  let activeTab = $state<"backlinks" | "frontlinks">("backlinks");
 
   const visibleOutgoingLinks = $derived(
     outgoingLinks.filter((link) => !link.embed),
   );
+
+  $effect(() => {
+    if (selectedTab !== activeTab) {
+      activeTab = selectedTab;
+    }
+  });
 
   $effect(() => {
     if (!docPath) {
@@ -42,13 +52,21 @@
       onnavigate(link.vault_path);
     }
   }
+
+  function setActiveTab(tab: "backlinks" | "frontlinks") {
+    if (activeTab === tab) {
+      return;
+    }
+    activeTab = tab;
+    ontabchange?.(tab);
+  }
 </script>
 
 <div class="panel">
   <div class="panel-header">
     <h3>{t("links.title")}</h3>
     <span class="panel-count">
-      {selectedTab === "backlinks"
+      {activeTab === "backlinks"
         ? t("links.count", { count: backlinks.length })
         : t("links.count", { count: visibleOutgoingLinks.length })}
     </span>
@@ -56,20 +74,20 @@
 
   <div class="tabs">
     <button
-      class:active={selectedTab === "backlinks"}
-      onclick={() => (selectedTab = "backlinks")}
+      class:active={activeTab === "backlinks"}
+      onclick={() => setActiveTab("backlinks")}
     >
       {t("links.tabs.backlinks")}
     </button>
     <button
-      class:active={selectedTab === "frontlinks"}
-      onclick={() => (selectedTab = "frontlinks")}
+      class:active={activeTab === "frontlinks"}
+      onclick={() => setActiveTab("frontlinks")}
     >
       {t("links.tabs.frontlinks")}
     </button>
   </div>
 
-  {#if selectedTab === "backlinks"}
+  {#if activeTab === "backlinks"}
     {#if backlinks.length === 0}
       <p class="empty">{t("links.backlinksEmpty")}</p>
     {:else}

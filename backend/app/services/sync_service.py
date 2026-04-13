@@ -50,18 +50,21 @@ async def get_active_sync_status(db: AsyncSession) -> SyncStatus:
 
 async def run_scheduled_sync(db: AsyncSession) -> SyncStatus:
     runtime = await get_runtime_sync_settings(db, use_cache=False)
-    if runtime.sync_backend != "git" or not runtime.sync_auto_enabled:
-        if runtime.sync_backend == "none":
-            return SyncStatus(backend="none", message="Sync is disabled")
-        if runtime.sync_backend == "webdav":
-            return SyncStatus(
-                backend="webdav",
-                message="WebDAV automatic sync is not implemented yet",
-            )
-        return SyncStatus(backend="git", message="Automatic sync is disabled")
+    backend = _get_backend(runtime)
+    if backend is None:
+        return SyncStatus(backend="none", message="Sync is disabled")
+    if not runtime.sync_auto_enabled:
+        return SyncStatus(backend=runtime.sync_backend, message="Automatic sync is disabled")
 
-    await pull_active_backend(db)
-    return await get_active_sync_status(db)
+    status_before = await backend.status(db)
+    if status_before.behind > 0:
+        await backend.pull(db)
+
+    status_after_pull = await backend.status(db)
+    if status_after_pull.ahead > 0:
+        await backend.push(db)
+
+    return await backend.status(db)
 
 
 async def test_sync_backend(db: AsyncSession, runtime_override=None):

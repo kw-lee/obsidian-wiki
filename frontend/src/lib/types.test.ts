@@ -151,7 +151,7 @@ describe("Type contracts", () => {
 
   it("GraphData has nodes and edges", () => {
     const graph: GraphData = {
-      nodes: [{ id: "a.md", title: "A", tags: [] }],
+      nodes: [{ id: "a.md", title: "A", kind: "note", tags: [] }],
       edges: [{ source: "a.md", target: "b.md" }],
     };
     expect(graph.nodes).toHaveLength(1);

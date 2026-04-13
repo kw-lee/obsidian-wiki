@@ -7,7 +7,7 @@
   import { fetchGraph } from "$lib/api/wiki";
   import { t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
-  import type { GraphData } from "$lib/types";
+  import type { GraphData, GraphNode } from "$lib/types";
   import {
     buildGraphRouteSearch,
     calculateAverageDegree,
@@ -16,6 +16,7 @@
     findGraphNode,
     getNeighborNodes,
     getNodeDegree,
+    isUnresolvedGraphNode,
     listGraphFolders,
     listGraphTags,
     parseGraphRouteState,
@@ -224,6 +225,7 @@
 
     const nodes: SimNode[] = data.nodes.map((node) => ({ ...node }));
     const nodeIds = new Set(nodes.map((node) => node.id));
+    const nodeById = new Map(data.nodes.map((node) => [node.id, node] as const));
     const links: SimLink[] = data.edges
       .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
       .map((edge) => ({ ...edge }));
@@ -260,10 +262,17 @@
       .data(nodes)
       .join("circle")
       .attr("r", (graphNode) => nodeRadius(data, graphNode.id))
-      .attr("fill", (graphNode) => nodeFill(graphNode.id))
-      .attr("stroke", (graphNode) => nodeStroke(graphNode.id))
-      .attr("stroke-width", (graphNode) => nodeStrokeWidth(data, graphNode.id))
-      .attr("fill-opacity", (graphNode) => nodeOpacity(data, graphNode.id))
+      .attr("fill", (graphNode) => nodeFill(nodeById.get(graphNode.id) ?? null))
+      .attr("stroke", (graphNode) => nodeStroke(nodeById.get(graphNode.id) ?? null))
+      .attr("stroke-width", (graphNode) =>
+        nodeStrokeWidth(data, nodeById.get(graphNode.id) ?? null),
+      )
+      .attr("fill-opacity", (graphNode) =>
+        nodeOpacity(data, nodeById.get(graphNode.id) ?? null),
+      )
+      .attr("stroke-dasharray", (graphNode) =>
+        isUnresolvedGraphNode(nodeById.get(graphNode.id)) ? "4 3" : null,
+      )
       .style("cursor", "pointer")
       .on("click", (_event, graphNode) => {
         selectedNodeId = graphNode.id;
@@ -313,8 +322,15 @@
       .attr("font-weight", (graphNode) =>
         graphNode.id === selectedId || graphNode.id === currentPath ? "600" : "400",
       )
+      .attr("font-style", (graphNode) =>
+        isUnresolvedGraphNode(nodeById.get(graphNode.id)) ? "italic" : "normal",
+      )
       .attr("fill", (graphNode) =>
-        graphNode.id === selectedId ? "var(--text-primary)" : "var(--text-secondary)",
+        isUnresolvedGraphNode(nodeById.get(graphNode.id))
+          ? "color-mix(in srgb, var(--warning) 88%, var(--text-primary))"
+          : graphNode.id === selectedId
+            ? "var(--text-primary)"
+            : "var(--text-secondary)",
       )
       .attr("dx", (graphNode) => nodeRadius(data, graphNode.id) + 5)
       .attr("dy", 4)
@@ -329,11 +345,17 @@
 
     node
       .append("title")
-      .text((graphNode) =>
-        graphNode.tags.length > 0
-          ? `${graphNode.title}\n${graphNode.tags.map((entry) => `#${entry}`).join(" ")}`
-          : graphNode.title,
-      );
+      .text((graphNode) => {
+        const source = nodeById.get(graphNode.id);
+        const lines = [graphNode.title];
+        if (source) {
+          lines.push(nodeKindLabel(source));
+        }
+        if (graphNode.tags.length > 0) {
+          lines.push(graphNode.tags.map((entry) => `#${entry}`).join(" "));
+        }
+        return lines.join("\n");
+      });
 
     function updatePositions() {
       link
@@ -373,8 +395,12 @@
 
   function nodeRadius(data: GraphData, nodeId: string) {
     const degree = getNodeDegree(data, nodeId);
+    const node = data.nodes.find((entry) => entry.id === nodeId);
     const baseRadius = degree >= 4 ? 8 : degree >= 2 ? 7 : 6;
 
+    if (node?.kind === "unresolved") {
+      return Math.max(baseRadius - 0.5, 5.5);
+    }
     if (nodeId === selectedNodeId) {
       return Math.max(baseRadius, 10);
     }
@@ -384,40 +410,64 @@
     return baseRadius;
   }
 
-  function nodeFill(nodeId: string) {
-    if (nodeId === selectedNodeId) {
+  function nodeFill(node: GraphNode | null) {
+    if (!node) {
+      return "var(--accent)";
+    }
+    if (node.kind === "unresolved") {
+      return "color-mix(in srgb, var(--warning) 24%, var(--bg-primary))";
+    }
+    if (node.id === selectedNodeId) {
       return "var(--text-primary)";
     }
-    if (nodeId === currentPath) {
+    if (node.id === currentPath) {
       return "#f59e0b";
     }
     return "var(--accent)";
   }
 
-  function nodeStroke(nodeId: string) {
-    if (nodeId === selectedNodeId) {
+  function nodeStroke(node: GraphNode | null) {
+    if (!node) {
+      return "var(--bg-primary)";
+    }
+    if (node.kind === "unresolved") {
+      return "color-mix(in srgb, var(--warning) 62%, var(--border))";
+    }
+    if (node.id === selectedNodeId) {
       return "var(--accent)";
     }
-    if (nodeId === currentPath) {
+    if (node.id === currentPath) {
       return "color-mix(in srgb, #f59e0b 55%, var(--bg-primary))";
     }
     return "var(--bg-primary)";
   }
 
-  function nodeStrokeWidth(data: GraphData, nodeId: string) {
-    const degree = getNodeDegree(data, nodeId);
-    if (nodeId === selectedNodeId) {
+  function nodeStrokeWidth(data: GraphData, node: GraphNode | null) {
+    if (!node) {
+      return 1.5;
+    }
+    const degree = getNodeDegree(data, node.id);
+    if (node.kind === "unresolved") {
+      return 1.75;
+    }
+    if (node.id === selectedNodeId) {
       return 3;
     }
-    if (nodeId === currentPath) {
+    if (node.id === currentPath) {
       return 2.5;
     }
     return degree >= 4 ? 2 : 1.5;
   }
 
-  function nodeOpacity(data: GraphData, nodeId: string) {
-    const degree = getNodeDegree(data, nodeId);
-    if (nodeId === selectedNodeId || nodeId === currentPath) {
+  function nodeOpacity(data: GraphData, node: GraphNode | null) {
+    if (!node) {
+      return 0.8;
+    }
+    const degree = getNodeDegree(data, node.id);
+    if (node.kind === "unresolved") {
+      return 0.84;
+    }
+    if (node.id === selectedNodeId || node.id === currentPath) {
       return 1;
     }
     if (degree >= 4) {
@@ -488,6 +538,13 @@
 
   function formatTags(tags: string[]) {
     return tags.map((entry) => `#${entry}`);
+  }
+
+  function nodeKindLabel(node: GraphNode | null | undefined) {
+    if (!node) {
+      return "";
+    }
+    return isUnresolvedGraphNode(node) ? t("graph.nodeKind.unresolved") : t("graph.nodeKind.note");
   }
 
   function formatFolder(path: string | null) {
@@ -584,6 +641,9 @@
       </span>
       <strong>{selectedNode?.title ?? t("graph.selection.none")}</strong>
       {#if selectedNode}
+        <span class="node-kind">
+          {nodeKindLabel(selectedNode)}
+        </span>
         <span class="meta-path">{selectedNode.id}</span>
         {#if selectedNode.tags.length > 0}
           <div class="tag-list">
@@ -608,6 +668,19 @@
         {t("graph.metrics.folderValue", { folder: formatFolder(selectedNode?.id ?? null) })}
       </span>
       <span class="meta-path">{t("graph.doubleClickHint")}</span>
+    </div>
+
+    <div class="meta-card">
+      <span class="meta-label">{t("graph.legend.title")}</span>
+      <div class="legend-item">
+        <span class="legend-swatch note"></span>
+        <span>{t("graph.nodeKind.note")}</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch unresolved"></span>
+        <span>{t("graph.nodeKind.unresolved")}</span>
+      </div>
+      <span class="meta-path">{t("graph.nodeKind.unresolvedHint")}</span>
     </div>
 
     <div class="meta-card">
@@ -670,6 +743,7 @@
         <aside class="hover-card">
           <span class="meta-label">{t("graph.preview.title")}</span>
           <strong>{hoveredNode.title}</strong>
+          <span class="node-kind">{nodeKindLabel(hoveredNode)}</span>
           <span class="meta-path">{hoveredNode.id}</span>
           {#if hoveredNode.tags.length > 0}
             <div class="tag-list">
@@ -805,6 +879,45 @@
     color: var(--text-secondary);
     font-size: 0.75rem;
     line-height: 1.1;
+  }
+
+  .node-kind {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 0.16rem 0.5rem;
+    background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+
+  .legend-swatch {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--border);
+    flex: none;
+  }
+
+  .legend-swatch.note {
+    background: var(--accent);
+  }
+
+  .legend-swatch.unresolved {
+    background: color-mix(in srgb, var(--warning) 24%, var(--bg-primary));
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--warning) 62%, var(--border));
   }
 
   .tool-btn {

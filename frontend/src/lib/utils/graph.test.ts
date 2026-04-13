@@ -11,6 +11,7 @@ import {
   findGraphNode,
   getNeighborNodes,
   getNodeDegree,
+  isUnresolvedGraphNode,
   listGraphFolders,
   listGraphTags,
   parseGraphRouteState,
@@ -19,11 +20,11 @@ import {
 
 const graph: GraphData = {
   nodes: [
-    { id: "alpha.md", title: "Alpha", tags: ["planning"] },
-    { id: "beta.md", title: "Beta", tags: ["planning", "team"] },
-    { id: "projects/gamma.md", title: "Gamma", tags: ["team"] },
-    { id: "projects/sub/delta.md", title: "Delta", tags: ["archive"] },
-    { id: "projects/sub/zeta.md", title: "Zeta", tags: [] },
+    { id: "alpha.md", title: "Alpha", kind: "note", tags: ["planning"] },
+    { id: "beta.md", title: "Beta", kind: "note", tags: ["planning", "team"] },
+    { id: "projects/gamma.md", title: "Gamma", kind: "note", tags: ["team"] },
+    { id: "projects/sub/delta.md", title: "Delta", kind: "note", tags: ["archive"] },
+    { id: "projects/sub/zeta.md", title: "Zeta", kind: "unresolved", tags: [] },
   ],
   edges: [
     { source: "alpha.md", target: "beta.md" },
@@ -88,6 +89,11 @@ describe("graph utils", () => {
     expect(findGraphNode(graph, "missing.md")).toBeNull();
   });
 
+  it("marks unresolved nodes explicitly", () => {
+    expect(isUnresolvedGraphNode(findGraphNode(graph, "projects/sub/zeta.md"))).toBe(true);
+    expect(isUnresolvedGraphNode(findGraphNode(graph, "alpha.md"))).toBe(false);
+  });
+
   it("returns direct neighbor nodes for hover previews", () => {
     expect(getNeighborNodes(graph, "projects/gamma.md").map((node) => node.id)).toEqual([
       "beta.md",
@@ -108,6 +114,7 @@ describe("graph utils", () => {
       {
         id: "beta.md",
         title: "Beta",
+        kind: "note",
         tags: ["planning", "team"],
         degree: 2,
         folder: "",
@@ -115,6 +122,7 @@ describe("graph utils", () => {
       {
         id: "projects/gamma.md",
         title: "Gamma",
+        kind: "note",
         tags: ["team"],
         degree: 2,
         folder: "projects",
@@ -122,6 +130,7 @@ describe("graph utils", () => {
       {
         id: "alpha.md",
         title: "Alpha",
+        kind: "note",
         tags: ["planning"],
         degree: 1,
         folder: "",

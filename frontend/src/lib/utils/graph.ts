@@ -15,6 +15,10 @@ export interface RankedGraphNode extends GraphNode {
   folder: string;
 }
 
+export function isUnresolvedGraphNode(node: GraphNode | null | undefined): boolean {
+  return node?.kind === "unresolved";
+}
+
 export interface GraphRouteState {
   focusPath: string | null;
   selectedNodeId: string | null;

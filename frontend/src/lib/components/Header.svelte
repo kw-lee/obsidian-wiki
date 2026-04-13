@@ -11,10 +11,23 @@
   import { getSyncIndicatorState } from "$lib/utils/sync-indicator";
   import { formatDateTime } from "$lib/utils/datetime";
 
-  let { onsearch }: { onsearch: () => void } = $props();
+  let {
+    onsearch,
+    onsidebartoggle = () => {},
+    showSidebarToggle = false,
+    sidebarOpen = false,
+  }: {
+    onsearch: () => void;
+    onsidebartoggle?: () => void;
+    showSidebarToggle?: boolean;
+    sidebarOpen?: boolean;
+  } = $props();
   const syncMonitor = getSyncMonitor();
   let syncSurface = $state<HTMLElement | null>(null);
   let syncOpen = $state(false);
+  const sidebarToggleLabel = $derived(
+    t(sidebarOpen ? "header.closeSidebar" : "header.openSidebar"),
+  );
 
   function handleLogout() {
     logout();
@@ -70,6 +83,19 @@
 
 <header class="header">
   <div class="header-left">
+    {#if showSidebarToggle}
+      <button
+        type="button"
+        class="icon-btn sidebar-btn"
+        aria-label={sidebarToggleLabel}
+        aria-controls="wiki-sidebar"
+        aria-expanded={sidebarOpen}
+        title={sidebarToggleLabel}
+        onclick={onsidebartoggle}
+      >
+        {sidebarOpen ? "✕" : "☰"}
+      </button>
+    {/if}
     <a href="/" class="logo">{t("common.appName")}</a>
   </div>
   <div class="header-center">
@@ -227,6 +253,13 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    min-width: 0;
+  }
+  .header-center {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
   }
   .sync-surface {
     position: relative;
@@ -250,6 +283,7 @@
     cursor: pointer;
     min-width: 240px;
     font-size: 0.875rem;
+    width: min(100%, 28rem);
   }
   .search-icon {
     font-size: 0.75rem;
@@ -447,5 +481,57 @@
     justify-self: end;
     font-size: 0.78rem;
     color: var(--accent);
+  }
+
+  @media (max-width: 768px) {
+    .header {
+      height: auto;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      align-items: center;
+    }
+
+    .header-left {
+      flex: 1 1 auto;
+    }
+
+    .header-center {
+      order: 3;
+      flex: 1 1 100%;
+      justify-content: stretch;
+    }
+
+    .header-right {
+      flex: 0 1 auto;
+      gap: 0.35rem;
+    }
+
+    .search-trigger {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .sync-pill {
+      max-width: min(11rem, calc(100vw - 11rem));
+    }
+
+    .sync-popover {
+      right: -0.25rem;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .logo {
+      font-size: 0.95rem;
+    }
+
+    .search-trigger {
+      padding-inline: 0.85rem;
+    }
+
+    .sync-label {
+      max-width: 5.5rem;
+    }
   }
 </style>

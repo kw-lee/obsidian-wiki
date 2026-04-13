@@ -39,6 +39,9 @@
   let editContent = $state("");
   let saving = $state(false);
   let sidebarOpen = $state(true);
+  let mobileSidebarOpen = $state(false);
+  let isMobileViewport = $state(false);
+  let headerHeight = $state(48);
   let explorerExpandedPaths = $state<string[]>([]);
   let linksTab = $state<WorkspaceLinksTab>("backlinks");
   let treeSortMode = $state<WorkspaceTreeSortMode>("folders-first");
@@ -50,6 +53,8 @@
 
   const activePath = $derived(initialPath?.trim() ?? "");
   const isEditable = $derived(Boolean(doc && isNotePath(doc.path)));
+  const sidebarVisible = $derived(isMobileViewport ? mobileSidebarOpen : sidebarOpen);
+  const mobileSidebarBackdropVisible = $derived(isMobileViewport && mobileSidebarOpen);
 
   onMount(() => {
     const auth = getAuth();
@@ -71,6 +76,21 @@
     ready = true;
     void loadTree();
 
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+
+    const applyViewportState = (matches: boolean) => {
+      isMobileViewport = matches;
+      if (!matches) {
+        mobileSidebarOpen = false;
+      }
+    };
+
+    applyViewportState(mediaQuery.matches);
+
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      applyViewportState(event.matches);
+    };
+
     function handleKeydown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
@@ -84,10 +104,25 @@
         event.preventDefault();
         void handleSave();
       }
+      if (event.key === "Escape" && mobileSidebarOpen) {
+        mobileSidebarOpen = false;
+      }
     }
 
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleViewportChange);
+    } else {
+      mediaQuery.addListener(handleViewportChange);
+    }
     window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
+    return () => {
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", handleViewportChange);
+      } else {
+        mediaQuery.removeListener(handleViewportChange);
+      }
+      window.removeEventListener("keydown", handleKeydown);
+    };
   });
 
   $effect(() => {
@@ -198,7 +233,34 @@
   }
 
   async function navigateTo(path: string) {
+    if (isMobileViewport) {
+      mobileSidebarOpen = false;
+    }
     await goto(buildWikiRoute(path));
+  }
+
+  function toggleSidebar() {
+    if (isMobileViewport) {
+      mobileSidebarOpen = !mobileSidebarOpen;
+      return;
+    }
+    sidebarOpen = !sidebarOpen;
+  }
+
+  function openSidebar() {
+    if (isMobileViewport) {
+      mobileSidebarOpen = true;
+      return;
+    }
+    sidebarOpen = true;
+  }
+
+  function closeSidebar() {
+    if (isMobileViewport) {
+      mobileSidebarOpen = false;
+      return;
+    }
+    sidebarOpen = false;
   }
 
   async function handleCreateFolder(path: string) {
@@ -292,7 +354,7 @@
       return;
     }
     if (action === "reveal-current") {
-      sidebarOpen = true;
+      openSidebar();
       revealNonce += 1;
       return;
     }
@@ -326,17 +388,41 @@
   }
 </script>
 
-<div class="app-layout">
-  <Header onsearch={() => (searchOpen = true)} />
+<div class="app-layout" style={`--workspace-header-offset: ${headerHeight}px;`}>
+  <div bind:clientHeight={headerHeight}>
+    <Header
+      onsearch={() => (searchOpen = true)}
+      onsidebartoggle={toggleSidebar}
+      showSidebarToggle={isMobileViewport}
+      sidebarOpen={sidebarVisible}
+    />
+  </div>
 
   <div class="body">
-    <aside class="sidebar" class:closed={!sidebarOpen}>
+    {#if mobileSidebarBackdropVisible}
+      <button
+        type="button"
+        class="sidebar-backdrop"
+        aria-label={t("header.closeSidebar")}
+        onclick={closeSidebar}
+      ></button>
+    {/if}
+
+    <aside id="wiki-sidebar" class="sidebar" class:closed={!sidebarVisible}>
       <div class="sidebar-header">
-        <button class="toggle-btn" onclick={() => (sidebarOpen = !sidebarOpen)}>
-          {sidebarOpen ? "◂" : "▸"}
+        <button
+          class="toggle-btn"
+          title={t(sidebarVisible ? "header.closeSidebar" : "header.openSidebar")}
+          onclick={toggleSidebar}
+        >
+          {#if isMobileViewport}
+            ✕
+          {:else}
+            {sidebarVisible ? "◂" : "▸"}
+          {/if}
         </button>
       </div>
-      {#if sidebarOpen}
+      {#if sidebarVisible}
         <FileExplorer
           nodes={tree}
           selectedPath={selectedPath}
@@ -442,7 +528,8 @@
   .app-layout {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: 100vh;
+    height: 100dvh;
   }
 
   .body {
@@ -457,9 +544,11 @@
     background: var(--bg-secondary);
     border-right: 1px solid var(--border);
     overflow-y: auto;
+    z-index: 50;
     transition:
       width 0.2s,
-      min-width 0.2s;
+      min-width 0.2s,
+      transform 0.2s ease;
   }
 
   .sidebar.closed {
@@ -479,6 +568,10 @@
     color: var(--text-muted);
     cursor: pointer;
     font-size: 0.875rem;
+  }
+
+  .sidebar-backdrop {
+    display: none;
   }
 
   .content {
@@ -578,22 +671,54 @@
   }
 
   @media (max-width: 768px) {
+    .body {
+      position: relative;
+    }
+
     .sidebar {
       position: fixed;
-      top: var(--header-height);
+      top: var(--workspace-header-offset, var(--header-height));
       left: 0;
       bottom: 0;
-      z-index: 50;
+      width: min(88vw, 22rem);
+      min-width: min(88vw, 22rem);
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+      transform: translateX(0);
     }
 
     .sidebar.closed {
-      width: 0;
-      min-width: 0;
-      overflow: hidden;
+      width: min(88vw, 22rem);
+      min-width: min(88vw, 22rem);
+      transform: translateX(-100%);
+      pointer-events: none;
+    }
+
+    .sidebar-header {
+      position: sticky;
+      top: 0;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      z-index: 1;
+    }
+
+    .sidebar-backdrop {
+      display: block;
+      position: fixed;
+      top: var(--workspace-header-offset, var(--header-height));
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: none;
+      background: rgba(15, 23, 42, 0.28);
+      z-index: 40;
     }
 
     .right-panel {
       display: none;
+    }
+
+    .content {
+      min-width: 0;
     }
   }
 </style>

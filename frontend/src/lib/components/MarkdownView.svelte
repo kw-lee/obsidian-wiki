@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Marked } from 'marked';
+	import { stripYamlFrontmatter } from '$lib/utils/markdown';
 	import DataviewBlock from './DataviewBlock.svelte';
 	import ExcalidrawView from './ExcalidrawView.svelte';
 
@@ -78,7 +79,8 @@
 		return segments.length > 0 ? segments : [{ type: 'markdown', content: source }];
 	}
 
-	let segments = $derived(splitSegments(content));
+	let renderedContent = $derived(stripYamlFrontmatter(content));
+	let segments = $derived(splitSegments(renderedContent));
 
 	function renderMarkdown(source: string) {
 		return marked.parse(source) as string;

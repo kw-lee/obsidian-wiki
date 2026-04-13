@@ -11,7 +11,7 @@
     getSyncMonitor,
     isSyncJobActive,
   } from "$lib/stores/sync.svelte";
-  import type { SyncBackend, SyncSettings } from "$lib/types";
+  import type { SyncBackend, SyncJob, SyncSettings } from "$lib/types";
   import { formatDateTime } from "$lib/utils/datetime";
 
   let settings = $state<SyncSettings | null>(null);
@@ -35,6 +35,11 @@
   let lastSettledJobId = $state<string | null>(null);
   const syncMonitor = getSyncMonitor();
   const hasActiveSyncJob = $derived(isSyncJobActive(syncMonitor.currentJob));
+  const recentSyncJobs = $derived.by(() =>
+    syncMonitor.recentJobs.filter(
+      (job) => syncMonitor.currentJob?.id !== job.id,
+    ),
+  );
 
   onMount(async () => {
     await loadSettings();
@@ -192,8 +197,7 @@
     pendingBackend = null;
   }
 
-  function syncJobTitle() {
-    const job = syncMonitor.currentJob;
+  function syncJobTitle(job: SyncJob | null | undefined = syncMonitor.currentJob) {
     if (!job) return "";
     if (job.action === "bootstrap") {
       return job.bootstrap_strategy === "remote"
@@ -201,6 +205,20 @@
         : t("sync.bootstrapLocalTitle");
     }
     return job.action === "pull" ? t("sync.pullButton") : t("sync.pushButton");
+  }
+
+  function formatSyncJobDuration(job: SyncJob) {
+    if (!job.started_at || !job.finished_at) return "-";
+
+    const start = new Date(job.started_at).getTime();
+    const end = new Date(job.finished_at).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return "-";
+
+    const totalSeconds = Math.max(1, Math.round((end - start) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes === 0) return `${seconds}s`;
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
   }
 </script>
 
@@ -449,6 +467,76 @@
       </section>
     {/if}
 
+    <section class="history-card">
+      <div class="status-header">
+        <h3>{t("sync.historyTitle")}</h3>
+        <span class="pill">{recentSyncJobs.length}</span>
+      </div>
+
+      {#if recentSyncJobs.length === 0}
+        <p class="notice">{t("sync.historyEmpty")}</p>
+      {:else}
+        <div class="history-list">
+          {#each recentSyncJobs as job, index}
+            <details class="history-item" open={index === 0}>
+              <summary>
+                <div class="history-summary-main">
+                  <strong>{syncJobTitle(job)}</strong>
+                  <span>{job.status}</span>
+                </div>
+                <div class="history-summary-meta">
+                  <span
+                    >{formatDateTime(
+                      job.finished_at ?? job.updated_at ?? job.started_at,
+                    )}</span
+                  >
+                  <span>{t("sync.jobChangedFiles", { count: job.changed_files })}</span>
+                </div>
+              </summary>
+
+              <div class="history-details">
+                <p>
+                  <span>{t("sync.jobStarted")}</span>
+                  <strong>{formatDateTime(job.started_at)}</strong>
+                </p>
+                <p>
+                  <span>{t("sync.jobFinished")}</span>
+                  <strong>{formatDateTime(job.finished_at)}</strong>
+                </p>
+                <p>
+                  <span>{t("sync.jobDuration")}</span>
+                  <strong>{formatSyncJobDuration(job)}</strong>
+                </p>
+                <p>
+                  <span>{t("sync.jobBackend")}</span>
+                  <strong
+                    >{job.backend ?? settings?.status.backend ?? syncMonitor.status?.backend ?? "-"}</strong
+                  >
+                </p>
+                <p>
+                  <span>{t("sync.jobSource")}</span>
+                  <strong>{job.source}</strong>
+                </p>
+                <p>
+                  <span>{t("sync.status.head")}</span>
+                  <strong>{job.head ?? "-"}</strong>
+                </p>
+                {#if job.message}
+                  <p>
+                    <span>{t("sync.jobMessage")}</span>
+                    <strong>{job.message}</strong>
+                  </p>
+                {/if}
+                {#if job.error}
+                  <p class="feedback error">{job.error}</p>
+                {/if}
+              </div>
+            </details>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
     {#if settings}
       <section class="status-card">
         <div class="status-header">
@@ -524,6 +612,7 @@
   .panel-header,
   .form,
   .job-card,
+  .history-card,
   .status-card {
     padding: 1.5rem;
     border: 1px solid var(--border);
@@ -649,6 +738,10 @@
     color: var(--text-secondary);
   }
 
+  .history-card {
+    background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  }
+
   .bootstrap-actions {
     display: flex;
     gap: 0.75rem;
@@ -735,6 +828,72 @@
       var(--accent)
     );
     transition: width 0.25s ease;
+  }
+
+  .history-list {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .history-item {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+    overflow: clip;
+  }
+
+  .history-item summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1rem 1.1rem;
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .history-item summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .history-summary-main,
+  .history-summary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .history-summary-main strong {
+    color: var(--text-primary);
+  }
+
+  .history-summary-main span,
+  .history-summary-meta span {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .history-details {
+    border-top: 1px solid var(--border);
+    padding: 1rem 1.1rem 1.1rem;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .history-details p {
+    margin: 0;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .history-details span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .history-details strong {
+    color: var(--text-primary);
+    font-weight: 500;
+    word-break: break-word;
   }
 
   @media (max-width: 720px) {

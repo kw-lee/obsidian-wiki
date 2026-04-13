@@ -5,6 +5,8 @@ import { getSyncSurfaceSummary } from "$lib/utils/sync-indicator";
 
 const POLL_INTERVAL_MS = 1500;
 const FINAL_JOB_RETENTION_MS = 15000;
+const RECENT_JOB_HISTORY_KEY = "sync_job_history_v1";
+const RECENT_JOB_HISTORY_LIMIT = 6;
 const FINAL_STATUSES = new Set<SyncJob["status"]>([
   "succeeded",
   "failed",
@@ -13,13 +15,84 @@ const FINAL_STATUSES = new Set<SyncJob["status"]>([
 
 export interface SyncMonitorState {
   currentJob: SyncJob | null;
+  recentJobs: SyncJob[];
   status: SyncStatus | null;
   initialized: boolean;
   error: string | null;
 }
 
+function isFinalJob(job: SyncJob | null | undefined): job is SyncJob {
+  return !!job && FINAL_STATUSES.has(job.status);
+}
+
+function getJobTimestamp(job: SyncJob) {
+  const timestamp = job.finished_at ?? job.updated_at ?? job.started_at;
+  if (!timestamp) return 0;
+  const parsed = new Date(timestamp).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function isRecentJobCandidate(value: unknown): value is SyncJob {
+  if (!value || typeof value !== "object") return false;
+  const job = value as Partial<SyncJob>;
+  return (
+    typeof job.id === "string" &&
+    typeof job.action === "string" &&
+    typeof job.source === "string" &&
+    typeof job.status === "string" &&
+    FINAL_STATUSES.has(job.status as SyncJob["status"])
+  );
+}
+
+function readRecentJobs(): SyncJob[] {
+  if (typeof localStorage === "undefined") return [];
+
+  try {
+    const raw = localStorage.getItem(RECENT_JOB_HISTORY_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(isRecentJobCandidate)
+      .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a))
+      .slice(0, RECENT_JOB_HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentJobs(jobs: SyncJob[]) {
+  if (typeof localStorage === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      RECENT_JOB_HISTORY_KEY,
+      JSON.stringify(jobs.slice(0, RECENT_JOB_HISTORY_LIMIT)),
+    );
+  } catch {
+    // Ignore storage quota and serialization errors.
+  }
+}
+
+function rememberRecentJob(job: SyncJob | null | undefined) {
+  if (!isFinalJob(job)) return;
+
+  const nextJobs = [
+    job,
+    ...state.recentJobs.filter((existing) => existing.id !== job.id),
+  ]
+    .sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a))
+    .slice(0, RECENT_JOB_HISTORY_LIMIT);
+
+  state.recentJobs = nextJobs;
+  persistRecentJobs(nextJobs);
+}
+
 let state = $state<SyncMonitorState>({
   currentJob: null,
+  recentJobs: readRecentJobs(),
   status: null,
   initialized: false,
   error: null,
@@ -66,6 +139,7 @@ export async function refreshSyncJob() {
     ]);
 
     if (jobResult.status === "fulfilled") {
+      rememberRecentJob(jobResult.value);
       state.currentJob = shouldShowJob(jobResult.value) ? jobResult.value : null;
     }
 
@@ -101,6 +175,7 @@ export async function enqueueSyncJob(payload: {
   state.currentJob = job;
   state.error = null;
   state.initialized = true;
+  rememberRecentJob(job);
   return job;
 }
 

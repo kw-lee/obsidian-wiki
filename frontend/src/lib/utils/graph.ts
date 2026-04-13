@@ -14,6 +14,16 @@ export interface RankedGraphNode extends GraphNode {
   folder: string;
 }
 
+export interface GraphRouteState {
+  focusPath: string | null;
+  selectedNodeId: string | null;
+  depth: GraphDepth;
+  folder: string;
+  query: string;
+  showLabels: boolean;
+  physicsEnabled: boolean;
+}
+
 export function filterGraphData(
   data: GraphData,
   options: FilterGraphOptions,
@@ -170,6 +180,57 @@ export function calculateGraphDensity(data: GraphData): number {
   return data.edges.length / ((nodeCount * (nodeCount - 1)) / 2);
 }
 
+export function parseGraphRouteState(
+  searchParams: URLSearchParams,
+  fallbackFocusPath: string | null,
+): GraphRouteState {
+  const focusParam = searchParams.get("focus")?.trim() ?? "";
+  const selectedParam = searchParams.get("selected")?.trim() ?? "";
+  const folderParam = searchParams.get("folder")?.trim() ?? "";
+  const queryParam = searchParams.get("q")?.trim() ?? "";
+  const depthParam = searchParams.get("depth")?.trim() ?? "";
+
+  return {
+    focusPath: focusParam || fallbackFocusPath,
+    selectedNodeId: selectedParam || null,
+    depth: isGraphDepth(depthParam) ? depthParam : fallbackFocusPath ? "2" : "all",
+    folder: folderParam || "__all__",
+    query: queryParam,
+    showLabels: searchParams.get("labels") !== "0",
+    physicsEnabled: searchParams.get("physics") !== "0",
+  };
+}
+
+export function buildGraphRouteSearch(
+  state: GraphRouteState,
+): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (state.focusPath) {
+    params.set("focus", state.focusPath);
+  }
+  if (state.selectedNodeId) {
+    params.set("selected", state.selectedNodeId);
+  }
+  if (state.depth !== "all") {
+    params.set("depth", state.depth);
+  }
+  if (state.folder && state.folder !== "__all__") {
+    params.set("folder", state.folder);
+  }
+  if (state.query) {
+    params.set("q", state.query);
+  }
+  if (!state.showLabels) {
+    params.set("labels", "0");
+  }
+  if (!state.physicsEnabled) {
+    params.set("physics", "0");
+  }
+
+  return params;
+}
+
 function collectNeighborhood(
   data: GraphData,
   focusPath: string,
@@ -223,6 +284,10 @@ function matchesQuery(node: GraphNode, query: string): boolean {
     node.title.toLowerCase().includes(query) ||
     node.id.toLowerCase().includes(query)
   );
+}
+
+function isGraphDepth(value: string): value is GraphDepth {
+  return value === "all" || value === "1" || value === "2" || value === "3";
 }
 
 function getNodeFolder(nodeId: string): string {

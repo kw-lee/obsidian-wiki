@@ -9,6 +9,7 @@
   import { getAuth } from "$lib/stores/auth.svelte";
   import type { GraphData } from "$lib/types";
   import {
+    buildGraphRouteSearch,
     calculateAverageDegree,
     calculateGraphDensity,
     filterGraphData,
@@ -16,6 +17,7 @@
     getNeighborNodes,
     getNodeDegree,
     listGraphFolders,
+    parseGraphRouteState,
     rankNodesByDegree,
     type GraphDepth,
   } from "$lib/utils/graph";
@@ -44,6 +46,7 @@
   let zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
   let svgSelection: d3.Selection<SVGSVGElement, unknown, null, undefined> | null =
     null;
+  let routeStateReady = $state(false);
   const backToWikiHref = $derived(buildWikiRoute(currentPath ?? ""));
   const effectiveFocusPath = $derived(selectedNodeId ?? currentPath);
   const folderOptions = $derived(graphData ? listGraphFolders(graphData) : []);
@@ -92,10 +95,18 @@
       return;
     }
 
-    currentPath = page.url.searchParams.get("focus") ?? getLastWikiPath();
-    if (currentPath) {
-      depth = "2";
-    }
+    const routeState = parseGraphRouteState(
+      page.url.searchParams,
+      getLastWikiPath(),
+    );
+    currentPath = routeState.focusPath;
+    selectedNodeId = routeState.selectedNodeId;
+    depth = routeState.depth;
+    folder = routeState.folder;
+    searchQuery = routeState.query;
+    showLabels = routeState.showLabels;
+    physicsEnabled = routeState.physicsEnabled;
+    routeStateReady = true;
 
     void loadGraph();
 
@@ -132,6 +143,28 @@
 
   $effect(() => {
     renderVisibleGraph();
+  });
+
+  $effect(() => {
+    if (!routeStateReady || typeof window === "undefined") {
+      return;
+    }
+
+    const nextSearch = buildGraphRouteSearch({
+      focusPath: currentPath,
+      selectedNodeId,
+      depth,
+      folder,
+      query: searchQuery.trim(),
+      showLabels,
+      physicsEnabled,
+    }).toString();
+    const nextUrl = nextSearch ? `${page.url.pathname}?${nextSearch}` : page.url.pathname;
+    const currentUrl = `${page.url.pathname}${page.url.search}`;
+
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
   });
 
   async function loadGraph() {

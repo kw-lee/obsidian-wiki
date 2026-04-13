@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GraphData } from "$lib/types";
 
 import {
+  buildGraphRouteSearch,
   calculateAverageDegree,
   calculateGraphDensity,
   countNeighbors,
@@ -11,6 +12,7 @@ import {
   getNeighborNodes,
   getNodeDegree,
   listGraphFolders,
+  parseGraphRouteState,
   rankNodesByDegree,
 } from "./graph";
 
@@ -113,5 +115,43 @@ describe("graph utils", () => {
   it("calculates average degree and density for the visible graph", () => {
     expect(calculateAverageDegree(graph)).toBe(1.2);
     expect(calculateGraphDensity(graph)).toBe(0.3);
+  });
+
+  it("parses graph route state from URL params", () => {
+    const params = new URLSearchParams({
+      focus: "notes/current.md",
+      selected: "projects/gamma.md",
+      depth: "3",
+      folder: "projects",
+      q: "gamma",
+      labels: "0",
+      physics: "0",
+    });
+
+    expect(parseGraphRouteState(params, "fallback.md")).toEqual({
+      focusPath: "notes/current.md",
+      selectedNodeId: "projects/gamma.md",
+      depth: "3",
+      folder: "projects",
+      query: "gamma",
+      showLabels: false,
+      physicsEnabled: false,
+    });
+  });
+
+  it("builds compact graph route params for non-default state", () => {
+    expect(
+      buildGraphRouteSearch({
+        focusPath: "notes/current.md",
+        selectedNodeId: "projects/gamma.md",
+        depth: "2",
+        folder: "projects",
+        query: "gamma",
+        showLabels: false,
+        physicsEnabled: false,
+      }).toString(),
+    ).toBe(
+      "focus=notes%2Fcurrent.md&selected=projects%2Fgamma.md&depth=2&folder=projects&q=gamma&labels=0&physics=0",
+    );
   });
 });

@@ -112,6 +112,7 @@ class DataviewQueryResponse(BaseModel):
 # ── Sync ──────────────────────────────────────────────
 class SyncStatus(BaseModel):
     last_sync: datetime | None = None
+    timezone: str | None = None
     ahead: int = 0
     behind: int = 0
     dirty: bool = False
@@ -247,6 +248,7 @@ class VaultGitStatus(BaseModel):
 class SystemSettingsResponse(BaseModel):
     version: str
     started_at: datetime
+    timezone: str
     uptime_seconds: int = Field(ge=0)
     sync_backend: Literal["git", "webdav", "none"]
     sync_auto_enabled: bool
@@ -261,6 +263,10 @@ class SystemLogEntry(BaseModel):
     level: str
     logger: str
     message: str
+
+
+class SystemSettingsUpdateRequest(BaseModel):
+    timezone: str
 
 
 class SystemLogsResponse(BaseModel):

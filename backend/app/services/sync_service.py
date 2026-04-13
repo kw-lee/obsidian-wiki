@@ -44,17 +44,22 @@ async def get_active_sync_status(db: AsyncSession) -> SyncStatus:
     runtime = await get_runtime_sync_settings(db)
     backend = build_sync_backend(runtime)
     if backend is None:
-        return SyncStatus(backend="none", message="Sync is disabled")
-    return await backend.status(db)
+        return SyncStatus(backend="none", message="Sync is disabled", timezone=runtime.timezone)
+    status = await backend.status(db)
+    return status.model_copy(update={"timezone": runtime.timezone})
 
 
 async def run_scheduled_sync(db: AsyncSession) -> SyncStatus:
     runtime = await get_runtime_sync_settings(db, use_cache=False)
     backend = build_sync_backend(runtime)
     if backend is None:
-        return SyncStatus(backend="none", message="Sync is disabled")
+        return SyncStatus(backend="none", message="Sync is disabled", timezone=runtime.timezone)
     if not runtime.sync_auto_enabled:
-        return SyncStatus(backend=runtime.sync_backend, message="Automatic sync is disabled")
+        return SyncStatus(
+            backend=runtime.sync_backend,
+            message="Automatic sync is disabled",
+            timezone=runtime.timezone,
+        )
 
     status_before = await backend.status(db)
     if status_before.behind > 0:
@@ -64,7 +69,8 @@ async def run_scheduled_sync(db: AsyncSession) -> SyncStatus:
     if status_after_pull.ahead > 0:
         await backend.push(db)
 
-    return await backend.status(db)
+    status = await backend.status(db)
+    return status.model_copy(update={"timezone": runtime.timezone})
 
 
 async def test_sync_backend(db: AsyncSession, runtime_override=None):

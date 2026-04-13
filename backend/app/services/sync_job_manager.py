@@ -126,6 +126,23 @@ class SyncJobManager:
                 return None
             return self._to_response(job)
 
+    async def get_last_successful_finished_at(
+        self,
+        *,
+        backend: str | None = None,
+    ) -> datetime | None:
+        async with self._lock:
+            for job_id in self._recent_job_ids:
+                job = self._jobs.get(job_id)
+                if job is None:
+                    continue
+                if job.status != "succeeded" or job.finished_at is None:
+                    continue
+                if backend is not None and job.backend != backend:
+                    continue
+                return job.finished_at
+            return None
+
     async def _run_job(self, job_id: str) -> None:
         try:
             async with self._session_factory() as db:

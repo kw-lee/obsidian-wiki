@@ -27,6 +27,7 @@ CREATE TABLE app_settings (
     webdav_password_enc   TEXT NOT NULL DEFAULT '',
     webdav_remote_root    TEXT NOT NULL DEFAULT '/',
     webdav_verify_tls     BOOLEAN NOT NULL DEFAULT TRUE,
+    timezone              TEXT NOT NULL DEFAULT 'Asia/Seoul',
     default_theme         TEXT NOT NULL DEFAULT 'system'
                           CHECK (default_theme IN ('light', 'dark', 'system')),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -91,6 +92,14 @@ CREATE INDEX idx_links_source ON links(source_path);
 CREATE INDEX idx_links_target ON links(target_path);
 CREATE INDEX idx_webdav_manifest_path ON webdav_manifest(path);
 
-INSERT INTO app_settings (id, sync_backend, sync_interval_seconds, sync_auto_enabled, git_remote_url, git_branch)
-VALUES (1, 'git', 300, TRUE, '', 'main')
+INSERT INTO app_settings (
+    id,
+    sync_backend,
+    sync_interval_seconds,
+    sync_auto_enabled,
+    git_remote_url,
+    git_branch,
+    timezone
+)
+VALUES (1, 'git', 300, TRUE, '', 'main', 'Asia/Seoul')
 ON CONFLICT (id) DO NOTHING;

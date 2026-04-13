@@ -6,7 +6,16 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.config import settings
-from app.db.models import AppSettings, Attachment, Document, EditSession, Link, Tag, User, WebDAVManifest  # noqa: F401
+from app.db.models import (  # noqa: F401
+    AppSettings,
+    Attachment,
+    Document,
+    EditSession,
+    Link,
+    Tag,
+    User,
+    WebDAVManifest,
+)
 from app.db.session import Base
 
 config = context.config
@@ -54,6 +63,10 @@ async def run_async_migrations() -> None:
         await connection.execute(
             text("select set_config('app.bootstrap_git_sync_interval_seconds', :value, false)"),
             {"value": str(settings.bootstrap_git_sync_interval_seconds)},
+        )
+        await connection.execute(
+            text("select set_config('app.app_timezone', :value, false)"),
+            {"value": settings.app_timezone},
         )
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()

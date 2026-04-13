@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_token, get_current_user, hash_password, verify_password
 from app.config import settings as app_settings
-from app.db.models import Attachment, Document, Tag, User
+from app.db.models import Document, Tag, User
 from app.db.session import get_db
 from app.schemas import (
     AppearanceSettingsResponse,
@@ -21,17 +22,27 @@ from app.schemas import (
     SyncSettingsResponse,
     SyncSettingsTestRequest,
     SyncSettingsUpdateRequest,
+    SyncStatus,
     SyncTestResult,
     SystemDependencyStatus,
     SystemLogEntry,
     SystemLogsResponse,
     SystemSettingsResponse,
+    SystemSettingsUpdateRequest,
     VaultGitStatus,
     VaultSettingsResponse,
 )
 from app.services.indexer import full_reindex
 from app.services.log_buffer import get_recent_logs
-from app.services.settings import ensure_app_settings, get_runtime_sync_settings, invalidate_settings_cache
+from app.services.settings import (
+    ensure_app_settings,
+    get_runtime_sync_settings,
+    invalidate_settings_cache,
+)
+from app.services.sync.crypto import encrypt_secret
+from app.services.sync_job_manager import SyncJobManager
+from app.services.sync_scheduler import SyncScheduler
+from app.services.sync_service import get_active_sync_status, test_sync_backend
 from app.services.system_status import (
     get_app_version,
     get_process_started_at,
@@ -39,9 +50,6 @@ from app.services.system_status import (
     ping_database,
     ping_redis,
 )
-from app.services.sync_scheduler import SyncScheduler
-from app.services.sync.crypto import encrypt_secret
-from app.services.sync_service import get_active_sync_status, test_sync_backend
 
 router = APIRouter()
 
@@ -51,8 +59,25 @@ def _normalize_username(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     if not normalized:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username cannot be empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username cannot be empty",
+        )
     return normalized
+
+
+async def _with_last_sync_from_jobs(request: Request, status_data: SyncStatus) -> SyncStatus:
+    if status_data.last_sync is not None:
+        return status_data
+
+    manager = getattr(request.app.state, "sync_job_manager", None)
+    if not isinstance(manager, SyncJobManager):
+        return status_data
+
+    last_sync = await manager.get_last_successful_finished_at(backend=status_data.backend)
+    if last_sync is None:
+        return status_data
+    return status_data.model_copy(update={"last_sync": last_sync})
 
 
 def _normalize_remote_root(value: str) -> str:
@@ -60,6 +85,23 @@ def _normalize_remote_root(value: str) -> str:
     if not normalized.startswith("/"):
         normalized = f"/{normalized}"
     return normalized.rstrip("/") or "/"
+
+
+def _normalize_timezone(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Timezone cannot be empty",
+        )
+    try:
+        ZoneInfo(normalized)
+    except ZoneInfoNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown timezone: {normalized}",
+        ) from exc
+    return normalized
 
 
 def _vault_disk_usage_bytes(root: Path) -> int:
@@ -70,6 +112,22 @@ def _vault_disk_usage_bytes(root: Path) -> int:
         if path.is_file():
             total += path.stat().st_size
     return total
+
+
+def _is_counted_attachment(path: Path, vault_root: Path) -> bool:
+    if not path.is_file():
+        return False
+    if path.suffix.lower() == ".md":
+        return False
+
+    relative_parts = path.relative_to(vault_root).parts
+    return not any(part.startswith(".") for part in relative_parts)
+
+
+def _vault_attachment_count(root: Path) -> int:
+    if not root.exists():
+        return 0
+    return sum(1 for path in root.rglob("*") if _is_counted_attachment(path, root))
 
 
 @router.get("/profile", response_model=ProfileSettingsResponse)
@@ -102,7 +160,10 @@ async def update_profile(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if not verify_password(body.current_password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid current password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid current password",
+        )
 
     new_username = _normalize_username(body.new_username) or user.username
     new_password = body.new_password or None
@@ -118,7 +179,10 @@ async def update_profile(
     if new_username != user.username:
         existing = await db.execute(select(User).where(User.username == new_username))
         if existing.scalar_one_or_none() is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already taken",
+            )
 
     user.username = new_username
     if new_password is not None:
@@ -135,11 +199,13 @@ async def update_profile(
 
 @router.get("/sync", response_model=SyncSettingsResponse)
 async def get_sync_settings(
+    request: Request,
     _username: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SyncSettingsResponse:
     row = await ensure_app_settings(db)
     status_data = await get_active_sync_status(db)
+    status_data = await _with_last_sync_from_jobs(request, status_data)
     return SyncSettingsResponse(
         sync_backend=row.sync_backend,
         sync_interval_seconds=row.sync_interval_seconds,
@@ -186,6 +252,7 @@ async def update_sync_settings(
     await db.refresh(row)
     runtime = await get_runtime_sync_settings(db, use_cache=False)
     status_data = await get_active_sync_status(db)
+    status_data = await _with_last_sync_from_jobs(request, status_data)
     return SyncSettingsResponse(
         sync_backend=runtime.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,
@@ -224,6 +291,7 @@ async def test_sync_settings(
         ),
         webdav_remote_root=_normalize_remote_root(body.webdav_remote_root),
         webdav_verify_tls=body.webdav_verify_tls,
+        timezone=runtime.timezone,
         default_theme=runtime.default_theme,
     )
     return await test_sync_backend(db, runtime_override=runtime)
@@ -236,13 +304,12 @@ async def get_vault_settings(
 ) -> VaultSettingsResponse:
     vault_path = Path(app_settings.vault_local_path)
     document_count = await db.scalar(select(func.count(Document.id)))
-    attachment_count = await db.scalar(select(func.count(Attachment.id)))
     tag_count = await db.scalar(select(func.count(Tag.id)))
     return VaultSettingsResponse(
         vault_path=str(vault_path),
         disk_usage_bytes=_vault_disk_usage_bytes(vault_path),
+        attachment_count=_vault_attachment_count(vault_path),
         document_count=document_count or 0,
-        attachment_count=attachment_count or 0,
         tag_count=tag_count or 0,
     )
 
@@ -291,17 +358,19 @@ async def get_system_settings(
     _username: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SystemSettingsResponse:
+    row = await ensure_app_settings(db)
     runtime = await get_runtime_sync_settings(db)
     sync_status = await get_active_sync_status(db)
     database_ok, database_detail = await ping_database(db)
     redis_ok, redis_detail = await ping_redis()
     started_at = get_process_started_at()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     uptime_seconds = max(0, int((now - started_at).total_seconds()))
 
     return SystemSettingsResponse(
         version=get_app_version(),
         started_at=started_at,
+        timezone=row.timezone,
         uptime_seconds=uptime_seconds,
         sync_backend=runtime.sync_backend,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -310,6 +379,19 @@ async def get_system_settings(
         redis=SystemDependencyStatus(ok=redis_ok, detail=redis_detail),
         vault_git=VaultGitStatus(**get_vault_git_status()),
     )
+
+
+@router.put("/system", response_model=SystemSettingsResponse)
+async def update_system_settings(
+    body: SystemSettingsUpdateRequest,
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SystemSettingsResponse:
+    row = await ensure_app_settings(db)
+    row.timezone = _normalize_timezone(body.timezone)
+    await db.commit()
+    invalidate_settings_cache()
+    return await get_system_settings(db=db, _username=_username)
 
 
 @router.get("/system/logs", response_model=SystemLogsResponse)

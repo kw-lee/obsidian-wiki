@@ -1,5 +1,6 @@
 import asyncio
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -88,6 +89,34 @@ async def test_sync_status(client, auth_headers, setup_vault):
     assert "ahead" in data
     assert "behind" in data
     assert "dirty" in data
+    assert data["timezone"] == "Asia/Seoul"
+
+
+@pytest.mark.asyncio
+async def test_sync_status_uses_last_successful_job_when_backend_omits_last_sync(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    finished_at = datetime(2026, 4, 13, 8, 31, tzinfo=UTC)
+
+    async def fake_status(db):  # noqa: ANN001
+        del db
+        return SyncStatus(backend="webdav", head="webdav:1", timezone="Asia/Seoul")
+
+    async def fake_last_successful_finished_at(*, backend=None):  # noqa: ANN001
+        assert backend == "webdav"
+        return finished_at
+
+    monkeypatch.setattr("app.routers.sync.get_active_sync_status", fake_status)
+    monkeypatch.setattr(
+        app.state.sync_job_manager,
+        "get_last_successful_finished_at",
+        fake_last_successful_finished_at,
+    )
+
+    resp = await client.get("/api/sync/status", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["last_sync"] == "2026-04-13T08:31:00Z"
+    assert resp.json()["timezone"] == "Asia/Seoul"
 
 
 @pytest.mark.asyncio

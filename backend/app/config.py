@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     init_admin_username: str = "admin"
     init_admin_password: str = "changeme"
+    app_timezone: str = Field(default="Asia/Seoul", alias="APP_TIMEZONE")
 
     # Legacy bootstrap-only sync seed values for the first AppSettings row.
     bootstrap_git_remote_url: str = Field(default="", alias="GIT_REMOTE_URL")

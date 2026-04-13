@@ -25,7 +25,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    must_change_credentials: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    must_change_credentials: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -36,7 +38,9 @@ class AppSettings(Base):
     __tablename__ = "app_settings"
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=1, server_default="1")
-    sync_backend: Mapped[str] = mapped_column(Text, nullable=False, default="git", server_default="git")
+    sync_backend: Mapped[str] = mapped_column(
+        Text, nullable=False, default="git", server_default="git"
+    )
     sync_interval_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=300, server_default="300"
     )
@@ -44,15 +48,28 @@ class AppSettings(Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
     git_remote_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
-    git_branch: Mapped[str] = mapped_column(Text, nullable=False, default="main", server_default="main")
+    git_branch: Mapped[str] = mapped_column(
+        Text, nullable=False, default="main", server_default="main"
+    )
     webdav_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
-    webdav_username: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
-    webdav_password_enc: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
-    webdav_remote_root: Mapped[str] = mapped_column(Text, nullable=False, default="/", server_default="/")
+    webdav_username: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    webdav_password_enc: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    webdav_remote_root: Mapped[str] = mapped_column(
+        Text, nullable=False, default="/", server_default="/"
+    )
     webdav_verify_tls: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
-    default_theme: Mapped[str] = mapped_column(Text, nullable=False, default="system", server_default="system")
+    timezone: Mapped[str] = mapped_column(
+        Text, nullable=False, default="Asia/Seoul", server_default="Asia/Seoul"
+    )
+    default_theme: Mapped[str] = mapped_column(
+        Text, nullable=False, default="system", server_default="system"
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

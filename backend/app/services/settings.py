@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -22,6 +21,7 @@ class SyncRuntimeSettings:
     webdav_password_enc: str
     webdav_remote_root: str
     webdav_verify_tls: bool
+    timezone: str
     default_theme: str
 
 
@@ -41,6 +41,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         webdav_password_enc=row.webdav_password_enc,
         webdav_remote_root=row.webdav_remote_root,
         webdav_verify_tls=row.webdav_verify_tls,
+        timezone=row.timezone,
         default_theme=row.default_theme,
     )
 
@@ -62,6 +63,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         webdav_password_enc="",
         webdav_remote_root="/",
         webdav_verify_tls=True,
+        timezone=settings.app_timezone,
         default_theme="system",
     )
     db.add(row)

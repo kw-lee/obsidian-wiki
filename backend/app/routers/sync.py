@@ -21,6 +21,17 @@ def _get_job_manager(request: Request) -> SyncJobManager:
     return manager
 
 
+async def _with_last_sync_from_jobs(request: Request, status_data: SyncStatus) -> SyncStatus:
+    if status_data.last_sync is not None:
+        return status_data
+
+    manager = _get_job_manager(request)
+    last_sync = await manager.get_last_successful_finished_at(backend=status_data.backend)
+    if last_sync is None:
+        return status_data
+    return status_data.model_copy(update={"last_sync": last_sync})
+
+
 @router.post("/pull")
 async def pull(
     db: AsyncSession = Depends(get_db),
@@ -41,10 +52,12 @@ async def push(
 
 @router.get("/status", response_model=SyncStatus)
 async def get_sync_status(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> SyncStatus:
-    return await get_active_sync_status(db)
+    status_data = await get_active_sync_status(db)
+    return await _with_last_sync_from_jobs(request, status_data)
 
 
 @router.post("/job", response_model=SyncJobResponse, status_code=status.HTTP_202_ACCEPTED)

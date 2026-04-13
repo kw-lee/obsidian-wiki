@@ -1,15 +1,16 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import bcrypt
 import pytest
 
 import app.db.session as session_mod
-from app.db.models import AppSettings, Attachment, Document, Tag, User
+from app.db.models import AppSettings, Document, Tag, User
+from app.main import app
 from app.schemas import SyncStatus, SyncTestResult
-from app.services.sync_scheduler import SyncScheduler
 from app.services.sync.crypto import decrypt_secret, encrypt_secret
+from app.services.sync_scheduler import SyncScheduler
 from app.services.vault import write_doc
 
 
@@ -191,7 +192,54 @@ async def test_sync_settings_redact_and_persist_webdav_password(
 
 
 @pytest.mark.asyncio
-async def test_sync_test_endpoint_uses_webdav_backend(client, auth_headers, monkeypatch, setup_vault):
+async def test_sync_settings_include_last_successful_job_time(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    finished_at = datetime(2026, 4, 13, 8, 31, tzinfo=UTC)
+
+    async def fake_status(self, db) -> SyncStatus:
+        del self, db
+        return SyncStatus(backend="webdav", message="WebDAV backend configured")
+
+    async def fake_last_successful_finished_at(*, backend=None):  # noqa: ANN001
+        assert backend == "webdav"
+        return finished_at
+
+    monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.status", fake_status)
+    monkeypatch.setattr(
+        app.state.sync_job_manager,
+        "get_last_successful_finished_at",
+        fake_last_successful_finished_at,
+    )
+
+    resp = await client.put(
+        "/api/settings/sync",
+        json={
+            "sync_backend": "webdav",
+            "sync_interval_seconds": 300,
+            "sync_auto_enabled": False,
+            "git_remote_url": "",
+            "git_branch": "main",
+            "webdav_url": "https://dav.example.com/remote.php/dav/files/me",
+            "webdav_username": "me",
+            "webdav_password": "app-token",
+            "webdav_remote_root": "/vault",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"]["last_sync"] == "2026-04-13T08:31:00Z"
+
+    read_resp = await client.get("/api/settings/sync", headers=auth_headers)
+    assert read_resp.status_code == 200
+    assert read_resp.json()["status"]["last_sync"] == "2026-04-13T08:31:00Z"
+
+
+@pytest.mark.asyncio
+async def test_sync_test_endpoint_uses_webdav_backend(
+    client, auth_headers, monkeypatch, setup_vault
+):
     async def fake_test(self) -> SyncTestResult:
         assert self.runtime.webdav_url == "https://dav.example.com/remote.php/dav/files/me"
         assert decrypt_secret(self.runtime.webdav_password_enc) == "app-token"
@@ -246,7 +294,7 @@ async def test_update_appearance_settings_persists_and_is_public(client, auth_he
 
 @pytest.mark.asyncio
 async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vault):
-    started_at = datetime(2026, 4, 13, 1, 0, tzinfo=timezone.utc)
+    started_at = datetime(2026, 4, 13, 1, 0, tzinfo=UTC)
 
     async def fake_database_ping(db):
         del db
@@ -276,6 +324,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     data = resp.json()
     assert data["version"] == "0.1.0"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
+    assert data["timezone"] == "Asia/Seoul"
     assert data["sync_backend"] == "git"
     assert data["sync_auto_enabled"] is True
     assert data["database"] == {"ok": True, "detail": "Database connection successful"}
@@ -283,6 +332,26 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     assert data["vault_git"]["branch"] == "main"
     assert data["vault_git"]["has_origin"] is True
     assert data["uptime_seconds"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_update_system_settings_persists_timezone(client, auth_headers, setup_vault):
+    resp = await client.put(
+        "/api/settings/system",
+        json={"timezone": "America/New_York"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["timezone"] == "America/New_York"
+
+    read_resp = await client.get("/api/settings/system", headers=auth_headers)
+    assert read_resp.status_code == 200
+    assert read_resp.json()["timezone"] == "America/New_York"
+
+    async with session_mod.async_session() as session:
+        row = await session.get(AppSettings, 1)
+        assert row is not None
+        assert row.timezone == "America/New_York"
 
 
 @pytest.mark.asyncio
@@ -341,6 +410,8 @@ async def test_get_vault_settings(client, auth_headers, setup_vault):
     await write_doc("notes/test.md", "# Test\n#tag")
     (setup_vault / "assets").mkdir(parents=True, exist_ok=True)
     (setup_vault / "assets" / "image.png").write_bytes(b"pngdata")
+    (setup_vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    (setup_vault / ".obsidian" / "workspace.json").write_text("{}", encoding="utf-8")
 
     async with session_mod.async_session() as session:
         session.add(
@@ -353,7 +424,6 @@ async def test_get_vault_settings(client, auth_headers, setup_vault):
             )
         )
         session.add(Tag(name="tag", doc_count=1))
-        session.add(Attachment(path="assets/image.png", mime_type="image/png", size_bytes=7))
         await session.commit()
 
     resp = await client.get("/api/settings/vault", headers=auth_headers)
@@ -362,6 +432,7 @@ async def test_get_vault_settings(client, auth_headers, setup_vault):
     assert data["vault_path"] == str(setup_vault)
     assert data["disk_usage_bytes"] >= len(b"pngdata")
     assert data["document_count"] >= 1
+    assert data["attachment_count"] == 1
     assert data["tag_count"] >= 1
 
 

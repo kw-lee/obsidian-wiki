@@ -5,6 +5,7 @@ services:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
       POSTGRES_DB: obsidian_test
+      TZ: Asia/Seoul
     volumes:
       - ./backend/app/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
@@ -17,6 +18,8 @@ services:
 
   test-redis:
     image: redis:7-alpine
+    environment:
+      TZ: Asia/Seoul
     command: redis-server --save "" --appendonly no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -34,6 +37,8 @@ services:
       JWT_SECRET: test-secret-for-ci
       INIT_ADMIN_USERNAME: admin
       INIT_ADMIN_PASSWORD: testpass
+      APP_TIMEZONE: Asia/Seoul
+      TZ: Asia/Seoul
       VAULT_LOCAL_PATH: /tmp/test_vault
     volumes:
       - ./backend:/app
@@ -48,6 +53,8 @@ services:
     build:
       context: ./frontend
       target: dev
+    environment:
+      TZ: Asia/Seoul
     volumes:
       - ./frontend:/app
       - /app/node_modules

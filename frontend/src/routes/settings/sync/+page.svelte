@@ -12,6 +12,7 @@
     isSyncJobActive,
   } from "$lib/stores/sync.svelte";
   import type { SyncBackend, SyncSettings } from "$lib/types";
+  import { formatDateTime } from "$lib/utils/datetime";
 
   let settings = $state<SyncSettings | null>(null);
   let syncBackend = $state<SyncBackend>("git");
@@ -464,8 +465,14 @@
           </p>
           <p>
             <span>{t("sync.status.lastSync")}</span><strong
-              >{settings.status.last_sync ?? "-"}</strong
+              >{formatDateTime(
+                settings.status.last_sync,
+                settings.status.timezone,
+              )}</strong
             >
+            {#if settings.status.timezone}
+              <small>{settings.status.timezone}</small>
+            {/if}
           </p>
           <p>
             <span>{t("sync.status.aheadBehind")}</span><strong

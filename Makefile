@@ -1,4 +1,4 @@
-.PHONY: build up down dev logs test test-backend test-frontend clean lint migrate shell-backend shell-frontend restart status
+.PHONY: build up down dev logs test test-backend test-frontend clean lint migrate shell-backend shell-frontend restart status rebuild rebuild-dev
 
 # ── Build ────────────────────────────────────────────
 build:
@@ -6,6 +6,17 @@ build:
 
 build-no-cache:
 	docker compose build --no-cache
+
+# 볼륨/컨테이너 모두 제거하고 no-cache 로 재빌드 후 기동 (완전 초기화)
+rebuild:
+	docker compose down -v --remove-orphans
+	docker compose build --no-cache
+	docker compose up -d
+
+rebuild-dev:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v --remove-orphans
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 # ── Run ──────────────────────────────────────────────
 up:

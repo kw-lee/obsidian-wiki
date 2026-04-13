@@ -109,6 +109,10 @@ nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 
 
 ## 문서
 
+문서 언어 정책:
+- `README.md` 는 사용자 안내 문서이므로 한국어를 유지합니다.
+- `llm-docs/` 는 구현/설계 참조 문서이므로 영어만 사용합니다.
+
 - [`AGENTS.md`](AGENTS.md) — 프로젝트 전반 규칙 (Claude/Codex 공통)
 - [`CLAUDE.md`](CLAUDE.md) — Claude용 포인터 문서
 - [`CODEX.md`](CODEX.md) — Codex용 포인터 문서

@@ -6,6 +6,12 @@ interface FilterGraphOptions {
   depth: GraphDepth;
   focusPath?: string | null;
   query?: string;
+  folder?: string | null;
+}
+
+export interface RankedGraphNode extends GraphNode {
+  degree: number;
+  folder: string;
 }
 
 export function filterGraphData(
@@ -15,16 +21,29 @@ export function filterGraphData(
   const focusPath = options.focusPath?.trim() ?? "";
   const depth = options.depth;
   const query = options.query?.trim().toLowerCase() ?? "";
+  const folder = options.folder?.trim() ?? "";
 
-  let allowedIds = new Set(data.nodes.map((node) => node.id));
+  const scopedNodes = folder
+    ? data.nodes.filter((node) => matchesFolder(node.id, folder))
+    : data.nodes;
+  const scopedIds = new Set(scopedNodes.map((node) => node.id));
+  const scopedEdges = data.edges.filter(
+    (edge) => scopedIds.has(edge.source) && scopedIds.has(edge.target),
+  );
+  const scopedData = {
+    nodes: scopedNodes,
+    edges: scopedEdges,
+  };
 
-  if (focusPath && depth !== "all" && hasNode(data.nodes, focusPath)) {
-    allowedIds = collectNeighborhood(data, focusPath, depth);
+  let allowedIds = new Set(scopedNodes.map((node) => node.id));
+
+  if (focusPath && depth !== "all" && hasNode(scopedNodes, focusPath)) {
+    allowedIds = collectNeighborhood(scopedData, focusPath, depth);
   }
 
   if (query) {
     const matches = new Set(
-      data.nodes
+      scopedNodes
         .filter((node) => matchesQuery(node, query))
         .map((node) => node.id),
     );
@@ -37,14 +56,18 @@ export function filterGraphData(
   }
 
   return {
-    nodes: data.nodes.filter((node) => allowedIds.has(node.id)),
-    edges: data.edges.filter(
+    nodes: scopedNodes.filter((node) => allowedIds.has(node.id)),
+    edges: scopedEdges.filter(
       (edge) => allowedIds.has(edge.source) && allowedIds.has(edge.target),
     ),
   };
 }
 
 export function countNeighbors(data: GraphData, nodeId: string | null): number {
+  return getNodeDegree(data, nodeId);
+}
+
+export function getNodeDegree(data: GraphData, nodeId: string | null): number {
   if (!nodeId) {
     return 0;
   }
@@ -61,6 +84,18 @@ export function countNeighbors(data: GraphData, nodeId: string | null): number {
   return neighbors.size;
 }
 
+export function getNeighborNodes(
+  data: GraphData,
+  nodeId: string | null,
+): GraphNode[] {
+  if (!nodeId) {
+    return [];
+  }
+
+  const neighborIds = buildAdjacency(data.edges).get(nodeId) ?? new Set<string>();
+  return data.nodes.filter((node) => neighborIds.has(node.id));
+}
+
 export function findGraphNode(
   data: GraphData,
   nodeId: string | null,
@@ -69,6 +104,70 @@ export function findGraphNode(
     return null;
   }
   return data.nodes.find((node) => node.id === nodeId) ?? null;
+}
+
+export function listGraphFolders(data: GraphData): string[] {
+  const folders = new Set<string>();
+
+  for (const node of data.nodes) {
+    const folder = getNodeFolder(node.id);
+    if (!folder) {
+      folders.add("");
+      continue;
+    }
+
+    const segments = folder.split("/");
+    for (let index = 0; index < segments.length; index += 1) {
+      folders.add(segments.slice(0, index + 1).join("/"));
+    }
+  }
+
+  return [...folders].sort((left, right) => {
+    if (left === right) {
+      return 0;
+    }
+    if (!left) {
+      return -1;
+    }
+    if (!right) {
+      return 1;
+    }
+    return left.localeCompare(right);
+  });
+}
+
+export function rankNodesByDegree(
+  data: GraphData,
+  limit = 5,
+): RankedGraphNode[] {
+  return data.nodes
+    .map((node) => ({
+      ...node,
+      degree: getNodeDegree(data, node.id),
+      folder: getNodeFolder(node.id),
+    }))
+    .sort((left, right) => {
+      if (right.degree !== left.degree) {
+        return right.degree - left.degree;
+      }
+      return left.title.localeCompare(right.title);
+    })
+    .slice(0, limit);
+}
+
+export function calculateAverageDegree(data: GraphData): number {
+  if (data.nodes.length === 0) {
+    return 0;
+  }
+  return (data.edges.length * 2) / data.nodes.length;
+}
+
+export function calculateGraphDensity(data: GraphData): number {
+  const nodeCount = data.nodes.length;
+  if (nodeCount < 2) {
+    return 0;
+  }
+  return data.edges.length / ((nodeCount * (nodeCount - 1)) / 2);
 }
 
 function collectNeighborhood(
@@ -126,6 +225,22 @@ function matchesQuery(node: GraphNode, query: string): boolean {
   );
 }
 
+function getNodeFolder(nodeId: string): string {
+  const segments = nodeId.split("/").filter(Boolean);
+  if (segments.length <= 1) {
+    return "";
+  }
+  return segments.slice(0, -1).join("/");
+}
+
 function hasNode(nodes: GraphNode[], nodeId: string): boolean {
   return nodes.some((node) => node.id === nodeId);
+}
+
+function matchesFolder(nodeId: string, folder: string): boolean {
+  const nodeFolder = getNodeFolder(nodeId);
+  if (!folder) {
+    return nodeFolder === "";
+  }
+  return nodeFolder === folder || nodeFolder.startsWith(`${folder}/`);
 }

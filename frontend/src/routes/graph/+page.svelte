@@ -9,9 +9,14 @@
   import { getAuth } from "$lib/stores/auth.svelte";
   import type { GraphData } from "$lib/types";
   import {
-    countNeighbors,
+    calculateAverageDegree,
+    calculateGraphDensity,
     filterGraphData,
     findGraphNode,
+    getNeighborNodes,
+    getNodeDegree,
+    listGraphFolders,
+    rankNodesByDegree,
     type GraphDepth,
   } from "$lib/utils/graph";
   import { buildWikiRoute } from "$lib/utils/routes";
@@ -29,20 +34,25 @@
   let loadFailed = $state(false);
   let searchQuery = $state("");
   let depth = $state<GraphDepth>("all");
+  let folder = $state("__all__");
+  let showLabels = $state(true);
   let currentPath = $state<string | null>(null);
   let selectedNodeId = $state<string | null>(null);
+  let hoveredNodeId = $state<string | null>(null);
 
   let zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown> | null = null;
   let svgSelection: d3.Selection<SVGSVGElement, unknown, null, undefined> | null =
     null;
   const backToWikiHref = $derived(buildWikiRoute(currentPath ?? ""));
   const effectiveFocusPath = $derived(selectedNodeId ?? currentPath);
+  const folderOptions = $derived(graphData ? listGraphFolders(graphData) : []);
   const visibleGraph = $derived.by(() => {
     if (!graphData) {
       return null;
     }
     return filterGraphData(graphData, {
       depth,
+      folder: folder === "__all__" ? null : folder,
       focusPath: effectiveFocusPath,
       query: searchQuery,
     });
@@ -50,8 +60,24 @@
   const selectedNode = $derived(
     graphData ? findGraphNode(graphData, effectiveFocusPath) : null,
   );
-  const selectedNeighborCount = $derived(
-    graphData ? countNeighbors(graphData, effectiveFocusPath) : 0,
+  const selectedDegree = $derived(
+    graphData ? getNodeDegree(graphData, effectiveFocusPath) : 0,
+  );
+  const visibleSelectedNeighbors = $derived(
+    visibleGraph ? getNeighborNodes(visibleGraph, effectiveFocusPath).slice(0, 5) : [],
+  );
+  const hoveredNode = $derived(graphData ? findGraphNode(graphData, hoveredNodeId) : null);
+  const hoveredDegree = $derived(graphData ? getNodeDegree(graphData, hoveredNodeId) : 0);
+  const hoveredNeighbors = $derived(
+    visibleGraph ? getNeighborNodes(visibleGraph, hoveredNodeId).slice(0, 4) : [],
+  );
+  const topConnectedNodes = $derived(visibleGraph ? rankNodesByDegree(visibleGraph, 4) : []);
+  const visibleAverageDegree = $derived(
+    visibleGraph ? calculateAverageDegree(visibleGraph) : 0,
+  );
+  const visibleDensity = $derived(visibleGraph ? calculateGraphDensity(visibleGraph) : 0);
+  const isSelectedNodeVisible = $derived(
+    visibleGraph ? Boolean(findGraphNode(visibleGraph, effectiveFocusPath)) : false,
   );
 
   onMount(() => {
@@ -75,6 +101,7 @@
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         selectedNodeId = null;
+        hoveredNodeId = null;
         searchQuery = "";
         resetZoom();
       }
@@ -111,6 +138,7 @@
     loadFailed = false;
     try {
       graphData = await fetchGraph();
+      hoveredNodeId = null;
     } catch {
       graphData = null;
       loadFailed = true;
@@ -170,7 +198,7 @@
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force(
         "collision",
-        d3.forceCollide<SimNode>().radius((node) => nodeRadius(node.id) + 12),
+        d3.forceCollide<SimNode>().radius((node) => nodeRadius(data, node.id) + 12),
       );
 
     const selectedId = effectiveFocusPath;
@@ -191,16 +219,25 @@
       .selectAll<SVGCircleElement, SimNode>("circle")
       .data(nodes)
       .join("circle")
-      .attr("r", (graphNode) => nodeRadius(graphNode.id))
+      .attr("r", (graphNode) => nodeRadius(data, graphNode.id))
       .attr("fill", (graphNode) => nodeFill(graphNode.id))
       .attr("stroke", (graphNode) => nodeStroke(graphNode.id))
-      .attr("stroke-width", (graphNode) => nodeStrokeWidth(graphNode.id))
+      .attr("stroke-width", (graphNode) => nodeStrokeWidth(data, graphNode.id))
+      .attr("fill-opacity", (graphNode) => nodeOpacity(data, graphNode.id))
       .style("cursor", "pointer")
       .on("click", (_event, graphNode) => {
         selectedNodeId = graphNode.id;
       })
       .on("dblclick", (_event, graphNode) => {
         goto(buildWikiRoute(graphNode.id));
+      })
+      .on("mouseenter", (_event, graphNode) => {
+        hoveredNodeId = graphNode.id;
+      })
+      .on("mouseleave", (_event, graphNode) => {
+        if (hoveredNodeId === graphNode.id) {
+          hoveredNodeId = null;
+        }
       })
       .call(
         d3
@@ -236,13 +273,15 @@
       .attr("fill", (graphNode) =>
         graphNode.id === selectedId ? "var(--text-primary)" : "var(--text-secondary)",
       )
-      .attr("dx", (graphNode) => nodeRadius(graphNode.id) + 5)
+      .attr("dx", (graphNode) => nodeRadius(data, graphNode.id) + 5)
       .attr("dy", 4)
       .style("pointer-events", "none")
       .style("opacity", (graphNode) =>
-        selectedId && graphNode.id !== selectedId && !isAdjacent(data, graphNode.id, selectedId)
-          ? 0.65
-          : 1,
+        showLabels
+          ? selectedId && graphNode.id !== selectedId && !isAdjacent(data, graphNode.id, selectedId)
+            ? 0.65
+            : 1
+          : 0,
       );
 
     node.append("title").text((graphNode) => graphNode.title);
@@ -273,14 +312,17 @@
       .call(zoomBehavior.transform as never, d3.zoomIdentity);
   }
 
-  function nodeRadius(nodeId: string) {
+  function nodeRadius(data: GraphData, nodeId: string) {
+    const degree = getNodeDegree(data, nodeId);
+    const baseRadius = degree >= 4 ? 8 : degree >= 2 ? 7 : 6;
+
     if (nodeId === selectedNodeId) {
-      return 10;
+      return Math.max(baseRadius, 10);
     }
     if (nodeId === currentPath) {
-      return 8;
+      return Math.max(baseRadius, 8);
     }
-    return 6;
+    return baseRadius;
   }
 
   function nodeFill(nodeId: string) {
@@ -303,14 +345,29 @@
     return "var(--bg-primary)";
   }
 
-  function nodeStrokeWidth(nodeId: string) {
+  function nodeStrokeWidth(data: GraphData, nodeId: string) {
+    const degree = getNodeDegree(data, nodeId);
     if (nodeId === selectedNodeId) {
       return 3;
     }
     if (nodeId === currentPath) {
       return 2.5;
     }
-    return 1.5;
+    return degree >= 4 ? 2 : 1.5;
+  }
+
+  function nodeOpacity(data: GraphData, nodeId: string) {
+    const degree = getNodeDegree(data, nodeId);
+    if (nodeId === selectedNodeId || nodeId === currentPath) {
+      return 1;
+    }
+    if (degree >= 4) {
+      return 0.95;
+    }
+    if (degree >= 2) {
+      return 0.88;
+    }
+    return 0.76;
   }
 
   function touchesNode(edge: SimLink, nodeId: string) {
@@ -340,6 +397,7 @@
 
   function clearSelection() {
     selectedNodeId = null;
+    hoveredNodeId = null;
   }
 
   function openFocusedNote() {
@@ -347,6 +405,23 @@
       return;
     }
     goto(buildWikiRoute(effectiveFocusPath));
+  }
+
+  function toggleLabels() {
+    showLabels = !showLabels;
+  }
+
+  function formatFolder(path: string | null) {
+    if (!path) {
+      return t("graph.folder.none");
+    }
+
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length <= 1) {
+      return t("graph.folder.root");
+    }
+
+    return segments.slice(0, -1).join("/");
   }
 </script>
 
@@ -387,7 +462,20 @@
         </select>
       </label>
 
+      <label class="depth-control">
+        <span>{t("graph.folderLabel")}</span>
+        <select bind:value={folder}>
+          <option value="__all__">{t("graph.folder.all")}</option>
+          {#each folderOptions as option}
+            <option value={option}>{option || t("graph.folder.root")}</option>
+          {/each}
+        </select>
+      </label>
+
       <button class="tool-btn" onclick={resetZoom}>{t("graph.resetZoom")}</button>
+      <button class="tool-btn" onclick={toggleLabels} aria-pressed={showLabels}>
+        {showLabels ? t("graph.labels.hide") : t("graph.labels.show")}
+      </button>
       <button class="tool-btn" onclick={focusCurrentNote} disabled={!currentPath}>
         {t("graph.focusCurrent")}
       </button>
@@ -405,18 +493,50 @@
       <strong>{selectedNode?.title ?? t("graph.selection.none")}</strong>
       {#if selectedNode}
         <span class="meta-path">{selectedNode.id}</span>
+        {#if !isSelectedNodeVisible}
+          <span class="meta-path">{t("graph.selection.filteredOut")}</span>
+        {/if}
       {/if}
+      <button class="meta-action" onclick={openFocusedNote} disabled={!selectedNode}>
+        {t("graph.openNote")}
+      </button>
     </div>
 
     <div class="meta-card">
-      <span class="meta-label">{t("graph.neighbors")}</span>
-      <strong>{selectedNeighborCount}</strong>
+      <span class="meta-label">{t("graph.metrics.focusTitle")}</span>
+      <strong>{t("graph.metrics.degreeValue", { count: selectedDegree })}</strong>
+      <span class="meta-path">
+        {t("graph.metrics.folderValue", { folder: formatFolder(selectedNode?.id ?? null) })}
+      </span>
       <span class="meta-path">{t("graph.doubleClickHint")}</span>
     </div>
 
-    <button class="open-btn" onclick={openFocusedNote} disabled={!selectedNode}>
-      {t("graph.openNote")}
-    </button>
+    <div class="meta-card">
+      <span class="meta-label">{t("graph.metrics.viewTitle")}</span>
+      <strong>{t("graph.metrics.avgDegreeValue", { value: visibleAverageDegree.toFixed(1) })}</strong>
+      <span class="meta-path">
+        {t("graph.metrics.densityValue", { value: visibleDensity.toFixed(2) })}
+      </span>
+      <span class="meta-path">{t("graph.neighbors", { count: visibleSelectedNeighbors.length })}</span>
+    </div>
+
+    <div class="meta-card">
+      <span class="meta-label">{t("graph.metrics.topConnected")}</span>
+      {#if topConnectedNodes.length > 0}
+        <div class="ranked-list">
+          {#each topConnectedNodes as node}
+            <div class="ranked-item">
+              <span>{node.title}</span>
+              <span class="ranked-degree">
+                {t("graph.metrics.degreeShort", { count: node.degree })}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <span class="meta-path">{t("graph.selection.none")}</span>
+      {/if}
+    </div>
   </section>
 
   {#if loading}
@@ -426,7 +546,35 @@
   {:else if !visibleGraph || visibleGraph.nodes.length === 0}
     <div class="state">{t("graph.emptyFiltered")}</div>
   {:else}
-    <div class="graph-container" bind:this={container}></div>
+    <div class="graph-stage">
+      <div class="graph-container" bind:this={container}></div>
+      {#if hoveredNode}
+        <aside class="hover-card">
+          <span class="meta-label">{t("graph.preview.title")}</span>
+          <strong>{hoveredNode.title}</strong>
+          <span class="meta-path">{hoveredNode.id}</span>
+          <span class="meta-path">
+            {t("graph.metrics.degreeValue", { count: hoveredDegree })}
+          </span>
+          <span class="meta-path">
+            {t("graph.metrics.folderValue", { folder: formatFolder(hoveredNode.id) })}
+          </span>
+
+          <div class="hover-neighbors">
+            <span class="meta-label">{t("graph.preview.neighbors")}</span>
+            {#if hoveredNeighbors.length > 0}
+              <div class="neighbor-chips">
+                {#each hoveredNeighbors as neighbor}
+                  <span class="neighbor-chip">{neighbor.title}</span>
+                {/each}
+              </div>
+            {:else}
+              <span class="meta-path">{t("graph.preview.emptyNeighbors")}</span>
+            {/if}
+          </div>
+        </aside>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -481,8 +629,7 @@
 
   .search,
   .depth-control select,
-  .tool-btn,
-  .open-btn {
+  .tool-btn {
     border: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
     color: var(--text-primary);
@@ -507,26 +654,23 @@
     padding: 0 0.8rem;
   }
 
-  .tool-btn,
-  .open-btn {
+  .tool-btn {
     padding: 0 0.95rem;
     cursor: pointer;
   }
 
-  .tool-btn:disabled,
-  .open-btn:disabled {
+  .tool-btn:disabled {
     opacity: 0.55;
     cursor: default;
   }
 
-  .tool-btn:hover:not(:disabled),
-  .open-btn:hover:not(:disabled) {
+  .tool-btn:hover:not(:disabled) {
     background: color-mix(in srgb, var(--bg-tertiary) 90%, transparent);
   }
 
   .graph-meta {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, auto));
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: 0.85rem;
     padding: 0.85rem 1.25rem 1rem;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
@@ -547,15 +691,82 @@
     font-size: 0.8rem;
   }
 
-  .open-btn {
-    justify-self: end;
-    align-self: stretch;
-    min-width: 10rem;
+  .meta-action {
+    width: fit-content;
+    margin-top: 0.35rem;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+    color: var(--text-primary);
+    border-radius: 999px;
+    min-height: 2.25rem;
+    padding: 0 0.9rem;
+    cursor: pointer;
+  }
+
+  .meta-action:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .ranked-list {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .ranked-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .ranked-degree {
+    color: var(--text-muted);
+  }
+
+  .graph-stage {
+    position: relative;
+    min-height: 0;
   }
 
   .graph-container {
     min-height: 0;
     overflow: hidden;
+  }
+
+  .hover-card {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: grid;
+    gap: 0.35rem;
+    width: min(20rem, calc(100% - 2rem));
+    padding: 0.95rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+    box-shadow: 0 18px 36px rgb(0 0 0 / 0.16);
+    backdrop-filter: blur(12px);
+  }
+
+  .hover-neighbors {
+    display: grid;
+    gap: 0.45rem;
+    padding-top: 0.25rem;
+  }
+
+  .neighbor-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .neighbor-chip {
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, var(--bg-secondary));
+    color: var(--text-secondary);
+    font-size: 0.78rem;
   }
 
   .state {
@@ -568,13 +779,10 @@
   }
 
   @media (max-width: 900px) {
-    .graph-meta {
-      grid-template-columns: 1fr;
-    }
-
-    .open-btn {
-      justify-self: stretch;
-      min-width: 0;
+    .hover-card {
+      position: static;
+      width: auto;
+      margin: 0 1rem 1rem;
     }
   }
 </style>

@@ -59,4 +59,31 @@ export interface SyncStatus {
 	ahead: number;
 	behind: number;
 	dirty: boolean;
+	backend?: string | null;
+	head?: string | null;
+	message?: string | null;
+}
+
+export interface AuthTokenPair {
+	access_token: string;
+	refresh_token: string;
+	must_change_credentials: boolean;
+}
+
+export interface ProfileSettings {
+	username: string;
+	must_change_credentials: boolean;
+	created_at: string | null;
+	updated_at: string | null;
+}
+
+export type SyncBackend = 'git' | 'webdav' | 'none';
+
+export interface SyncSettings {
+	sync_backend: SyncBackend;
+	sync_interval_seconds: number;
+	sync_auto_enabled: boolean;
+	git_remote_url: string;
+	git_branch: string;
+	status: SyncStatus;
 }

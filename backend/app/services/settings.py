@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.db.models import AppSettings
+
+
+@dataclass(frozen=True)
+class SyncRuntimeSettings:
+    sync_backend: str
+    sync_interval_seconds: int
+    sync_auto_enabled: bool
+    git_remote_url: str
+    git_branch: str
+
+
+_settings_cache: SyncRuntimeSettings | None = None
+_settings_lock = asyncio.Lock()
+
+
+def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
+    return SyncRuntimeSettings(
+        sync_backend=row.sync_backend,
+        sync_interval_seconds=row.sync_interval_seconds,
+        sync_auto_enabled=row.sync_auto_enabled,
+        git_remote_url=row.git_remote_url,
+        git_branch=row.git_branch,
+    )
+
+
+async def ensure_app_settings(db: AsyncSession) -> AppSettings:
+    row = await db.get(AppSettings, 1)
+    if row is not None:
+        return row
+
+    row = AppSettings(
+        id=1,
+        sync_backend="git",
+        sync_interval_seconds=max(settings.bootstrap_git_sync_interval_seconds, 60),
+        sync_auto_enabled=True,
+        git_remote_url=settings.bootstrap_git_remote_url,
+        git_branch=settings.bootstrap_git_branch,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    invalidate_settings_cache()
+    return row
+
+
+async def get_runtime_sync_settings(
+    db: AsyncSession, *, use_cache: bool = True
+) -> SyncRuntimeSettings:
+    global _settings_cache
+    if use_cache and _settings_cache is not None:
+        return _settings_cache
+
+    async with _settings_lock:
+        if use_cache and _settings_cache is not None:
+            return _settings_cache
+        row = await ensure_app_settings(db)
+        _settings_cache = _to_runtime_snapshot(row)
+        return _settings_cache
+
+
+def invalidate_settings_cache() -> None:
+    global _settings_cache
+    _settings_cache = None

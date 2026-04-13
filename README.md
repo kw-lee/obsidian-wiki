@@ -42,9 +42,9 @@ POSTGRES_PASSWORD=...               # 아무 강한 값
 JWT_SECRET=$(openssl rand -hex 32)  # 반드시 교체
 INIT_ADMIN_USERNAME=admin           # 최초 관리자 계정 (최초 로그인 후 강제 변경됨)
 INIT_ADMIN_PASSWORD=changeme
-GIT_REMOTE_URL=git@github.com:you/vault.git
-GIT_BRANCH=main
 ```
+
+동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 초기값만 시드할 수 있습니다.
 
 ### 2. 실행
 
@@ -57,7 +57,7 @@ make down      # 정지
 
 브라우저에서 **`http://localhost:${WEB_PORT}`** (기본 80) 접속 → `INIT_ADMIN_*` 로 로그인
 
-> `BACKEND_PORT` / `FRONTEND_PORT` 는 nginx 를 거치지 않는 직접 접근용(디버그). 실제 사용 진입점은 `WEB_PORT` 입니다. → **강제 credential 변경 페이지** (`/auth/setup`) 에서 새 username/password 지정 → 메인 화면으로 이동.
+> `BACKEND_PORT` / `FRONTEND_PORT` 는 nginx 를 거치지 않는 직접 접근용(디버그). 실제 사용 진입점은 `WEB_PORT` 입니다. → **강제 credential 변경 페이지** (`/auth/setup`) 에서 새 username/password 지정 → 필요하면 **설정 페이지** (`/settings/profile`, `/settings/sync`) 에서 계정/동기화 설정을 바로 조정합니다.
 
 ### 3. DB 마이그레이션 (스키마 변경 시)
 

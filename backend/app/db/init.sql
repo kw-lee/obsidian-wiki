@@ -13,6 +13,19 @@ CREATE TABLE users (
     updated_at               TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE app_settings (
+    id                    SMALLINT PRIMARY KEY DEFAULT 1,
+    sync_backend          TEXT NOT NULL DEFAULT 'git'
+                          CHECK (sync_backend IN ('git', 'webdav', 'none')),
+    sync_interval_seconds INTEGER NOT NULL DEFAULT 300
+                          CHECK (sync_interval_seconds >= 60),
+    sync_auto_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+    git_remote_url        TEXT NOT NULL DEFAULT '',
+    git_branch            TEXT NOT NULL DEFAULT 'main',
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT ck_app_settings_single_row CHECK (id = 1)
+);
+
 CREATE TABLE documents (
     id            SERIAL PRIMARY KEY,
     path          TEXT UNIQUE NOT NULL,
@@ -60,3 +73,7 @@ CREATE INDEX idx_documents_tags ON documents USING GIN(tags);
 CREATE INDEX idx_documents_path_trgm ON documents USING GIN(path gin_trgm_ops);
 CREATE INDEX idx_links_source ON links(source_path);
 CREATE INDEX idx_links_target ON links(target_path);
+
+INSERT INTO app_settings (id, sync_backend, sync_interval_seconds, sync_auto_enabled, git_remote_url, git_branch)
+VALUES (1, 'git', 300, TRUE, '', 'main')
+ON CONFLICT (id) DO NOTHING;

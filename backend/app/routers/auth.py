@@ -12,6 +12,7 @@ from app.auth import (
 )
 from app.db.models import User
 from app.db.session import get_db
+from app.schemas import AuthTokenPair
 
 router = APIRouter()
 
@@ -19,13 +20,6 @@ router = APIRouter()
 class LoginRequest(BaseModel):
     username: str
     password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    must_change_credentials: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -42,14 +36,14 @@ class ChangeCredentialsRequest(BaseModel):
     new_password: str
 
 
-@router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+@router.post("/login", response_model=AuthTokenPair)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> AuthTokenPair:
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     must_change = user.must_change_credentials
-    return TokenResponse(
+    return AuthTokenPair(
         access_token=create_token(user.username, "access", must_change=must_change),
         refresh_token=create_token(user.username, "refresh", must_change=must_change),
         must_change_credentials=must_change,
@@ -72,12 +66,12 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)) -> A
     )
 
 
-@router.post("/change-credentials", response_model=TokenResponse)
+@router.post("/change-credentials", response_model=AuthTokenPair)
 async def change_credentials(
     body: ChangeCredentialsRequest,
     username: str = Depends(get_current_user_allow_must_change),
     db: AsyncSession = Depends(get_db),
-) -> TokenResponse:
+) -> AuthTokenPair:
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
     if user is None:
@@ -94,7 +88,7 @@ async def change_credentials(
     user.must_change_credentials = False
     await db.commit()
 
-    return TokenResponse(
+    return AuthTokenPair(
         access_token=create_token(body.new_username, "access", must_change=False),
         refresh_token=create_token(body.new_username, "refresh", must_change=False),
         must_change_credentials=False,

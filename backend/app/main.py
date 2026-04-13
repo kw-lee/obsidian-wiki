@@ -10,7 +10,9 @@ from sqlalchemy.exc import IntegrityError
 from app.config import settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
-from app.routers import attachments, auth, search, sync, tags, wiki
+from app.routers import attachments, auth, search, settings as settings_router, sync, tags, wiki
+from app.services.settings import ensure_app_settings
+from app.services.sync_scheduler import SyncScheduler
 
 
 async def _ensure_initial_admin() -> None:
@@ -47,9 +49,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await _ensure_initial_admin()
-    yield
-    # shutdown
-    await engine.dispose()
+    async with async_session() as session:
+        await ensure_app_settings(session)
+
+    scheduler = SyncScheduler(async_session)
+    app.state.sync_scheduler = scheduler
+    await scheduler.start()
+    try:
+        yield
+    finally:
+        await scheduler.stop()
+        await engine.dispose()
 
 
 app = FastAPI(title="Obsidian Wiki API", lifespan=lifespan)
@@ -67,6 +77,7 @@ app.include_router(wiki.router, prefix="/api/wiki", tags=["wiki"])
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(attachments.router, prefix="/api/attachments", tags=["attachments"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
+app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])
 
 

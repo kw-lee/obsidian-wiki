@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.db.session import get_db
 from app.schemas import SyncStatus
-from app.services.git_ops import git_pull, git_push, sync_status
-from app.services.indexer import incremental_reindex
+from app.services.sync_service import get_active_sync_status, pull_active_backend, push_active_backend
 
 router = APIRouter()
 
@@ -15,19 +14,22 @@ async def pull(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> dict:
-    new_sha, changed = git_pull()
-    if changed:
-        await incremental_reindex(db, changed)
+    new_sha, changed = await pull_active_backend(db)
     return {"head": new_sha, "changed_files": len(changed)}
 
 
 @router.post("/push")
-async def push(_user: str = Depends(get_current_user)) -> dict:
-    git_push()
+async def push(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> dict:
+    await push_active_backend(db)
     return {"status": "ok"}
 
 
 @router.get("/status", response_model=SyncStatus)
-async def get_sync_status(_user: str = Depends(get_current_user)) -> SyncStatus:
-    data = sync_status()
-    return SyncStatus(**data)
+async def get_sync_status(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> SyncStatus:
+    return await get_active_sync_status(db)

@@ -1,12 +1,12 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.config import settings
-from app.db.models import Attachment, Document, EditSession, Link, Tag, User  # noqa: F401
+from app.db.models import AppSettings, Attachment, Document, EditSession, Link, Tag, User  # noqa: F401
 from app.db.session import Base
 
 config = context.config
@@ -43,6 +43,18 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
     )
     async with connectable.connect() as connection:
+        await connection.execute(
+            text("select set_config('app.bootstrap_git_remote_url', :value, false)"),
+            {"value": settings.bootstrap_git_remote_url},
+        )
+        await connection.execute(
+            text("select set_config('app.bootstrap_git_branch', :value, false)"),
+            {"value": settings.bootstrap_git_branch},
+        )
+        await connection.execute(
+            text("select set_config('app.bootstrap_git_sync_interval_seconds', :value, false)"),
+            {"value": str(settings.bootstrap_git_sync_interval_seconds)},
+        )
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 

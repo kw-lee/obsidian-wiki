@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type {
+	AuthTokenPair,
 	TreeNode,
 	DocDetail,
 	SearchResponse,
 	BacklinkItem,
 	TagInfo,
 	GraphData,
+	ProfileSettings,
+	SyncSettings,
 	SyncStatus
 } from './types';
 
@@ -73,9 +76,48 @@ describe('Type contracts', () => {
 			last_sync: null,
 			ahead: 0,
 			behind: 0,
-			dirty: false
+			dirty: false,
+			backend: 'git',
+			head: 'abc123',
+			message: null
 		};
 		expect(status.dirty).toBe(false);
+	});
+
+	it('AuthTokenPair has expected shape', () => {
+		const tokens: AuthTokenPair = {
+			access_token: 'access',
+			refresh_token: 'refresh',
+			must_change_credentials: false
+		};
+		expect(tokens.access_token).toBe('access');
+	});
+
+	it('ProfileSettings has expected shape', () => {
+		const profile: ProfileSettings = {
+			username: 'admin',
+			must_change_credentials: false,
+			created_at: null,
+			updated_at: null
+		};
+		expect(profile.username).toBe('admin');
+	});
+
+	it('SyncSettings has expected shape', () => {
+		const sync: SyncSettings = {
+			sync_backend: 'git',
+			sync_interval_seconds: 120,
+			sync_auto_enabled: true,
+			git_remote_url: 'git@github.com:test/vault.git',
+			git_branch: 'main',
+			status: {
+				last_sync: null,
+				ahead: 0,
+				behind: 0,
+				dirty: false
+			}
+		};
+		expect(sync.sync_interval_seconds).toBe(120);
 	});
 
 	it('BacklinkItem has expected shape', () => {

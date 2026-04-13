@@ -1,6 +1,18 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +29,34 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AppSettings(Base):
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=1, server_default="1")
+    sync_backend: Mapped[str] = mapped_column(Text, nullable=False, default="git", server_default="git")
+    sync_interval_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=300, server_default="300"
+    )
+    sync_auto_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    git_remote_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    git_branch: Mapped[str] = mapped_column(Text, nullable=False, default="main", server_default="main")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_app_settings_single_row"),
+        CheckConstraint(
+            "sync_backend IN ('git', 'webdav', 'none')", name="ck_app_settings_sync_backend"
+        ),
+        CheckConstraint(
+            "sync_interval_seconds >= 60", name="ck_app_settings_sync_interval_seconds"
+        ),
     )
 
 

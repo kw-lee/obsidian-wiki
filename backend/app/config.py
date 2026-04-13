@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -16,10 +17,12 @@ class Settings(BaseSettings):
     init_admin_username: str = "admin"
     init_admin_password: str = "changeme"
 
-    # Git
-    git_remote_url: str = ""
-    git_branch: str = "main"
-    git_sync_interval_seconds: int = 300
+    # Legacy bootstrap-only sync seed values for the first AppSettings row.
+    bootstrap_git_remote_url: str = Field(default="", alias="GIT_REMOTE_URL")
+    bootstrap_git_branch: str = Field(default="main", alias="GIT_BRANCH")
+    bootstrap_git_sync_interval_seconds: int = Field(
+        default=300, alias="GIT_SYNC_INTERVAL_SECONDS"
+    )
 
     # Vault
     vault_local_path: str = "/data/vault"

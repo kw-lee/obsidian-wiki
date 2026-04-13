@@ -33,6 +33,14 @@
 			}
 		},
 		{
+			id: 'settings',
+			label: '설정 열기',
+			action: () => {
+				onclose();
+				goto('/settings/profile');
+			}
+		},
+		{
 			id: 'pull',
 			label: 'Git Pull (동기화)',
 			action: async () => {

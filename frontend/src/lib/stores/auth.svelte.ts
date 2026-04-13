@@ -18,6 +18,19 @@ let state = $state<AuthState>({
 	mustChangeCredentials: false
 });
 
+function applySession(username: string, data: LoginResponse) {
+	setTokens(data.access_token, data.refresh_token);
+	localStorage.setItem('username', username);
+	state.isAuthenticated = true;
+	state.username = username;
+	state.mustChangeCredentials = data.must_change_credentials;
+	if (data.must_change_credentials) {
+		localStorage.setItem('must_change_credentials', 'true');
+	} else {
+		localStorage.removeItem('must_change_credentials');
+	}
+}
+
 export function initAuth() {
 	if (typeof window === 'undefined') return;
 	const token = localStorage.getItem('access_token');
@@ -36,14 +49,7 @@ export async function login(
 			method: 'POST',
 			body: JSON.stringify({ username, password })
 		});
-		setTokens(data.access_token, data.refresh_token);
-		localStorage.setItem('username', username);
-		state.isAuthenticated = true;
-		state.username = username;
-		state.mustChangeCredentials = data.must_change_credentials;
-		if (data.must_change_credentials) {
-			localStorage.setItem('must_change_credentials', 'true');
-		}
+		applySession(username, data);
 		return { success: true, mustChange: data.must_change_credentials };
 	} catch {
 		return { success: false, mustChange: false };
@@ -59,16 +65,15 @@ export async function changeCredentials(
 			method: 'POST',
 			body: JSON.stringify({ new_username: newUsername, new_password: newPassword })
 		});
-		setTokens(data.access_token, data.refresh_token);
-		localStorage.setItem('username', newUsername);
-		localStorage.removeItem('must_change_credentials');
-		state.isAuthenticated = true;
-		state.username = newUsername;
-		state.mustChangeCredentials = false;
+		applySession(newUsername, data);
 		return true;
 	} catch {
 		return false;
 	}
+}
+
+export function updateSession(username: string, data: LoginResponse) {
+	applySession(username, data);
 }
 
 export function logout() {

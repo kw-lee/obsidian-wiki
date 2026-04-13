@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ── Wiki ──────────────────────────────────────────────
@@ -82,3 +83,44 @@ class SyncStatus(BaseModel):
     ahead: int = 0
     behind: int = 0
     dirty: bool = False
+    backend: str | None = None
+    head: str | None = None
+    message: str | None = None
+
+
+# ── Settings ──────────────────────────────────────────
+class ProfileSettingsResponse(BaseModel):
+    username: str
+    must_change_credentials: bool = False
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ProfileSettingsUpdateRequest(BaseModel):
+    current_password: str
+    new_username: str | None = None
+    new_password: str | None = None
+
+
+class AuthTokenPair(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    must_change_credentials: bool = False
+
+
+class SyncSettingsResponse(BaseModel):
+    sync_backend: Literal["git", "webdav", "none"]
+    sync_interval_seconds: int = Field(ge=60)
+    sync_auto_enabled: bool = True
+    git_remote_url: str = ""
+    git_branch: str = "main"
+    status: SyncStatus
+
+
+class SyncSettingsUpdateRequest(BaseModel):
+    sync_backend: Literal["git", "webdav", "none"]
+    sync_interval_seconds: int = Field(ge=60)
+    sync_auto_enabled: bool = True
+    git_remote_url: str = ""
+    git_branch: str = "main"

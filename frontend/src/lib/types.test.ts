@@ -9,6 +9,7 @@ import type {
 	GraphData,
 	ProfileSettings,
 	SyncSettings,
+	SyncTestResult,
 	SyncStatus
 } from './types';
 
@@ -110,6 +111,11 @@ describe('Type contracts', () => {
 			sync_auto_enabled: true,
 			git_remote_url: 'git@github.com:test/vault.git',
 			git_branch: 'main',
+			webdav_url: '',
+			webdav_username: '',
+			webdav_remote_root: '/',
+			webdav_verify_tls: true,
+			has_webdav_password: false,
 			status: {
 				last_sync: null,
 				ahead: 0,
@@ -118,6 +124,15 @@ describe('Type contracts', () => {
 			}
 		};
 		expect(sync.sync_interval_seconds).toBe(120);
+	});
+
+	it('SyncTestResult has expected shape', () => {
+		const result: SyncTestResult = {
+			ok: true,
+			backend: 'webdav',
+			detail: 'WebDAV connection successful'
+		};
+		expect(result.ok).toBe(true);
 	});
 
 	it('BacklinkItem has expected shape', () => {

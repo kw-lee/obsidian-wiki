@@ -85,5 +85,16 @@ export interface SyncSettings {
 	sync_auto_enabled: boolean;
 	git_remote_url: string;
 	git_branch: string;
+	webdav_url: string;
+	webdav_username: string;
+	webdav_remote_root: string;
+	webdav_verify_tls: boolean;
+	has_webdav_password: boolean;
 	status: SyncStatus;
+}
+
+export interface SyncTestResult {
+	ok: boolean;
+	backend: string;
+	detail: string;
 }

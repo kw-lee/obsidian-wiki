@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchSyncSettings, updateSyncSettings } from '$lib/api/settings';
+	import { fetchSyncSettings, testSyncConnection, updateSyncSettings } from '$lib/api/settings';
 	import { syncPull, syncPush } from '$lib/api/wiki';
 	import type { SyncBackend, SyncSettings } from '$lib/types';
 
@@ -10,9 +10,16 @@
 	let syncAutoEnabled = $state(true);
 	let gitRemoteUrl = $state('');
 	let gitBranch = $state('main');
+	let webdavUrl = $state('');
+	let webdavUsername = $state('');
+	let webdavPassword = $state('');
+	let webdavRemoteRoot = $state('/');
+	let webdavVerifyTls = $state(true);
+	let hasWebdavPassword = $state(false);
 	let loading = $state(true);
 	let saving = $state(false);
 	let actionBusy = $state<'pull' | 'push' | null>(null);
+	let testing = $state(false);
 	let error = $state('');
 	let success = $state('');
 
@@ -27,6 +34,12 @@
 		syncAutoEnabled = data.sync_auto_enabled;
 		gitRemoteUrl = data.git_remote_url;
 		gitBranch = data.git_branch;
+		webdavUrl = data.webdav_url;
+		webdavUsername = data.webdav_username;
+		webdavRemoteRoot = data.webdav_remote_root;
+		webdavVerifyTls = data.webdav_verify_tls;
+		hasWebdavPassword = data.has_webdav_password;
+		webdavPassword = '';
 	}
 
 	async function loadSettings() {
@@ -53,7 +66,12 @@
 				sync_interval_seconds: syncIntervalSeconds,
 				sync_auto_enabled: syncAutoEnabled,
 				git_remote_url: gitRemoteUrl,
-				git_branch: gitBranch
+				git_branch: gitBranch,
+				webdav_url: webdavUrl,
+				webdav_username: webdavUsername,
+				webdav_password: webdavPassword || undefined,
+				webdav_remote_root: webdavRemoteRoot,
+				webdav_verify_tls: webdavVerifyTls
 			});
 			hydrate(updated);
 			success = '동기화 설정이 저장되었습니다.';
@@ -83,6 +101,29 @@
 			actionBusy = null;
 		}
 	}
+
+	async function handleTestConnection() {
+		testing = true;
+		error = '';
+		success = '';
+		try {
+			const result = await testSyncConnection({
+				sync_backend: syncBackend,
+				git_remote_url: gitRemoteUrl,
+				git_branch: gitBranch,
+				webdav_url: webdavUrl,
+				webdav_username: webdavUsername,
+				webdav_password: webdavPassword || undefined,
+				webdav_remote_root: webdavRemoteRoot,
+				webdav_verify_tls: webdavVerifyTls
+			});
+			success = result.detail;
+		} catch (err) {
+			error = err instanceof Error ? err.message : '연결 테스트에 실패했습니다.';
+		} finally {
+			testing = false;
+		}
+	}
 </script>
 
 <section class="panel">
@@ -90,7 +131,7 @@
 		<div>
 			<p class="eyebrow">Sync</p>
 			<h2>동기화 설정</h2>
-			<p class="copy">현재는 Git과 비활성화 모드를 지원하고, WebDAV는 다음 단계에서 이어집니다.</p>
+			<p class="copy">Git과 WebDAV 설정을 여기서 전환하고, 저장 전 연결 테스트까지 바로 확인할 수 있습니다.</p>
 		</div>
 	</div>
 
@@ -108,13 +149,17 @@
 				</button>
 				<button
 					type="button"
+					class:active={syncBackend === 'webdav'}
+					onclick={() => (syncBackend = 'webdav')}
+				>
+					WebDAV
+				</button>
+				<button
+					type="button"
 					class:active={syncBackend === 'none'}
 					onclick={() => (syncBackend = 'none')}
 				>
 					None
-				</button>
-				<button type="button" disabled title="WebDAV backend is coming in the next phase">
-					WebDAV
 				</button>
 			</div>
 
@@ -140,6 +185,41 @@
 						<input type="text" bind:value={gitBranch} />
 					</label>
 				</div>
+			{:else if syncBackend === 'webdav'}
+				<div class="subpanel">
+					<h3>WebDAV 설정</h3>
+					<label>
+						<span>Server URL</span>
+						<input
+							type="text"
+							bind:value={webdavUrl}
+							placeholder="https://cloud.example.com/remote.php/dav/files/me"
+						/>
+					</label>
+					<label>
+						<span>Username</span>
+						<input type="text" bind:value={webdavUsername} />
+					</label>
+					<label>
+						<span>Password / App Token</span>
+						<input
+							type="password"
+							bind:value={webdavPassword}
+							placeholder={hasWebdavPassword ? '저장된 값 유지 또는 새 값 입력' : '새 비밀번호 또는 앱 토큰'}
+						/>
+					</label>
+					<label>
+						<span>Remote Root</span>
+						<input type="text" bind:value={webdavRemoteRoot} placeholder="/vault" />
+					</label>
+					<label class="toggle">
+						<span>TLS 검증</span>
+						<input type="checkbox" bind:checked={webdavVerifyTls} />
+					</label>
+					<p class="notice">
+						WebDAV는 현재 연결 테스트와 설정 저장까지 지원합니다. 실제 pull/push 동기화 엔진은 다음 단계에서 이어집니다.
+					</p>
+				</div>
 			{:else if syncBackend === 'none'}
 				<p class="notice">자동/수동 동기화가 비활성화됩니다. 로컬 vault는 그대로 유지됩니다.</p>
 			{/if}
@@ -154,6 +234,9 @@
 			<div class="actions">
 				<button type="submit" disabled={saving}>
 					{saving ? '저장 중...' : '설정 저장'}
+				</button>
+				<button type="button" class="secondary" disabled={testing} onclick={handleTestConnection}>
+					{testing ? '테스트 중...' : '연결 테스트'}
 				</button>
 				<button type="button" class="secondary" disabled={actionBusy !== null} onclick={() => runSyncAction('pull')}>
 					{actionBusy === 'pull' ? 'Pull 중...' : 'Pull'}
@@ -237,7 +320,8 @@
 	}
 
 	input[type='text'],
-	input[type='number'] {
+	input[type='number'],
+	input[type='password'] {
 		padding: 0.85rem 1rem;
 		border: 1px solid var(--border);
 		border-radius: 12px;
@@ -316,6 +400,7 @@
 	.notice {
 		background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
 		color: var(--text-secondary);
+		line-height: 1.5;
 	}
 
 	.status-header {

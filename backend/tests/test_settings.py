@@ -5,7 +5,9 @@ import pytest
 
 import app.db.session as session_mod
 from app.db.models import AppSettings, User
+from app.schemas import SyncTestResult
 from app.services.sync_scheduler import SyncScheduler
+from app.services.sync.crypto import decrypt_secret, encrypt_secret
 
 
 @pytest.mark.asyncio
@@ -137,6 +139,77 @@ async def test_sync_status_reflects_disabled_backend(client, auth_headers, setup
 
     pull_resp = await client.post("/api/sync/pull", headers=auth_headers)
     assert pull_resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_redact_and_persist_webdav_password(client, auth_headers, setup_vault):
+    resp = await client.put(
+        "/api/settings/sync",
+        json={
+            "sync_backend": "webdav",
+            "sync_interval_seconds": 300,
+            "sync_auto_enabled": False,
+            "git_remote_url": "",
+            "git_branch": "main",
+            "webdav_url": "https://dav.example.com/remote.php/dav/files/me",
+            "webdav_username": "me",
+            "webdav_password": "app-token",
+            "webdav_remote_root": "/vault",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sync_backend"] == "webdav"
+    assert data["has_webdav_password"] is True
+    assert data["webdav_url"] == "https://dav.example.com/remote.php/dav/files/me"
+    assert data["status"]["backend"] == "webdav"
+
+    async with session_mod.async_session() as session:
+        row = await session.get(AppSettings, 1)
+        assert row is not None
+        assert row.webdav_password_enc != "app-token"
+        assert decrypt_secret(row.webdav_password_enc) == "app-token"
+
+    read_resp = await client.get("/api/settings/sync", headers=auth_headers)
+    assert read_resp.status_code == 200
+    read_data = read_resp.json()
+    assert read_data["has_webdav_password"] is True
+    assert "webdav_password" not in read_data
+
+
+@pytest.mark.asyncio
+async def test_sync_test_endpoint_uses_webdav_backend(client, auth_headers, monkeypatch, setup_vault):
+    async def fake_test(self) -> SyncTestResult:
+        assert self.runtime.webdav_url == "https://dav.example.com/remote.php/dav/files/me"
+        assert decrypt_secret(self.runtime.webdav_password_enc) == "app-token"
+        return SyncTestResult(ok=True, backend="webdav", detail="WebDAV connection successful")
+
+    monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.test", fake_test)
+
+    resp = await client.post(
+        "/api/settings/sync/test",
+        json={
+            "sync_backend": "webdav",
+            "git_remote_url": "",
+            "git_branch": "main",
+            "webdav_url": "https://dav.example.com/remote.php/dav/files/me",
+            "webdav_username": "me",
+            "webdav_password": "app-token",
+            "webdav_remote_root": "/vault",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["detail"] == "WebDAV connection successful"
+
+
+def test_encrypt_secret_roundtrip():
+    encrypted = encrypt_secret("secret")
+    assert encrypted != "secret"
+    assert decrypt_secret(encrypted) == "secret"
 
 
 @pytest.mark.asyncio

@@ -22,6 +22,11 @@ CREATE TABLE app_settings (
     sync_auto_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
     git_remote_url        TEXT NOT NULL DEFAULT '',
     git_branch            TEXT NOT NULL DEFAULT 'main',
+    webdav_url            TEXT NOT NULL DEFAULT '',
+    webdav_username       TEXT NOT NULL DEFAULT '',
+    webdav_password_enc   TEXT NOT NULL DEFAULT '',
+    webdav_remote_root    TEXT NOT NULL DEFAULT '/',
+    webdav_verify_tls     BOOLEAN NOT NULL DEFAULT TRUE,
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_app_settings_single_row CHECK (id = 1)
 );
@@ -68,11 +73,20 @@ CREATE TABLE edit_sessions (
     expires_at  TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE webdav_manifest (
+    id    SERIAL PRIMARY KEY,
+    path  TEXT UNIQUE NOT NULL,
+    etag  TEXT,
+    mtime TIMESTAMPTZ,
+    sha256 TEXT NOT NULL
+);
+
 CREATE INDEX idx_documents_search ON documents USING GIN(search_vector);
 CREATE INDEX idx_documents_tags ON documents USING GIN(tags);
 CREATE INDEX idx_documents_path_trgm ON documents USING GIN(path gin_trgm_ops);
 CREATE INDEX idx_links_source ON links(source_path);
 CREATE INDEX idx_links_target ON links(target_path);
+CREATE INDEX idx_webdav_manifest_path ON webdav_manifest(path);
 
 INSERT INTO app_settings (id, sync_backend, sync_interval_seconds, sync_auto_enabled, git_remote_url, git_branch)
 VALUES (1, 'git', 300, TRUE, '', 'main')

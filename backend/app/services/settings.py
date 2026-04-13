@@ -17,6 +17,11 @@ class SyncRuntimeSettings:
     sync_auto_enabled: bool
     git_remote_url: str
     git_branch: str
+    webdav_url: str
+    webdav_username: str
+    webdav_password_enc: str
+    webdav_remote_root: str
+    webdav_verify_tls: bool
 
 
 _settings_cache: SyncRuntimeSettings | None = None
@@ -30,6 +35,11 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         sync_auto_enabled=row.sync_auto_enabled,
         git_remote_url=row.git_remote_url,
         git_branch=row.git_branch,
+        webdav_url=row.webdav_url,
+        webdav_username=row.webdav_username,
+        webdav_password_enc=row.webdav_password_enc,
+        webdav_remote_root=row.webdav_remote_root,
+        webdav_verify_tls=row.webdav_verify_tls,
     )
 
 
@@ -45,6 +55,11 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         sync_auto_enabled=True,
         git_remote_url=settings.bootstrap_git_remote_url,
         git_branch=settings.bootstrap_git_branch,
+        webdav_url="",
+        webdav_username="",
+        webdav_password_enc="",
+        webdav_remote_root="/",
+        webdav_verify_tls=True,
     )
     db.add(row)
     await db.commit()

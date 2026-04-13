@@ -45,6 +45,13 @@ class AppSettings(Base):
     )
     git_remote_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     git_branch: Mapped[str] = mapped_column(Text, nullable=False, default="main", server_default="main")
+    webdav_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    webdav_username: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    webdav_password_enc: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    webdav_remote_root: Mapped[str] = mapped_column(Text, nullable=False, default="/", server_default="/")
+    webdav_verify_tls: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -124,3 +131,15 @@ class EditSession(Base):
     base_commit: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WebDAVManifest(Base):
+    __tablename__ = "webdav_manifest"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    path: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    etag: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mtime: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (Index("idx_webdav_manifest_path", "path"),)

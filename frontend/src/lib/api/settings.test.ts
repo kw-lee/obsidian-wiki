@@ -8,6 +8,7 @@ import { api } from './client';
 import {
 	fetchProfileSettings,
 	fetchSyncSettings,
+	testSyncConnection,
 	updateProfileSettings,
 	updateSyncSettings
 } from './settings';
@@ -55,7 +56,11 @@ describe('Settings API functions', () => {
 			sync_interval_seconds: 120,
 			sync_auto_enabled: false,
 			git_remote_url: 'git@github.com:test/vault.git',
-			git_branch: 'develop'
+			git_branch: 'develop',
+			webdav_url: '',
+			webdav_username: '',
+			webdav_remote_root: '/',
+			webdav_verify_tls: true
 		});
 		expect(mockApi).toHaveBeenCalledWith('/settings/sync', {
 			method: 'PUT',
@@ -64,7 +69,38 @@ describe('Settings API functions', () => {
 				sync_interval_seconds: 120,
 				sync_auto_enabled: false,
 				git_remote_url: 'git@github.com:test/vault.git',
-				git_branch: 'develop'
+				git_branch: 'develop',
+				webdav_url: '',
+				webdav_username: '',
+				webdav_remote_root: '/',
+				webdav_verify_tls: true
+			})
+		});
+	});
+
+	it('testSyncConnection sends POST payload', async () => {
+		mockApi.mockResolvedValueOnce({ ok: true, backend: 'webdav', detail: 'ok' });
+		await testSyncConnection({
+			sync_backend: 'webdav',
+			git_remote_url: '',
+			git_branch: 'main',
+			webdav_url: 'https://dav.example.com/remote.php/dav/files/me',
+			webdav_username: 'me',
+			webdav_password: 'secret',
+			webdav_remote_root: '/vault',
+			webdav_verify_tls: true
+		});
+		expect(mockApi).toHaveBeenCalledWith('/settings/sync/test', {
+			method: 'POST',
+			body: JSON.stringify({
+				sync_backend: 'webdav',
+				git_remote_url: '',
+				git_branch: 'main',
+				webdav_url: 'https://dav.example.com/remote.php/dav/files/me',
+				webdav_username: 'me',
+				webdav_password: 'secret',
+				webdav_remote_root: '/vault',
+				webdav_verify_tls: true
 			})
 		});
 	});

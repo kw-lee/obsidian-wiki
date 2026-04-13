@@ -115,6 +115,11 @@ class SyncSettingsResponse(BaseModel):
     sync_auto_enabled: bool = True
     git_remote_url: str = ""
     git_branch: str = "main"
+    webdav_url: str = ""
+    webdav_username: str = ""
+    webdav_remote_root: str = "/"
+    webdav_verify_tls: bool = True
+    has_webdav_password: bool = False
     status: SyncStatus
 
 
@@ -124,3 +129,25 @@ class SyncSettingsUpdateRequest(BaseModel):
     sync_auto_enabled: bool = True
     git_remote_url: str = ""
     git_branch: str = "main"
+    webdav_url: str = ""
+    webdav_username: str = ""
+    webdav_password: str | None = None
+    webdav_remote_root: str = "/"
+    webdav_verify_tls: bool = True
+
+
+class SyncSettingsTestRequest(BaseModel):
+    sync_backend: Literal["git", "webdav", "none"]
+    git_remote_url: str = ""
+    git_branch: str = "main"
+    webdav_url: str = ""
+    webdav_username: str = ""
+    webdav_password: str | None = None
+    webdav_remote_root: str = "/"
+    webdav_verify_tls: bool = True
+
+
+class SyncTestResult(BaseModel):
+    ok: bool
+    backend: str
+    detail: str

@@ -22,11 +22,76 @@ export interface SyncIndicatorState {
     | "sync.header.unavailable";
 }
 
+export interface SyncSurfaceSummary {
+  jobLabel: string | null;
+  jobMessage: string | null;
+  issueMessage: string | null;
+  issueTone: SyncIndicatorTone | null;
+  progressCurrent: number | null;
+  progressTotal: number | null;
+  progressPercent: number | null;
+}
+
 const FINAL_STATUSES = new Set<SyncJob["status"]>([
   "succeeded",
   "failed",
   "conflict",
 ]);
+
+export function getSyncJobLabel(job: SyncJob | null | undefined): string | null {
+  if (!job) return null;
+
+  if (job.action === "bootstrap") {
+    return job.bootstrap_strategy === "remote"
+      ? "sync.bootstrapRemoteTitle"
+      : "sync.bootstrapLocalTitle";
+  }
+
+  return job.action === "pull" ? "sync.pullButton" : "sync.pushButton";
+}
+
+export function getSyncSurfaceSummary(input: {
+  currentJob: SyncJob | null;
+  error: string | null;
+  status: SyncStatus | null;
+}): SyncSurfaceSummary {
+  const { currentJob, error, status } = input;
+  const ahead = status?.ahead ?? 0;
+  const behind = status?.behind ?? 0;
+  const issueMessage =
+    currentJob?.error ??
+    (currentJob?.status === "conflict" || currentJob?.status === "failed"
+      ? currentJob.message
+      : null) ??
+    status?.message ??
+    error ??
+    null;
+
+  const issueTone =
+    currentJob?.status === "conflict"
+      ? "conflict"
+      : currentJob?.status === "failed" || error
+        ? "error"
+        : status?.dirty || ahead > 0 || behind > 0
+          ? "warning"
+          : null;
+
+  const progressTotal = currentJob?.total ?? null;
+  const progressPercent =
+    currentJob && currentJob.total > 0
+      ? currentJob.progress_percent ?? Math.round((currentJob.current / currentJob.total) * 100)
+      : null;
+
+  return {
+    jobLabel: getSyncJobLabel(currentJob),
+    jobMessage: currentJob?.phase ?? currentJob?.message ?? null,
+    issueMessage,
+    issueTone,
+    progressCurrent: currentJob?.current ?? null,
+    progressTotal,
+    progressPercent,
+  };
+}
 
 export function getSyncIndicatorState(input: {
   currentJob: SyncJob | null;

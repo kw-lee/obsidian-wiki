@@ -1,6 +1,7 @@
 import { fetchCurrentSyncJob, fetchSyncStatus, startSyncJob } from "$lib/api/wiki";
 import type { SyncJob, SyncStatus } from "$lib/types";
 import { getAuth } from "$lib/stores/auth.svelte";
+import { getSyncSurfaceSummary } from "$lib/utils/sync-indicator";
 
 const POLL_INTERVAL_MS = 1500;
 const FINAL_JOB_RETENTION_MS = 15000;
@@ -10,7 +11,7 @@ const FINAL_STATUSES = new Set<SyncJob["status"]>([
   "conflict",
 ]);
 
-interface SyncMonitorState {
+export interface SyncMonitorState {
   currentJob: SyncJob | null;
   status: SyncStatus | null;
   initialized: boolean;
@@ -105,6 +106,16 @@ export async function enqueueSyncJob(payload: {
 
 export function getSyncMonitor() {
   return state;
+}
+
+export function getSyncMonitorSummary(
+  monitor: SyncMonitorState = state,
+): ReturnType<typeof getSyncSurfaceSummary> {
+  return getSyncSurfaceSummary({
+    currentJob: monitor.currentJob,
+    error: monitor.error,
+    status: monitor.status,
+  });
 }
 
 export function isSyncJobActive(job: SyncJob | null | undefined) {

@@ -1,18 +1,54 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { t } from "$lib/i18n/index.svelte";
   import { logout } from "$lib/stores/auth.svelte";
-  import { getSyncMonitor } from "$lib/stores/sync.svelte";
+  import {
+    getSyncMonitor,
+    getSyncMonitorSummary,
+  } from "$lib/stores/sync.svelte";
   import { toggleTheme, getTheme } from "$lib/stores/theme.svelte";
   import { getSyncIndicatorState } from "$lib/utils/sync-indicator";
+  import { formatDateTime } from "$lib/utils/datetime";
 
   let { onsearch }: { onsearch: () => void } = $props();
   const syncMonitor = getSyncMonitor();
+  let syncSurface = $state<HTMLElement | null>(null);
+  let syncOpen = $state(false);
 
   function handleLogout() {
     logout();
     goto("/login");
   }
+
+  function closeSyncSurface() {
+    syncOpen = false;
+  }
+
+  function toggleSyncSurface() {
+    syncOpen = !syncOpen;
+  }
+
+  function handleWindowPointerDown(event: PointerEvent) {
+    if (!syncOpen || !syncSurface) return;
+    if (syncSurface.contains(event.target as Node)) return;
+    closeSyncSurface();
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      closeSyncSurface();
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener("pointerdown", handleWindowPointerDown, true);
+    window.addEventListener("keydown", handleWindowKeydown);
+    return () => {
+      window.removeEventListener("pointerdown", handleWindowPointerDown, true);
+      window.removeEventListener("keydown", handleWindowKeydown);
+    };
+  });
 
   const syncIndicator = $derived(
     getSyncIndicatorState({
@@ -21,6 +57,8 @@
       status: syncMonitor.status,
     }),
   );
+
+  const syncSummary = $derived(getSyncMonitorSummary(syncMonitor));
 
   function syncPillLabel() {
     if (syncMonitor.currentJob?.message && syncIndicator.tone === "running") {
@@ -41,21 +79,122 @@
     </button>
   </div>
   <div class="header-right">
-    {#if syncMonitor.initialized}
-      <a
-        href="/settings/sync"
-        class="sync-pill"
-        class:running={syncIndicator.tone === "running"}
-        class:success={syncIndicator.tone === "success"}
-        class:conflict={syncIndicator.tone === "conflict"}
-        class:error={syncIndicator.tone === "error"}
-        class:warning={syncIndicator.tone === "warning"}
-        class:disabled={syncIndicator.tone === "disabled"}
-      >
-        <span class="sync-dot"></span>
-        <span>{syncPillLabel()}</span>
-      </a>
-    {/if}
+    <div class="sync-surface" bind:this={syncSurface}>
+      {#if syncMonitor.initialized}
+        <button
+          type="button"
+          class="sync-pill"
+          class:running={syncIndicator.tone === "running"}
+          class:success={syncIndicator.tone === "success"}
+          class:conflict={syncIndicator.tone === "conflict"}
+          class:error={syncIndicator.tone === "error"}
+          class:warning={syncIndicator.tone === "warning"}
+          class:disabled={syncIndicator.tone === "disabled"}
+          aria-haspopup="dialog"
+          aria-expanded={syncOpen}
+          aria-controls="sync-drilldown"
+          onclick={toggleSyncSurface}
+        >
+          <span class="sync-dot"></span>
+          <span class="sync-label">{syncPillLabel()}</span>
+          <span class="sync-chevron">▾</span>
+        </button>
+
+        {#if syncOpen}
+          <div
+            id="sync-drilldown"
+            class="sync-popover"
+            role="region"
+            aria-label={t("sync.statusTitle")}
+          >
+            <div class="sync-popover-header">
+              <div>
+                <p class="sync-popover-eyebrow">{t("sync.statusTitle")}</p>
+                <strong>{t(syncIndicator.messageKey)}</strong>
+              </div>
+              <span class="sync-backend"
+                >{syncMonitor.status?.backend ??
+                  syncMonitor.currentJob?.backend ??
+                  "-"}</span
+              >
+            </div>
+
+            <div class="sync-grid">
+              <p>
+                <span>{t("sync.status.head")}</span>
+                <strong>{syncMonitor.status?.head ?? syncMonitor.currentJob?.head ?? "-"}</strong>
+              </p>
+              <p>
+                <span>{t("sync.status.lastSync")}</span>
+                <strong
+                  >{formatDateTime(
+                    syncMonitor.status?.last_sync,
+                    syncMonitor.status?.timezone,
+                  )}</strong
+                >
+                {#if syncMonitor.status?.timezone}
+                  <small>{syncMonitor.status.timezone}</small>
+                {/if}
+              </p>
+              <p>
+                <span>{t("sync.status.aheadBehind")}</span>
+                <strong
+                  >{syncMonitor.status?.ahead ?? 0} / {syncMonitor.status?.behind ?? 0}</strong
+                >
+              </p>
+              <p>
+                <span>{t("sync.status.dirty")}</span>
+                <strong
+                  >{syncMonitor.status?.dirty ? t("sync.status.yes") : t("sync.status.no")}</strong
+                >
+              </p>
+            </div>
+
+            {#if syncMonitor.currentJob}
+              <section class="sync-job">
+                <div class="sync-job-header">
+                  <span>{t("sync.jobTitle")}</span>
+                  {#if syncSummary.jobLabel}
+                    <strong>{t(syncSummary.jobLabel)}</strong>
+                  {/if}
+                </div>
+                {#if syncSummary.jobMessage}
+                  <p class="sync-job-message">{syncSummary.jobMessage}</p>
+                {/if}
+                {#if syncSummary.progressTotal && syncSummary.progressTotal > 0}
+                  <div class="sync-progress">
+                    <div
+                      class="sync-progress-bar"
+                      style={`width: ${syncSummary.progressPercent ?? 0}%`}
+                    ></div>
+                  </div>
+                  <p class="sync-progress-copy">
+                    {syncSummary.progressCurrent} / {syncSummary.progressTotal}
+                  </p>
+                {/if}
+                {#if syncSummary.issueMessage}
+                  <p
+                    class="sync-issue"
+                    class:error={syncSummary.issueTone === "error" || syncSummary.issueTone === "conflict"}
+                    class:warning={syncSummary.issueTone === "warning"}
+                  >
+                    {syncSummary.issueMessage}
+                  </p>
+                {/if}
+              </section>
+            {/if}
+
+            {#if syncMonitor.status?.message && !syncSummary.issueMessage}
+              <p class="sync-issue warning">{syncMonitor.status.message}</p>
+            {/if}
+
+            <a href="/settings/sync" class="sync-settings-link"
+              >{t("header.settings")}</a
+            >
+          </div>
+        {/if}
+      {/if}
+    </div>
     <a href="/graph" class="icon-btn" title={t("header.graph")}>◉</a>
     <a href="/settings/profile" class="icon-btn" title={t("header.settings")}
       >⚙</a
@@ -88,6 +227,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+  .sync-surface {
+    position: relative;
+    display: flex;
+    align-items: center;
   }
   .logo {
     font-weight: 700;
@@ -136,6 +280,8 @@
     color: var(--text-secondary);
     font-size: 0.8rem;
     max-width: 260px;
+    cursor: pointer;
+    text-align: left;
   }
   .sync-pill.running,
   .sync-pill.success {
@@ -154,10 +300,15 @@
   .sync-pill.disabled {
     opacity: 0.8;
   }
-  .sync-pill span:last-child {
+  .sync-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .sync-chevron {
+    opacity: 0.8;
+    font-size: 0.7rem;
+    flex: 0 0 auto;
   }
   .sync-dot {
     width: 0.55rem;
@@ -175,5 +326,126 @@
   }
   .sync-pill.disabled .sync-dot {
     background: var(--text-muted);
+  }
+  .sync-pill:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+  .sync-popover {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    z-index: 30;
+    width: min(24rem, calc(100vw - 1rem));
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-primary);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+    display: grid;
+    gap: 0.85rem;
+  }
+  .sync-popover-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .sync-popover-eyebrow {
+    margin: 0 0 0.15rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .sync-backend {
+    flex: 0 0 auto;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+  }
+  .sync-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .sync-grid p {
+    margin: 0;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+  }
+  .sync-grid span {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .sync-grid strong {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.86rem;
+    color: var(--text-primary);
+  }
+  .sync-grid small {
+    display: block;
+    margin-top: 0.2rem;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+  }
+  .sync-job {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 85%, var(--bg-primary));
+  }
+  .sync-job-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: baseline;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .sync-job-header strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .sync-job-message,
+  .sync-issue,
+  .sync-progress-copy {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+  .sync-progress {
+    height: 0.4rem;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+  }
+  .sync-progress-bar {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+  }
+  .sync-issue.warning {
+    color: #d97706;
+  }
+  .sync-issue.error {
+    color: #dc2626;
+  }
+  .sync-settings-link {
+    justify-self: end;
+    font-size: 0.78rem;
+    color: var(--accent);
   }
 </style>

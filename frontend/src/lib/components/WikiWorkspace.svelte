@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { rebuildVaultIndex } from "$lib/api/settings";
   import { createDoc, createFolder, fetchDoc, fetchTree, saveDoc } from "$lib/api/wiki";
-  import { t } from "$lib/i18n/index.svelte";
+  import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
   import type { DocDetail, TreeNode } from "$lib/types";
@@ -228,8 +229,28 @@
       toggleTheme();
       return;
     }
+    if (action === "toggle-locale") {
+      setLocale(getLocale() === "ko" ? "en" : "ko");
+      showToast(t("appearance.language.saved"));
+      return;
+    }
     if (action === "toast") {
       showToast(payload ?? "");
+      return;
+    }
+    if (action === "rebuild-index") {
+      try {
+        const result = await rebuildVaultIndex();
+        showToast(
+          t("commandPalette.rebuildIndexSuccess", {
+            count: result.indexed_documents,
+          }),
+        );
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : t("commandPalette.rebuildIndexFailed"),
+        );
+      }
       return;
     }
     if (action === "edit-current") {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { t } from "$lib/i18n/index.svelte";
+  import { getLocale, t } from "$lib/i18n/index.svelte";
   import { enqueueSyncJob } from "$lib/stores/sync.svelte";
 
   let {
@@ -61,6 +61,19 @@
         goto("/settings/profile");
       },
     },
+    {
+      id: "sync-settings",
+      label: t("commandPalette.syncSettings"),
+      action: () => {
+        onclose();
+        goto("/settings/sync");
+      },
+    },
+    {
+      id: "rebuild-index",
+      label: t("commandPalette.rebuildIndex"),
+      action: () => onaction("rebuild-index"),
+    },
     ...(currentPath
       ? [
           {
@@ -112,6 +125,17 @@
       action: () => {
         onclose();
         onaction("toggle-theme");
+      },
+    },
+    {
+      id: "locale",
+      label:
+        getLocale() === "ko"
+          ? t("commandPalette.localeEnglish")
+          : t("commandPalette.localeKorean"),
+      action: () => {
+        onclose();
+        onaction("toggle-locale");
       },
     },
   ]);

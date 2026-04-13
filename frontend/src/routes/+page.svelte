@@ -176,7 +176,7 @@
 					onsave={handleSave}
 				/>
 				{:else}
-					<MarkdownView content={doc.content} onnavigate={navigateTo} />
+					<MarkdownView path={doc.path} content={doc.content} onnavigate={navigateTo} />
 				{/if}
 			{:else}
 				<div class="empty-state">

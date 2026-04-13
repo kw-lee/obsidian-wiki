@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Marked } from 'marked';
+	import ExcalidrawView from './ExcalidrawView.svelte';
 
-	let { content, onnavigate }: { content: string; onnavigate: (path: string) => void } = $props();
+	let { path, content, onnavigate }: { path: string; content: string; onnavigate: (path: string) => void } = $props();
 
 	const marked = new Marked();
 
@@ -67,11 +68,15 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="markdown-body" onclick={handleClick}>
-	{@html html}
-</div>
+{#if path.endsWith('.excalidraw.md')}
+	<ExcalidrawView {path} {content} />
+{:else}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="markdown-body" onclick={handleClick}>
+		{@html html}
+	</div>
+{/if}
 
 <style>
 	.markdown-body {

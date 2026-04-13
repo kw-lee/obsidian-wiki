@@ -187,7 +187,10 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'tasks.priority.medium': '중간',
 		'tasks.priority.low': '낮음',
 		'tasks.due': '마감',
-		'tasks.line': '라인'
+		'tasks.line': '라인',
+		'excalidraw.title': 'Excalidraw 미리보기',
+		'excalidraw.description': 'Export된 PNG/SVG가 있으면 읽기 전용으로 표시합니다.',
+		'excalidraw.fallback': '함께 export된 이미지가 없어 원본 문서 내용을 대신 표시합니다.'
 	},
 	en: {
 		'common.appName': 'Obsidian Wiki',
@@ -376,6 +379,9 @@ export const messages: Record<Locale, Record<string, string>> = {
 		'tasks.priority.medium': 'Medium',
 		'tasks.priority.low': 'Low',
 		'tasks.due': 'Due',
-		'tasks.line': 'Line'
+		'tasks.line': 'Line',
+		'excalidraw.title': 'Excalidraw Preview',
+		'excalidraw.description': 'If an exported PNG or SVG exists, show it in read-only mode.',
+		'excalidraw.fallback': 'No exported image was found, so the raw document content is shown instead.'
 	}
 };

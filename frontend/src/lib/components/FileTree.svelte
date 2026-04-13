@@ -7,14 +7,31 @@
 		selectedPath,
 		expandedPaths,
 		onselect,
-		ontoggle
+		ontoggle,
+		onmove,
+		draggedPath = '',
+		dropTargetPath = '',
+		ondragstatechange = undefined,
+		ondroptargetchange = undefined
 	}: {
 		nodes: TreeNode[];
 		selectedPath: string;
 		expandedPaths: Set<string>;
 		onselect: (path: string) => void;
 		ontoggle: (path: string, open: boolean) => void;
+		onmove: (sourcePath: string, targetFolderPath: string) => void | Promise<void>;
+		draggedPath?: string;
+		dropTargetPath?: string;
+		ondragstatechange?: (path: string) => void;
+		ondroptargetchange?: (path: string) => void;
 	} = $props();
+
+	function handleDrop(event: DragEvent, folderPath: string) {
+		event.preventDefault();
+		const sourcePath = event.dataTransfer?.getData('text/plain') ?? '';
+		if (!sourcePath) return;
+		void onmove(sourcePath, folderPath);
+	}
 </script>
 
 <ul class="tree">
@@ -25,13 +42,48 @@
 					open={expandedPaths.has(node.path)}
 					ontoggle={(event) => ontoggle(node.path, (event.currentTarget as HTMLDetailsElement).open)}
 				>
-					<summary class="dir">{node.name}</summary>
+					<summary
+						class="dir"
+						class:drop-target={dropTargetPath === node.path}
+						draggable="true"
+						ondragstart={(event) => {
+							event.dataTransfer?.setData('text/plain', node.path);
+							ondragstatechange?.(node.path);
+						}}
+						ondragenter={() => {
+							if (draggedPath && draggedPath !== node.path) {
+								ondroptargetchange?.(node.path);
+							}
+						}}
+						ondragleave={() => {
+							if (dropTargetPath === node.path) {
+								ondroptargetchange?.('');
+							}
+						}}
+						ondragend={() => {
+							ondragstatechange?.('');
+							ondroptargetchange?.('');
+						}}
+						ondragover={(event) => {
+							if (draggedPath && draggedPath !== node.path) {
+								event.preventDefault();
+							}
+						}}
+						ondrop={(event) => handleDrop(event, node.path)}
+					>
+						{node.name}
+					</summary>
 					<FileTree
 						nodes={node.children}
 						{selectedPath}
 						{expandedPaths}
 						{onselect}
 						{ontoggle}
+						{onmove}
+						{draggedPath}
+						{dropTargetPath}
+						{ondragstatechange}
+						{ondroptargetchange}
 					/>
 				</details>
 			{:else}
@@ -39,6 +91,15 @@
 					class="file"
 					class:active={selectedPath === node.path}
 					data-tree-path={node.path}
+					draggable="true"
+					ondragstart={(event) => {
+						event.dataTransfer?.setData('text/plain', node.path);
+						ondragstatechange?.(node.path);
+					}}
+					ondragend={() => {
+						ondragstatechange?.('');
+						ondroptargetchange?.('');
+					}}
 					onclick={() => onselect(node.path)}
 				>
 					{node.name.replace(/\.md$/, '')}
@@ -66,6 +127,10 @@
 	}
 	.dir:hover {
 		background: var(--bg-tertiary);
+	}
+	.dir.drop-target {
+		background: color-mix(in srgb, var(--accent) 18%, var(--bg-tertiary));
+		outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 	.file {
 		display: block;

@@ -92,6 +92,24 @@ def git_add_and_commit(paths: list[str], message: str, *, git_remote_url: str = 
     return _commit_index(repo, message)
 
 
+def git_stage_move_and_commit(
+    source_path: str,
+    destination_path: str,
+    message: str,
+    *,
+    git_remote_url: str = "",
+) -> str | None:
+    repo = get_repo(git_remote_url=git_remote_url)
+    repo.git.add(destination_path)
+    repo.git.rm("-r", "--cached", "--ignore-unmatch", source_path)
+    if repo.head.is_valid():
+        if not repo.index.diff("HEAD") and not repo.untracked_files:
+            return None
+    elif not repo.index.entries and not repo.untracked_files:
+        return None
+    return _commit_index(repo, message)
+
+
 def git_pull(*, git_remote_url: str = "", git_branch: str = "main") -> tuple[str | None, list[str]]:
     """Pull from remote. Returns (new_head_sha, changed_files)."""
     repo = get_repo(git_remote_url=git_remote_url)

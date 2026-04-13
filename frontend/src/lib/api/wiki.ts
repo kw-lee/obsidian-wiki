@@ -3,6 +3,7 @@ import type {
   TreeNode,
   DocDetail,
   FolderCreateResult,
+  MovePathResult,
   SearchResponse,
   BacklinkItem,
   TagInfo,
@@ -37,6 +38,12 @@ export const createFolder = (path: string) =>
   api<FolderCreateResult>("/wiki/folder", {
     method: "POST",
     body: JSON.stringify({ path }),
+  });
+
+export const movePath = (sourcePath: string, destinationPath: string) =>
+  api<MovePathResult>("/wiki/move", {
+    method: "POST",
+    body: JSON.stringify({ source_path: sourcePath, destination_path: destinationPath }),
   });
 
 export const deleteDoc = (path: string) =>

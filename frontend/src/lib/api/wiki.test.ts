@@ -18,6 +18,7 @@ import {
   fetchTags,
   fetchGraph,
   fetchTasks,
+  movePath,
   queryDataview,
   syncPull,
   syncPush,
@@ -77,6 +78,18 @@ describe("Wiki API functions", () => {
     expect(mockApi).toHaveBeenCalledWith("/wiki/folder", {
       method: "POST",
       body: JSON.stringify({ path: "notes" }),
+    });
+  });
+
+  it("movePath sends POST", async () => {
+    mockApi.mockResolvedValueOnce({ path: "archive/note.md" });
+    await movePath("notes/note.md", "archive/note.md");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/move", {
+      method: "POST",
+      body: JSON.stringify({
+        source_path: "notes/note.md",
+        destination_path: "archive/note.md",
+      }),
     });
   });
 

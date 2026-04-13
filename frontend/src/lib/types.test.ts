@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type {
   AuthTokenPair,
   TreeNode,
+  MovePathResult,
   TaskItem,
   TaskListResponse,
   DataviewQueryResponse,
@@ -50,6 +51,11 @@ describe("Type contracts", () => {
     };
     expect(tree.children).toHaveLength(1);
     expect(tree.children[0].name).toBe("child.md");
+  });
+
+  it("MovePathResult has expected shape", () => {
+    const result: MovePathResult = { path: "archive/note.md" };
+    expect(result.path).toBe("archive/note.md");
   });
 
   it("TaskItem has expected shape", () => {

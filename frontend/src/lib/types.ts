@@ -21,6 +21,10 @@ export interface FolderCreateResult {
   path: string;
 }
 
+export interface MovePathResult {
+  path: string;
+}
+
 export interface SearchResult {
   path: string;
   title: string;

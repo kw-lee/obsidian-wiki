@@ -16,6 +16,8 @@ from app.schemas import (
     DocSaveRequest,
     FolderCreateRequest,
     FolderCreateResponse,
+    MovePathRequest,
+    MovePathResponse,
     TreeNode,
 )
 from app.services import vault
@@ -23,10 +25,11 @@ from app.services.conflict import three_way_merge
 from app.services.git_ops import (
     file_changed_between,
     git_add_and_commit,
+    git_stage_move_and_commit,
     head_commit_sha,
     read_file_at_commit,
 )
-from app.services.indexer import index_file
+from app.services.indexer import full_reindex, index_file
 from app.services.wiki_links import (
     ParsedWikiLink,
     load_resolver_catalog,
@@ -200,6 +203,39 @@ async def create_folder(
     placeholder_path = await vault.create_folder(path)
     git_add_and_commit([placeholder_path], f"web: create folder {path}")
     return FolderCreateResponse(path=path)
+
+
+@router.post("/move", response_model=MovePathResponse)
+async def move_path(
+    body: MovePathRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> MovePathResponse:
+    source_path = body.source_path.strip().strip("/")
+    destination_path = body.destination_path.strip().strip("/")
+
+    if not source_path or not destination_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination are required")
+    if source_path == destination_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination must differ")
+    if any(part.startswith(".") for part in source_path.split("/")) or any(
+        part.startswith(".") for part in destination_path.split("/")
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hidden paths cannot be moved")
+    if destination_path.startswith(f"{source_path}/"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot move a folder into itself")
+
+    source_full = vault.resolve(source_path)
+    destination_full = vault.resolve(destination_path)
+    if not source_full.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source path does not exist")
+    if destination_full.exists():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Destination already exists")
+
+    moved_path = await vault.move_path(source_path, destination_path)
+    git_stage_move_and_commit(source_path, moved_path, f"web: move {source_path} -> {moved_path}")
+    await full_reindex(db)
+    return MovePathResponse(path=moved_path)
 
 
 @router.delete("/doc/{path:path}", status_code=status.HTTP_204_NO_CONTENT)

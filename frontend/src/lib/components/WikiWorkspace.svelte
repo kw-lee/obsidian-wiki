@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { rebuildVaultIndex } from "$lib/api/settings";
-  import { createDoc, createFolder, fetchDoc, fetchTree, saveDoc } from "$lib/api/wiki";
+  import { createDoc, createFolder, fetchDoc, fetchTree, movePath, saveDoc } from "$lib/api/wiki";
   import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
@@ -210,6 +210,27 @@
     }
   }
 
+  async function handleMovePath(sourcePath: string, destinationPath: string) {
+    try {
+      const moved = await movePath(sourcePath, destinationPath);
+      await loadTree();
+
+      if (selectedPath === sourcePath || selectedPath.startsWith(`${sourcePath}/`)) {
+        const nextPath = `${moved.path}${selectedPath.slice(sourcePath.length)}`;
+        await navigateTo(nextPath);
+      }
+
+      showToast(
+        t("fileExplorer.moveSuccess", {
+          source: sourcePath,
+          destination: moved.path,
+        }),
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t("fileExplorer.moveFailed"));
+    }
+  }
+
   function showToast(message: string) {
     toast = message;
     setTimeout(() => {
@@ -334,6 +355,10 @@
             await navigateTo(newDoc.path);
           }}
           oncreateFolder={handleCreateFolder}
+          onmove={handleMovePath}
+          oninvalidmove={() => {
+            showToast(t("fileExplorer.moveInvalid"));
+          }}
         />
       {/if}
     </aside>

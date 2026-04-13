@@ -8,7 +8,7 @@ from pathlib import Path
 
 import frontmatter
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import delete, func, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -125,15 +125,16 @@ async def index_file(session: AsyncSession, relative_path: str, content: str) ->
     )
     await session.execute(stmt)
 
-    # Update search vector
-    await session.execute(
-        text("""
-            UPDATE documents
-            SET search_vector = to_tsvector('korean', coalesce(title, '') || ' ' || :content)
-            WHERE path = :path
-        """),
-        {"path": relative_path, "content": fm.content},
-    )
+    # Update search vector on PostgreSQL only.
+    if session.bind is None or session.bind.dialect.name != "sqlite":
+        await session.execute(
+            text("""
+                UPDATE documents
+                SET search_vector = to_tsvector('korean', coalesce(title, '') || ' ' || :content)
+                WHERE path = :path
+            """),
+            {"path": relative_path, "content": fm.content},
+        )
 
     # Re-create links for this doc
     await session.execute(delete(Link).where(Link.source_path == relative_path))
@@ -190,6 +191,23 @@ async def incremental_reindex(session: AsyncSession, changed_paths: list[str]) -
 async def _refresh_tag_counts(session: AsyncSession) -> None:
     """Rebuild the tags table from documents.tags arrays."""
     await session.execute(delete(Tag))
+    if session.bind is not None and session.bind.dialect.name == "sqlite":
+        result = await session.execute(select(Document.tags))
+        counts: dict[str, int] = {}
+        for row in result.all():
+            raw_tags = row[0]
+            if not raw_tags:
+                continue
+            if isinstance(raw_tags, str):
+                tags = [tag.strip() for tag in raw_tags.split(",") if tag.strip()]
+            else:
+                tags = [str(tag).strip() for tag in raw_tags if str(tag).strip()]
+            for tag in tags:
+                counts[tag] = counts.get(tag, 0) + 1
+        for name, doc_count in counts.items():
+            session.add(Tag(name=name, doc_count=doc_count))
+        return
+
     await session.execute(
         text("""
             INSERT INTO tags (name, doc_count)

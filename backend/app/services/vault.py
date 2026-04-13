@@ -45,6 +45,28 @@ async def create_folder(relative: str) -> str:
     return str(placeholder.relative_to(vault_path()))
 
 
+async def move_path(source_relative: str, destination_relative: str) -> str:
+    source = resolve(source_relative)
+    destination = resolve(destination_relative)
+
+    if not source.exists():
+        raise FileNotFoundError(source_relative)
+    if destination.exists():
+        raise FileExistsError(destination_relative)
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(destination)
+
+    if destination.is_dir():
+        has_visible_entries = any(not child.name.startswith(".") for child in destination.iterdir())
+        if not has_visible_entries:
+            placeholder = destination / ".gitkeep"
+            async with aiofiles.open(placeholder, "w", encoding="utf-8") as f:
+                await f.write("")
+
+    return str(destination.relative_to(vault_path()))
+
+
 async def delete_doc(relative: str) -> None:
     path = resolve(relative)
     path.unlink(missing_ok=True)

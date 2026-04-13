@@ -38,6 +38,15 @@ class FolderCreateResponse(BaseModel):
     path: str
 
 
+class MovePathRequest(BaseModel):
+    source_path: str
+    destination_path: str
+
+
+class MovePathResponse(BaseModel):
+    path: str
+
+
 # ── Tree ──────────────────────────────────────────────
 class TreeNode(BaseModel):
     name: str

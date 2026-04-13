@@ -110,6 +110,40 @@ async def test_create_folder_conflict(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_move_doc(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "archive").mkdir()
+    await write_doc("notes/move-me.md", "# Move me")
+
+    resp = await client.post(
+        "/api/wiki/move",
+        json={"source_path": "notes/move-me.md", "destination_path": "archive/move-me.md"},
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["path"] == "archive/move-me.md"
+    assert not (setup_vault / "notes" / "move-me.md").exists()
+    assert (setup_vault / "archive" / "move-me.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_move_folder_into_itself_rejected(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "notes" / "child").mkdir()
+
+    resp = await client.post(
+        "/api/wiki/move",
+        json={"source_path": "notes", "destination_path": "notes/child/notes"},
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_create_doc_conflict(client, auth_headers, setup_vault):
     await write_doc("existing.md", "content")
     resp = await client.post(

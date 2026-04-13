@@ -13,6 +13,8 @@
     onselect,
     oncreateNote,
     oncreateFolder,
+    onmove,
+    oninvalidmove = undefined,
     onexpandedchange = undefined,
     onsortmodechange = undefined,
   }: {
@@ -24,11 +26,15 @@
     onselect: (path: string) => void | Promise<void>;
     oncreateNote: (path: string) => void | Promise<void>;
     oncreateFolder: (path: string) => void | Promise<void>;
+    onmove: (sourcePath: string, destinationPath: string) => void | Promise<void>;
+    oninvalidmove?: (sourcePath: string, targetFolderPath: string) => void;
     onexpandedchange?: (paths: string[]) => void;
     onsortmodechange?: (mode: WorkspaceTreeSortMode) => void;
   } = $props();
 
   let localExpandedPaths = $state<Set<string>>(new Set<string>());
+  let draggedPath = $state("");
+  let dropTargetPath = $state("");
   const sortedNodes = $derived.by(() => sortNodes(nodes, sortMode));
 
   $effect(() => {
@@ -156,6 +162,17 @@
     onsortmodechange?.(sortMode === "folders-first" ? "name" : "folders-first");
   }
 
+  async function handleMove(sourcePath: string, targetFolderPath: string) {
+    const destinationPath = buildDestinationPath(sourcePath, targetFolderPath);
+    draggedPath = "";
+    dropTargetPath = "";
+    if (!destinationPath || destinationPath === sourcePath || destinationPath.startsWith(`${sourcePath}/`)) {
+      oninvalidmove?.(sourcePath, targetFolderPath);
+      return;
+    }
+    await onmove(sourcePath, destinationPath);
+  }
+
   function updateExpandedPaths(next: Set<string>) {
     if (samePathSet(localExpandedPaths, next)) {
       return;
@@ -191,6 +208,11 @@
     }
     return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
   }
+
+  function buildDestinationPath(sourcePath: string, targetFolderPath: string) {
+    const name = sourcePath.split("/").pop() ?? sourcePath;
+    return targetFolderPath ? `${targetFolderPath}/${name}` : name;
+  }
 </script>
 
 <div class="explorer">
@@ -209,6 +231,15 @@
     expandedPaths={localExpandedPaths}
     onselect={onselect}
     ontoggle={toggleFolder}
+    onmove={handleMove}
+    {draggedPath}
+    {dropTargetPath}
+    ondragstatechange={(path) => {
+      draggedPath = path;
+    }}
+    ondroptargetchange={(path) => {
+      dropTargetPath = path;
+    }}
   />
 </div>
 

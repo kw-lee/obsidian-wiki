@@ -33,3 +33,9 @@ config/ssh/
 
 # Vault (if local dev)
 vault/
+
+# Private LLM docs
+llm-docs/
+AGENTS.md
+CLAUDE.md
+CODEX.md

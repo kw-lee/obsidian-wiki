@@ -88,3 +88,39 @@
 - [x] 강제 credential 변경 페이지 (`/auth/setup`)
 - [x] 로그인 후 `must_change` 감지 시 강제 리다이렉트 (다른 라우트 접근 차단)
 - [x] 변경 완료 후 새 토큰으로 메인 페이지 이동
+
+## Phase 7: 설정 페이지 (Admin Dashboard)
+
+설계: [`docs/SETTINGS.md`](SETTINGS.md) 참고. `.env` 에서 운영 중 변경되는 값을 DB 로 이전하고 웹 UI 에서 관리.
+
+### Phase 7-1: MVP (Profile + Git Sync)
+
+#### Backend
+- [ ] `AppSettings` 모델 추가 (single-row, `CHECK(id=1)`)
+- [ ] Alembic 마이그레이션 — 테이블 생성 + `.env` 값 seed (`GIT_REMOTE_URL`/`GIT_BRANCH`/`GIT_SYNC_INTERVAL_SECONDS`)
+- [ ] `init.sql` 동기화
+- [ ] `services/settings.py` — DB 런타임 설정 로더 (캐시 + invalidate)
+- [ ] `config.py` 정리 — 부트스트랩 값만 유지, git 관련 제거
+- [ ] `GET/PUT /api/settings/profile` — username/password 변경 + 새 토큰 발급
+- [ ] `GET/PUT /api/settings/git` — git sync 설정 조회/변경
+- [ ] `services/git_scheduler.py` — asyncio.Task 래퍼, 설정 변경 시 cancel+restart
+- [ ] 테스트 — profile 변경/검증, git 설정 저장, 스케줄러 리로드
+
+#### Frontend
+- [ ] `/settings` 레이아웃 + 탭 네비 (`+layout.svelte`)
+- [ ] `/settings/profile` 페이지 — 현재 pw 확인 + 새 username/pw 변경
+- [ ] `/settings/git` 페이지 — remote URL/branch/interval/auto-sync 토글, 수동 pull/push, 상태 카드
+- [ ] `lib/api/settings.ts` — API 래퍼
+- [ ] 커맨드 팔레트(⌘P)에 "Open Settings" 항목 추가
+- [ ] `mustChangeCredentials` 가드 적용
+
+#### 정리
+- [ ] `.env.example` / `.env` 에서 git 관련 변수 제거 + 주석 안내
+- [ ] `README.md` / `docs/ARCHITECTURE.md` 에 설정 페이지 언급
+
+### Phase 7-2: 후속
+
+- [ ] Vault 탭 — 디스크/문서/태그 통계, 인덱스 재빌드 버튼
+- [ ] Appearance 탭 — 서버 기본 테마
+- [ ] System 탭 — 버전, uptime, DB/Redis ping, vault git status
+- [ ] (옵션) 로그 tail 뷰어

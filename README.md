@@ -19,7 +19,7 @@
 - **Auth**: JWT (access 15분 / refresh 7일) + bcrypt
 - **Deploy**: Docker Compose
 
-아키텍처와 데이터 흐름은 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 에 정리되어 있습니다.
+아키텍처와 데이터 흐름은 [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) 에 정리되어 있습니다.
 
 ## 빠른 시작
 
@@ -88,11 +88,11 @@ make test-frontend     # frontend 만 (vitest)
 make test-clean        # 테스트 컨테이너/볼륨 정리
 ```
 
-자세한 내용은 [`docs/TESTING.md`](docs/TESTING.md) 참고.
+자세한 내용은 [`llm-docs/TESTING.md`](llm-docs/TESTING.md) 참고.
 
 ## 배포
 
-nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 [`docs/DOCKER.md`](docs/DOCKER.md) 참고.
+nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) 참고.
 
 퍼시스턴트 볼륨 3개:
 - `db_data` — PostgreSQL 데이터
@@ -110,11 +110,11 @@ nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 
 ## 문서
 
 - [`CLAUDE.md`](CLAUDE.md) — 프로젝트 전반 규칙 (AI/기여자용)
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 시스템 아키텍처 / 기술 결정
-- [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) — 코드 스타일 / Git / CI
-- [`docs/DOCKER.md`](docs/DOCKER.md) — Docker 빌드·배포
-- [`docs/TESTING.md`](docs/TESTING.md) — 테스트 가이드
-- [`docs/PROGRESS.md`](docs/PROGRESS.md) — 구현 진행 상황
+- [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — 시스템 아키텍처 / 기술 결정
+- [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — 코드 스타일 / Git / CI
+- [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) — Docker 빌드·배포
+- [`llm-docs/TESTING.md`](llm-docs/TESTING.md) — 테스트 가이드
+- [`llm-docs/PROGRESS.md`](llm-docs/PROGRESS.md) — 구현 진행 상황
 
 ## 라이선스
 

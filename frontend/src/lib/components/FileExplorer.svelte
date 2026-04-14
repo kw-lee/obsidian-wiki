@@ -226,16 +226,22 @@
 
 <div class="explorer">
   <div class="toolbar">
-    <button onclick={handleCreateNote} title={t("fileExplorer.newNote")}>＋</button>
-    <button onclick={handleCreateFolder} title={t("fileExplorer.newFolder")}>▣</button>
-    <button onclick={toggleSortMode} title={t(`fileExplorer.sort.${sortMode}`)}>⇅</button>
+    <button type="button" onclick={handleCreateNote} title={t("fileExplorer.newNote")}>＋</button>
+    <button type="button" onclick={handleCreateFolder} title={t("fileExplorer.newFolder")}>▣</button>
+    <button
+      type="button"
+      onclick={toggleSortMode}
+      title={t(`fileExplorer.sort.${sortMode}`)}
+    >
+      ⇅
+    </button>
     <label class="rewrite-toggle" title={t("fileExplorer.rewriteLinks")}>
       <input bind:checked={rewriteLinksEnabled} type="checkbox" />
-      <span>{t("fileExplorer.rewriteLinks")}</span>
+      <span>↻</span>
     </label>
-    <button onclick={expandAll} title={t("fileExplorer.expandAll")}>⤢</button>
-    <button onclick={collapseAll} title={t("fileExplorer.collapseAll")}>⤡</button>
-    <button onclick={revealSelected} title={t("fileExplorer.revealCurrent")}>◎</button>
+    <button type="button" onclick={expandAll} title={t("fileExplorer.expandAll")}>⤢</button>
+    <button type="button" onclick={collapseAll} title={t("fileExplorer.collapseAll")}>⤡</button>
+    <button type="button" onclick={revealSelected} title={t("fileExplorer.revealCurrent")}>◎</button>
   </div>
 
   <FileTree
@@ -260,40 +266,59 @@
 <style>
   .explorer {
     display: grid;
-    gap: 0.6rem;
-    padding: 0 0.5rem 0.5rem;
+    gap: 0.55rem;
+    padding: 0 0.65rem 0.65rem;
   }
 
   .toolbar {
-    display: flex;
-    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.35rem;
+    padding: 0.4rem 0 0.2rem;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-panel) 98%, transparent),
+      color-mix(in srgb, var(--bg-panel) 76%, transparent)
+    );
+    backdrop-filter: blur(14px);
   }
 
   .toolbar button {
-    flex: 1 1 2.5rem;
     border: 1px solid var(--border);
-    background: var(--bg-primary);
+    background: color-mix(in srgb, var(--bg-primary) 76%, transparent);
     color: var(--text-secondary);
-    border-radius: 8px;
-    padding: 0.45rem 0.2rem;
+    border-radius: 10px;
+    min-height: 2.35rem;
+    padding: 0.35rem 0.2rem;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+    transition:
+      background 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.18s ease;
   }
 
   .rewrite-toggle {
-    flex: 1 1 8rem;
-    display: inline-flex;
+    display: inline-grid;
+    place-items: center;
     align-items: center;
-    gap: 0.35rem;
     border: 1px solid var(--border);
-    background: var(--bg-primary);
+    background: color-mix(in srgb, var(--bg-primary) 76%, transparent);
     color: var(--text-secondary);
-    border-radius: 8px;
-    padding: 0.45rem 0.5rem;
+    border-radius: 10px;
+    min-height: 2.35rem;
+    padding: 0.35rem;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.92rem;
     user-select: none;
+    transition:
+      background 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease;
   }
 
   .rewrite-toggle:hover {
@@ -302,12 +327,40 @@
   }
 
   .rewrite-toggle input {
-    margin: 0;
-    accent-color: var(--accent);
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rewrite-toggle:has(input:checked) {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-primary));
+    color: var(--text-primary);
   }
 
   .toolbar button:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 1024px) {
+    .toolbar {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .toolbar {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      padding-top: 0;
+      background: transparent;
+      backdrop-filter: none;
+    }
+
+    .explorer {
+      padding-top: 0.2rem;
+    }
   }
 </style>

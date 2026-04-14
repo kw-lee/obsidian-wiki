@@ -2,20 +2,25 @@ const LAST_WIKI_PATH_KEY = "last_wiki_path";
 const WORKSPACE_STATE_KEY = "workspace_state_v1";
 
 export type WorkspaceLinksTab = "backlinks" | "frontlinks";
+export type WorkspaceRightPanelTab = WorkspaceLinksTab | "outline";
 export type WorkspaceTreeSortMode = "folders-first" | "name";
 
 interface WorkspaceState {
   sidebarOpen: boolean;
+  rightSidebarOpen: boolean;
   expandedPaths: string[];
-  linksTab: WorkspaceLinksTab;
+  rightPanelTab: WorkspaceRightPanelTab;
   treeSortMode: WorkspaceTreeSortMode;
+  openTabs: string[];
 }
 
 const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   sidebarOpen: true,
+  rightSidebarOpen: true,
   expandedPaths: [],
-  linksTab: "backlinks",
+  rightPanelTab: "backlinks",
   treeSortMode: "folders-first",
+  openTabs: [],
 };
 
 export function getLastWikiPath(): string | null {
@@ -43,23 +48,36 @@ export function getWorkspaceState(): WorkspaceState {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<WorkspaceState>;
+    const parsed = JSON.parse(raw) as Partial<WorkspaceState> & {
+      linksTab?: WorkspaceLinksTab;
+    };
     return {
       sidebarOpen:
         typeof parsed.sidebarOpen === "boolean"
           ? parsed.sidebarOpen
           : DEFAULT_WORKSPACE_STATE.sidebarOpen,
+      rightSidebarOpen:
+        typeof parsed.rightSidebarOpen === "boolean"
+          ? parsed.rightSidebarOpen
+          : DEFAULT_WORKSPACE_STATE.rightSidebarOpen,
       expandedPaths: Array.isArray(parsed.expandedPaths)
         ? parsed.expandedPaths.filter((value): value is string => typeof value === "string")
         : DEFAULT_WORKSPACE_STATE.expandedPaths,
-      linksTab:
-        parsed.linksTab === "frontlinks" || parsed.linksTab === "backlinks"
-          ? parsed.linksTab
-          : DEFAULT_WORKSPACE_STATE.linksTab,
+      rightPanelTab:
+        parsed.rightPanelTab === "outline" ||
+        parsed.rightPanelTab === "frontlinks" ||
+        parsed.rightPanelTab === "backlinks"
+          ? parsed.rightPanelTab
+          : parsed.linksTab === "frontlinks" || parsed.linksTab === "backlinks"
+            ? parsed.linksTab
+            : DEFAULT_WORKSPACE_STATE.rightPanelTab,
       treeSortMode:
         parsed.treeSortMode === "name" || parsed.treeSortMode === "folders-first"
           ? parsed.treeSortMode
           : DEFAULT_WORKSPACE_STATE.treeSortMode,
+      openTabs: Array.isArray(parsed.openTabs)
+        ? parsed.openTabs.filter((value): value is string => typeof value === "string")
+        : DEFAULT_WORKSPACE_STATE.openTabs,
     };
   } catch {
     return { ...DEFAULT_WORKSPACE_STATE };
@@ -74,12 +92,26 @@ export function setWorkspaceExpandedPaths(expandedPaths: string[]): void {
   writeWorkspaceState({ expandedPaths: [...expandedPaths] });
 }
 
+export function setWorkspaceRightSidebarOpen(rightSidebarOpen: boolean): void {
+  writeWorkspaceState({ rightSidebarOpen });
+}
+
+export function setWorkspaceRightPanelTab(
+  rightPanelTab: WorkspaceRightPanelTab,
+): void {
+  writeWorkspaceState({ rightPanelTab });
+}
+
 export function setWorkspaceLinksTab(linksTab: WorkspaceLinksTab): void {
-  writeWorkspaceState({ linksTab });
+  writeWorkspaceState({ rightPanelTab: linksTab });
 }
 
 export function setWorkspaceTreeSortMode(treeSortMode: WorkspaceTreeSortMode): void {
   writeWorkspaceState({ treeSortMode });
+}
+
+export function setWorkspaceOpenTabs(openTabs: string[]): void {
+  writeWorkspaceState({ openTabs: [...openTabs] });
 }
 
 function writeWorkspaceState(patch: Partial<WorkspaceState>): void {

@@ -23,9 +23,11 @@ describe("workspace utils", () => {
   it("returns default workspace state when nothing is stored", () => {
     expect(getWorkspaceState()).toEqual({
       sidebarOpen: true,
+      rightSidebarOpen: true,
       expandedPaths: [],
-      linksTab: "backlinks",
+      rightPanelTab: "backlinks",
       treeSortMode: "folders-first",
+      openTabs: [],
     });
   });
 
@@ -37,9 +39,11 @@ describe("workspace utils", () => {
 
     expect(getWorkspaceState()).toEqual({
       sidebarOpen: false,
+      rightSidebarOpen: true,
       expandedPaths: ["projects", "projects/demo"],
-      linksTab: "frontlinks",
+      rightPanelTab: "frontlinks",
       treeSortMode: "name",
+      openTabs: [],
     });
   });
 
@@ -48,9 +52,11 @@ describe("workspace utils", () => {
 
     expect(getWorkspaceState()).toEqual({
       sidebarOpen: true,
+      rightSidebarOpen: true,
       expandedPaths: [],
-      linksTab: "backlinks",
+      rightPanelTab: "backlinks",
       treeSortMode: "folders-first",
+      openTabs: [],
     });
   });
 });

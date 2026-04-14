@@ -2,7 +2,14 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { rebuildVaultIndex } from "$lib/api/settings";
-  import { createDoc, createFolder, fetchDoc, fetchTree, movePath, saveDoc } from "$lib/api/wiki";
+  import {
+    createDoc,
+    createFolder,
+    fetchDoc,
+    fetchTree,
+    movePath,
+    saveDoc,
+  } from "$lib/api/wiki";
   import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
@@ -53,8 +60,12 @@
 
   const activePath = $derived(initialPath?.trim() ?? "");
   const isEditable = $derived(Boolean(doc && isNotePath(doc.path)));
-  const sidebarVisible = $derived(isMobileViewport ? mobileSidebarOpen : sidebarOpen);
-  const mobileSidebarBackdropVisible = $derived(isMobileViewport && mobileSidebarOpen);
+  const sidebarVisible = $derived(
+    isMobileViewport ? mobileSidebarOpen : sidebarOpen,
+  );
+  const mobileSidebarBackdropVisible = $derived(
+    isMobileViewport && mobileSidebarOpen,
+  );
 
   onMount(() => {
     const auth = getAuth();
@@ -228,7 +239,9 @@
       await loadTree();
       await navigateTo(created.path);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("home.newDocFailed"));
+      showToast(
+        error instanceof Error ? error.message : t("home.newDocFailed"),
+      );
     }
   }
 
@@ -269,7 +282,11 @@
       await loadTree();
       showToast(t("fileExplorer.folderCreated"));
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("fileExplorer.folderCreateFailed"));
+      showToast(
+        error instanceof Error
+          ? error.message
+          : t("fileExplorer.folderCreateFailed"),
+      );
     }
   }
 
@@ -282,7 +299,10 @@
       const moved = await movePath(sourcePath, destinationPath, rewriteLinks);
       await loadTree();
 
-      if (selectedPath === sourcePath || selectedPath.startsWith(`${sourcePath}/`)) {
+      if (
+        selectedPath === sourcePath ||
+        selectedPath.startsWith(`${sourcePath}/`)
+      ) {
         const nextPath = `${moved.path}${selectedPath.slice(sourcePath.length)}`;
         await navigateTo(nextPath);
       }
@@ -290,7 +310,9 @@
       const summary = describeMoveToast(sourcePath, moved.path, moved);
       showToast(t(summary.key, summary.values));
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t("fileExplorer.moveFailed"));
+      showToast(
+        error instanceof Error ? error.message : t("fileExplorer.moveFailed"),
+      );
     }
   }
 
@@ -332,7 +354,9 @@
         );
       } catch (error) {
         showToast(
-          error instanceof Error ? error.message : t("commandPalette.rebuildIndexFailed"),
+          error instanceof Error
+            ? error.message
+            : t("commandPalette.rebuildIndexFailed"),
         );
       }
       return;
@@ -367,7 +391,9 @@
         await loadTree();
         await navigateTo(newDoc.path);
       } catch (error) {
-        showToast(error instanceof Error ? error.message : t("home.newDocFailed"));
+        showToast(
+          error instanceof Error ? error.message : t("home.newDocFailed"),
+        );
       }
     }
   }
@@ -412,7 +438,9 @@
       <div class="sidebar-header">
         <button
           class="toggle-btn"
-          title={t(sidebarVisible ? "header.closeSidebar" : "header.openSidebar")}
+          title={t(
+            sidebarVisible ? "header.closeSidebar" : "header.openSidebar",
+          )}
           onclick={toggleSidebar}
         >
           {#if isMobileViewport}
@@ -425,7 +453,7 @@
       {#if sidebarVisible}
         <FileExplorer
           nodes={tree}
-          selectedPath={selectedPath}
+          {selectedPath}
           expandedPaths={explorerExpandedPaths}
           sortMode={treeSortMode}
           {revealNonce}
@@ -463,7 +491,9 @@
                 {t("home.buttonCancel")}
               </button>
             {:else if isEditable}
-              <button class="btn" onclick={startEdit}>{t("home.buttonEdit")}</button>
+              <button class="btn" onclick={startEdit}
+                >{t("home.buttonEdit")}</button
+              >
             {/if}
           </div>
         </div>
@@ -486,7 +516,9 @@
       {:else if missingPath}
         <div class="empty-state">
           <p>{t("home.missing", { path: missingPath })}</p>
-          <button class="btn" onclick={createMissingNote}>{t("home.createMissing")}</button>
+          <button class="btn" onclick={createMissingNote}
+            >{t("home.createMissing")}</button
+          >
         </div>
       {:else}
         <div class="empty-state">
@@ -512,7 +544,11 @@
   </div>
 </div>
 
-<SearchModal open={searchOpen} onclose={() => (searchOpen = false)} onselect={navigateTo} />
+<SearchModal
+  open={searchOpen}
+  onclose={() => (searchOpen = false)}
+  onselect={navigateTo}
+/>
 <CommandPalette
   open={commandOpen}
   currentPath={doc?.path ?? ""}
@@ -541,10 +577,11 @@
   .sidebar {
     width: var(--sidebar-width);
     min-width: var(--sidebar-width);
-    background: var(--bg-secondary);
+    background: var(--bg-panel);
     border-right: 1px solid var(--border);
     overflow-y: auto;
     z-index: 50;
+    backdrop-filter: blur(18px);
     transition:
       width 0.2s,
       min-width 0.2s,
@@ -583,9 +620,10 @@
   .right-panel {
     width: var(--right-panel-width);
     min-width: var(--right-panel-width);
-    background: var(--bg-secondary);
+    background: var(--bg-panel);
     border-left: 1px solid var(--border);
     overflow-y: auto;
+    backdrop-filter: blur(18px);
   }
 
   .doc-header {
@@ -608,11 +646,12 @@
   .btn {
     padding: 0.4rem 0.8rem;
     border: none;
-    border-radius: 4px;
+    border-radius: 999px;
     background: var(--accent);
     color: white;
     cursor: pointer;
     font-size: 0.85rem;
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent);
   }
 
   .btn:disabled {
@@ -620,8 +659,9 @@
   }
 
   .btn.secondary {
-    background: var(--bg-tertiary);
+    background: var(--bg-panel-hover);
     color: var(--text-primary);
+    box-shadow: none;
   }
 
   .tags {
@@ -634,8 +674,8 @@
   .tag {
     background: var(--tag-bg);
     color: var(--tag-text);
-    padding: 0.15rem 0.5rem;
-    border-radius: 3px;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
     font-size: 0.8rem;
   }
 
@@ -661,13 +701,15 @@
     bottom: 1.5rem;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--bg-tertiary);
+    background: var(--bg-panel-strong);
     color: var(--text-primary);
     padding: 0.6rem 1.2rem;
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
     font-size: 0.875rem;
     z-index: 200;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(18px);
   }
 
   @media (max-width: 768px) {
@@ -682,7 +724,7 @@
       bottom: 0;
       width: min(88vw, 22rem);
       min-width: min(88vw, 22rem);
-      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+      box-shadow: var(--shadow-strong);
       transform: translateX(0);
     }
 
@@ -696,7 +738,7 @@
     .sidebar-header {
       position: sticky;
       top: 0;
-      background: var(--bg-secondary);
+      background: var(--bg-panel-strong);
       border-bottom: 1px solid var(--border);
       z-index: 1;
     }

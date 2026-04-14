@@ -337,27 +337,28 @@ async def test_sync_test_endpoint_uses_webdav_backend(
 async def test_get_appearance_settings_defaults_to_system(client, auth_headers, setup_vault):
     resp = await client.get("/api/settings/appearance", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.json() == {"default_theme": "system"}
+    assert resp.json() == {"default_theme": "system", "theme_preset": "obsidian"}
 
 
 @pytest.mark.asyncio
 async def test_update_appearance_settings_persists_and_is_public(client, auth_headers, setup_vault):
     resp = await client.put(
         "/api/settings/appearance",
-        json={"default_theme": "light"},
+        json={"default_theme": "light", "theme_preset": "dawn"},
         headers=auth_headers,
     )
     assert resp.status_code == 200
-    assert resp.json() == {"default_theme": "light"}
+    assert resp.json() == {"default_theme": "light", "theme_preset": "dawn"}
 
     public_resp = await client.get("/api/settings/appearance/public")
     assert public_resp.status_code == 200
-    assert public_resp.json() == {"default_theme": "light"}
+    assert public_resp.json() == {"default_theme": "light", "theme_preset": "dawn"}
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.default_theme == "light"
+        assert row.theme_preset == "dawn"
 
 
 @pytest.mark.asyncio
@@ -432,6 +433,7 @@ async def test_get_system_logs(client, auth_headers, setup_vault):
     data = resp.json()
     assert any(entry["message"] == "System log tail smoke test" for entry in data["entries"])
 
+
 @pytest.mark.asyncio
 async def test_get_system_logs_redacts_sync_url_secrets(client, auth_headers, setup_vault):
     logger = logging.getLogger("tests.system")
@@ -445,7 +447,6 @@ async def test_get_system_logs_redacts_sync_url_secrets(client, auth_headers, se
         for entry in data["entries"]
     )
     assert all("secret@" not in entry["message"] for entry in data["entries"])
-
 
 
 def test_encrypt_secret_roundtrip():

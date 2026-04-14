@@ -265,10 +265,12 @@ class RebuildIndexResponse(BaseModel):
 
 class AppearanceSettingsResponse(BaseModel):
     default_theme: Literal["light", "dark", "system"]
+    theme_preset: Literal["obsidian", "graphite", "dawn", "forest"]
 
 
 class AppearanceSettingsUpdateRequest(BaseModel):
     default_theme: Literal["light", "dark", "system"]
+    theme_preset: Literal["obsidian", "graphite", "dawn", "forest"]
 
 
 class SystemDependencyStatus(BaseModel):

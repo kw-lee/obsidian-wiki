@@ -148,7 +148,11 @@
             <div class="sync-grid">
               <p>
                 <span>{t("sync.status.head")}</span>
-                <strong>{syncMonitor.status?.head ?? syncMonitor.currentJob?.head ?? "-"}</strong>
+                <strong
+                  >{syncMonitor.status?.head ??
+                    syncMonitor.currentJob?.head ??
+                    "-"}</strong
+                >
               </p>
               <p>
                 <span>{t("sync.status.lastSync")}</span>
@@ -165,13 +169,16 @@
               <p>
                 <span>{t("sync.status.aheadBehind")}</span>
                 <strong
-                  >{syncMonitor.status?.ahead ?? 0} / {syncMonitor.status?.behind ?? 0}</strong
+                  >{syncMonitor.status?.ahead ?? 0} / {syncMonitor.status
+                    ?.behind ?? 0}</strong
                 >
               </p>
               <p>
                 <span>{t("sync.status.dirty")}</span>
                 <strong
-                  >{syncMonitor.status?.dirty ? t("sync.status.yes") : t("sync.status.no")}</strong
+                  >{syncMonitor.status?.dirty
+                    ? t("sync.status.yes")
+                    : t("sync.status.no")}</strong
                 >
               </p>
             </div>
@@ -201,7 +208,8 @@
                 {#if syncSummary.issueMessage}
                   <p
                     class="sync-issue"
-                    class:error={syncSummary.issueTone === "error" || syncSummary.issueTone === "conflict"}
+                    class:error={syncSummary.issueTone === "error" ||
+                      syncSummary.issueTone === "conflict"}
                     class:warning={syncSummary.issueTone === "warning"}
                   >
                     {syncSummary.issueMessage}
@@ -245,8 +253,10 @@
     justify-content: space-between;
     height: var(--header-height);
     padding: 0 1rem;
-    background: var(--bg-secondary);
+    background: var(--bg-panel-strong);
     border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(18px);
   }
   .header-left,
   .header-right {
@@ -270,6 +280,7 @@
     font-weight: 700;
     font-size: 1rem;
     color: var(--accent);
+    letter-spacing: 0.02em;
   }
   .search-trigger {
     display: flex;
@@ -277,8 +288,8 @@
     gap: 0.5rem;
     padding: 0.4rem 1rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg-primary);
+    border-radius: 999px;
+    background: var(--bg-input);
     color: var(--text-muted);
     cursor: pointer;
     min-width: 240px;
@@ -288,20 +299,26 @@
   .search-icon {
     font-size: 0.75rem;
     padding: 0.1rem 0.3rem;
-    background: var(--bg-tertiary);
+    background: var(--bg-panel-hover);
     border-radius: 3px;
   }
   .icon-btn {
-    background: none;
-    border: none;
+    background: transparent;
+    border: 1px solid transparent;
     color: var(--text-secondary);
     cursor: pointer;
     font-size: 1.1rem;
-    padding: 0.25rem;
-    border-radius: 4px;
+    padding: 0.35rem 0.45rem;
+    border-radius: 10px;
+    transition:
+      background 0.18s ease,
+      border-color 0.18s ease,
+      transform 0.18s ease;
   }
   .icon-btn:hover {
-    background: var(--bg-tertiary);
+    background: var(--bg-panel-hover);
+    border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+    transform: translateY(-1px);
   }
   .sync-pill {
     display: inline-flex;
@@ -310,7 +327,7 @@
     padding: 0.35rem 0.7rem;
     border-radius: 999px;
     border: 1px solid var(--border);
-    background: var(--bg-primary);
+    background: var(--bg-input);
     color: var(--text-secondary);
     font-size: 0.8rem;
     max-width: 260px;
@@ -374,8 +391,9 @@
     padding: 0.9rem;
     border: 1px solid var(--border);
     border-radius: 16px;
-    background: var(--bg-primary);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+    background: var(--bg-panel-strong);
+    box-shadow: var(--shadow-strong);
+    backdrop-filter: blur(18px);
     display: grid;
     gap: 0.85rem;
   }
@@ -398,7 +416,7 @@
     padding: 0.2rem 0.5rem;
     border-radius: 999px;
     border: 1px solid var(--border);
-    background: var(--bg-secondary);
+    background: var(--bg-panel-hover);
     color: var(--text-secondary);
     font-size: 0.72rem;
   }
@@ -412,7 +430,7 @@
     padding: 0.55rem 0.65rem;
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: var(--bg-secondary);
+    background: var(--bg-panel-hover);
   }
   .sync-grid span {
     display: block;

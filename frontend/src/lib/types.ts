@@ -51,7 +51,13 @@ export interface BacklinkItem {
 export interface ResolvedWikiLink {
   raw_target: string;
   display_text: string;
-  kind: "note" | "attachment" | "heading" | "block" | "unresolved" | "ambiguous";
+  kind:
+    | "note"
+    | "attachment"
+    | "heading"
+    | "block"
+    | "unresolved"
+    | "ambiguous";
   vault_path: string | null;
   subpath: string | null;
   embed: boolean;
@@ -191,9 +197,12 @@ export interface RebuildIndexResult {
 }
 
 export type ThemePreference = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark";
+export type ThemePreset = "obsidian" | "graphite" | "dawn" | "forest";
 
 export interface AppearanceSettings {
   default_theme: ThemePreference;
+  theme_preset: ThemePreset;
 }
 
 export interface SystemDependencyStatus {

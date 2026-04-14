@@ -30,6 +30,8 @@ CREATE TABLE app_settings (
     timezone              TEXT NOT NULL DEFAULT 'Asia/Seoul',
     default_theme         TEXT NOT NULL DEFAULT 'system'
                           CHECK (default_theme IN ('light', 'dark', 'system')),
+    theme_preset          TEXT NOT NULL DEFAULT 'obsidian'
+                          CHECK (theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_app_settings_single_row CHECK (id = 1)
 );

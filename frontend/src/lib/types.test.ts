@@ -249,8 +249,12 @@ describe("Type contracts", () => {
   });
 
   it("AppearanceSettings has expected shape", () => {
-    const appearance: AppearanceSettings = { default_theme: "system" };
+    const appearance: AppearanceSettings = {
+      default_theme: "system",
+      theme_preset: "obsidian",
+    };
     expect(appearance.default_theme).toBe("system");
+    expect(appearance.theme_preset).toBe("obsidian");
   });
 
   it("SystemSettings has expected shape", () => {

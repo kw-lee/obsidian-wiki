@@ -132,22 +132,34 @@ describe("Settings API functions", () => {
   });
 
   it("fetchAppearanceSettings calls the appearance endpoint", async () => {
-    mockApi.mockResolvedValueOnce({ default_theme: "system" });
+    mockApi.mockResolvedValueOnce({
+      default_theme: "system",
+      theme_preset: "obsidian",
+    });
     await fetchAppearanceSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance");
   });
 
   it("updateAppearanceSettings sends PUT payload", async () => {
-    mockApi.mockResolvedValueOnce({ default_theme: "dark" });
-    await updateAppearanceSettings({ default_theme: "dark" });
+    mockApi.mockResolvedValueOnce({
+      default_theme: "dark",
+      theme_preset: "graphite",
+    });
+    await updateAppearanceSettings({
+      default_theme: "dark",
+      theme_preset: "graphite",
+    });
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance", {
       method: "PUT",
-      body: JSON.stringify({ default_theme: "dark" }),
+      body: JSON.stringify({ default_theme: "dark", theme_preset: "graphite" }),
     });
   });
 
   it("fetchPublicAppearanceSettings calls the public appearance endpoint", async () => {
-    mockApi.mockResolvedValueOnce({ default_theme: "light" });
+    mockApi.mockResolvedValueOnce({
+      default_theme: "light",
+      theme_preset: "dawn",
+    });
     await fetchPublicAppearanceSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance/public");
   });

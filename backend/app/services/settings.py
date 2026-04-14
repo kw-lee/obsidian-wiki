@@ -23,6 +23,7 @@ class SyncRuntimeSettings:
     webdav_verify_tls: bool
     timezone: str
     default_theme: str
+    theme_preset: str
 
 
 _settings_cache: SyncRuntimeSettings | None = None
@@ -43,6 +44,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         webdav_verify_tls=row.webdav_verify_tls,
         timezone=row.timezone,
         default_theme=row.default_theme,
+        theme_preset=row.theme_preset,
     )
 
 
@@ -65,6 +67,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         webdav_verify_tls=True,
         timezone=settings.app_timezone,
         default_theme="system",
+        theme_preset="obsidian",
     )
     db.add(row)
     await db.commit()

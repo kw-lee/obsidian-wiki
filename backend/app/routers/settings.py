@@ -349,6 +349,7 @@ async def test_sync_settings(
         webdav_verify_tls=body.webdav_verify_tls,
         timezone=runtime.timezone,
         default_theme=runtime.default_theme,
+        theme_preset=runtime.theme_preset,
     )
     return await test_sync_backend(db, runtime_override=runtime)
 
@@ -385,7 +386,10 @@ async def get_appearance_settings(
     db: AsyncSession = Depends(get_db),
 ) -> AppearanceSettingsResponse:
     row = await ensure_app_settings(db)
-    return AppearanceSettingsResponse(default_theme=row.default_theme)
+    return AppearanceSettingsResponse(
+        default_theme=row.default_theme,
+        theme_preset=row.theme_preset,
+    )
 
 
 @router.put("/appearance", response_model=AppearanceSettingsResponse)
@@ -396,9 +400,13 @@ async def update_appearance_settings(
 ) -> AppearanceSettingsResponse:
     row = await ensure_app_settings(db)
     row.default_theme = body.default_theme
+    row.theme_preset = body.theme_preset
     await db.commit()
     invalidate_settings_cache()
-    return AppearanceSettingsResponse(default_theme=row.default_theme)
+    return AppearanceSettingsResponse(
+        default_theme=row.default_theme,
+        theme_preset=row.theme_preset,
+    )
 
 
 @router.get("/appearance/public", response_model=AppearanceSettingsResponse)
@@ -406,7 +414,10 @@ async def get_public_appearance_settings(
     db: AsyncSession = Depends(get_db),
 ) -> AppearanceSettingsResponse:
     row = await ensure_app_settings(db)
-    return AppearanceSettingsResponse(default_theme=row.default_theme)
+    return AppearanceSettingsResponse(
+        default_theme=row.default_theme,
+        theme_preset=row.theme_preset,
+    )
 
 
 @router.get("/system", response_model=SystemSettingsResponse)

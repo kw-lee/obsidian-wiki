@@ -13,6 +13,7 @@ export interface DocDetail {
   created_at: string | null;
   updated_at: string | null;
   content: string;
+  rendered_content: string | null;
   base_commit: string | null;
   outgoing_links: ResolvedWikiLink[];
 }
@@ -223,6 +224,8 @@ export interface SystemSettings {
   version: string;
   started_at: string;
   timezone: string;
+  folder_note_enabled: boolean;
+  templater_enabled: boolean;
   uptime_seconds: number;
   sync_backend: SyncBackend;
   sync_auto_enabled: boolean;

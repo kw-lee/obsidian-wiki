@@ -81,7 +81,11 @@ export const fetchPublicAppearanceSettings = () =>
 export const fetchSystemSettings = () =>
   api<SystemSettings>("/settings/system");
 
-export const updateSystemSettings = (payload: { timezone: string }) =>
+export const updateSystemSettings = (payload: {
+  timezone: string;
+  folder_note_enabled: boolean;
+  templater_enabled: boolean;
+}) =>
   api<SystemSettings>("/settings/system", {
     method: "PUT",
     body: JSON.stringify(payload),

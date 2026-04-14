@@ -350,6 +350,8 @@ async def test_sync_settings(
         timezone=runtime.timezone,
         default_theme=runtime.default_theme,
         theme_preset=runtime.theme_preset,
+        folder_note_enabled=runtime.folder_note_enabled,
+        templater_enabled=runtime.templater_enabled,
     )
     return await test_sync_backend(db, runtime_override=runtime)
 
@@ -438,6 +440,8 @@ async def get_system_settings(
         version=get_app_version(),
         started_at=started_at,
         timezone=row.timezone,
+        folder_note_enabled=row.folder_note_enabled,
+        templater_enabled=row.templater_enabled,
         uptime_seconds=uptime_seconds,
         sync_backend=runtime.sync_backend,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -456,6 +460,8 @@ async def update_system_settings(
 ) -> SystemSettingsResponse:
     row = await ensure_app_settings(db)
     row.timezone = _normalize_timezone(body.timezone)
+    row.folder_note_enabled = body.folder_note_enabled
+    row.templater_enabled = body.templater_enabled
     await db.commit()
     invalidate_settings_cache()
     return await get_system_settings(db=db, _username=_username)

@@ -24,6 +24,8 @@ class SyncRuntimeSettings:
     timezone: str
     default_theme: str
     theme_preset: str
+    folder_note_enabled: bool
+    templater_enabled: bool
 
 
 _settings_cache: SyncRuntimeSettings | None = None
@@ -45,6 +47,8 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         timezone=row.timezone,
         default_theme=row.default_theme,
         theme_preset=row.theme_preset,
+        folder_note_enabled=row.folder_note_enabled,
+        templater_enabled=row.templater_enabled,
     )
 
 
@@ -68,6 +72,8 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         timezone=settings.app_timezone,
         default_theme="system",
         theme_preset="obsidian",
+        folder_note_enabled=False,
+        templater_enabled=False,
     )
     db.add(row)
     await db.commit()

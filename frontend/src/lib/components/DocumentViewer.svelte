@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fetchApiResource } from "$lib/api/client";
   import { t } from "$lib/i18n/index.svelte";
   import type { DocDetail } from "$lib/types";
   import {
@@ -26,13 +27,7 @@
   const emptyCaptionsTrack = "data:text/vtt;charset=utf-8,WEBVTT%0A%0A";
 
   async function loadAttachmentUrl(targetPath: string): Promise<string> {
-    const token = localStorage.getItem("access_token");
-    const response = await fetch(buildAttachmentApiPath(targetPath), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) {
-      throw new Error(t("viewer.failed"));
-    }
+    const response = await fetchApiResource(buildAttachmentApiPath(targetPath));
     const blob = await response.blob();
     return URL.createObjectURL(blob);
   }
@@ -81,7 +76,7 @@
 {#if viewerKind === "note" && doc}
   <MarkdownView
     path={doc.path}
-    content={doc.content}
+    content={doc.rendered_content ?? doc.content}
     links={doc.outgoing_links}
     {onnavigate}
   />

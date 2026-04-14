@@ -16,6 +16,7 @@ class DocMeta(BaseModel):
 
 class DocDetail(DocMeta):
     content: str
+    rendered_content: str | None = None
     base_commit: str | None = None
     outgoing_links: list["ResolvedWikiLink"] = []
 
@@ -291,6 +292,8 @@ class SystemSettingsResponse(BaseModel):
     version: str
     started_at: datetime
     timezone: str
+    folder_note_enabled: bool = False
+    templater_enabled: bool = False
     uptime_seconds: int = Field(ge=0)
     sync_backend: Literal["git", "webdav", "none"]
     sync_auto_enabled: bool
@@ -309,6 +312,8 @@ class SystemLogEntry(BaseModel):
 
 class SystemSettingsUpdateRequest(BaseModel):
     timezone: str
+    folder_note_enabled: bool = False
+    templater_enabled: bool = False
 
 
 class SystemLogsResponse(BaseModel):

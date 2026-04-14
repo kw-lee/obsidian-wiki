@@ -1,7 +1,7 @@
 import json
-from collections import defaultdict
 import posixpath
 import re
+from collections import defaultdict
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -34,6 +34,8 @@ from app.services.git_ops import (
     read_file_at_commit,
 )
 from app.services.indexer import full_reindex, index_file
+from app.services.settings import ensure_app_settings
+from app.services.templater import TemplaterRenderContext, render_template_markdown
 from app.services.wiki_links import (
     ParsedWikiLink,
     load_resolver_catalog,
@@ -93,7 +95,9 @@ def _normalize_snippet(text: str, max_length: int = 160) -> str:
     return f"{compact[: max_length - 1].rstrip()}…"
 
 
-def _extract_backlink_snippet(source_content: str, source_path: str, target_path: str, catalog) -> str | None:
+def _extract_backlink_snippet(
+    source_content: str, source_path: str, target_path: str, catalog
+) -> str | None:
     for raw_line in source_content.splitlines():
         line = raw_line.strip()
         if not line or "[[" not in line:
@@ -135,7 +139,11 @@ def _split_subpath(raw_target: str) -> tuple[str, str | None, str | None]:
 
     heading_index = raw_target.find("#")
     block_index = raw_target.find("^")
-    indexes = [(index, marker) for index, marker in ((heading_index, "#"), (block_index, "^")) if index >= 0]
+    indexes = [
+        (index, marker)
+        for index, marker in ((heading_index, "#"), (block_index, "^"))
+        if index >= 0
+    ]
     if not indexes:
         return raw_target.strip(), None, None
 
@@ -157,7 +165,10 @@ def _rewrite_wikilink_target(
         start=PurePosixPath(current_path).parent.as_posix() or ".",
     )
     original_suffix = PurePosixPath(target_path).suffix.lower()
-    if original_suffix not in (".md", ".mdx") and PurePosixPath(resolved_path).suffix.lower() in (".md", ".mdx"):
+    if original_suffix not in (".md", ".mdx") and PurePosixPath(resolved_path).suffix.lower() in (
+        ".md",
+        ".mdx",
+    ):
         note_suffix = PurePosixPath(relative_target).suffix
         if note_suffix.lower() in (".md", ".mdx"):
             relative_target = relative_target[: -len(note_suffix)]
@@ -228,7 +239,11 @@ def _rewrite_wikilinks_for_move(
         leading_ws = target_part[: len(target_part) - len(target_part.lstrip())]
         trailing_ws = target_part[len(target_part.rstrip()) :]
         rewritten_target_part = f"{leading_ws}{rewritten_target}{trailing_ws}"
-        rewritten_body = f"{rewritten_target_part}{separator}{alias_part}" if separator else rewritten_target_part
+        rewritten_body = (
+            f"{rewritten_target_part}{separator}{alias_part}"
+            if separator
+            else rewritten_target_part
+        )
         parts.append(f"{'!' if match.group('embed') else ''}[[{rewritten_body}]]")
         rewritten += 1
         last_index = match.end()
@@ -285,18 +300,42 @@ async def get_doc(
     except ValueError as exc:
         raise _invalid_path(str(exc)) from exc
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        ) from exc
     row = await db.execute(select(Document).where(Document.path == path))
     doc = row.scalar_one_or_none()
     outgoing_links = await resolve_links_for_document(db, path, content)
+    runtime_settings = await ensure_app_settings(db)
+    title = doc.title if doc else path.rsplit("/", 1)[-1].removesuffix(".md")
+    tags = _normalize_tags(doc.tags) if doc else []
+    frontmatter = _normalize_frontmatter(doc.frontmatter) if doc else {}
+    rendered_content = None
+    if runtime_settings.templater_enabled:
+        rendered_content = await render_template_markdown(
+            db,
+            content,
+            TemplaterRenderContext(
+                note_path=path,
+                resolve_path=path,
+                title=title,
+                content=content,
+                frontmatter=frontmatter,
+                tags=tags,
+                created_at=doc.created_at if doc else None,
+                updated_at=doc.updated_at if doc else None,
+                timezone=runtime_settings.timezone,
+            ),
+        )
     return DocDetail(
         path=path,
-        title=doc.title if doc else path.rsplit("/", 1)[-1].removesuffix(".md"),
-        tags=_normalize_tags(doc.tags) if doc else [],
-        frontmatter=_normalize_frontmatter(doc.frontmatter) if doc else {},
+        title=title,
+        tags=tags,
+        frontmatter=frontmatter,
         created_at=doc.created_at if doc else None,
         updated_at=doc.updated_at if doc else None,
         content=content,
+        rendered_content=rendered_content,
         base_commit=head_commit_sha(),
         outgoing_links=outgoing_links,
     )
@@ -374,7 +413,9 @@ async def create_folder(
 ) -> FolderCreateResponse:
     path = body.path.strip().strip("/")
     if not path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Folder path is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Folder path is required"
+        )
 
     full = _resolve_or_400(path, for_write=True)
     if full.exists():
@@ -395,32 +436,48 @@ async def move_path(
     destination_path = body.destination_path.strip().strip("/")
 
     if not source_path or not destination_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination are required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination are required"
+        )
     if source_path == destination_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination must differ")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Source and destination must differ"
+        )
     if any(part.startswith(".") for part in source_path.split("/")) or any(
         part.startswith(".") for part in destination_path.split("/")
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hidden paths cannot be moved")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Hidden paths cannot be moved"
+        )
     if destination_path.startswith(f"{source_path}/"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot move a folder into itself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot move a folder into itself"
+        )
 
     source_full = _resolve_or_400(source_path)
     destination_full = _resolve_or_400(destination_path, for_write=True)
     if not source_full.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source path does not exist")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Source path does not exist"
+        )
     if destination_full.exists():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Destination already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Destination already exists"
+        )
 
     catalog = await load_resolver_catalog(db)
     moved_path = await vault.move_path(source_path, destination_path)
     rewritten_paths: list[str] = []
     rewritten_links = 0
     if body.rewrite_links:
-        rewritten_paths, rewritten_links = await _rewrite_links_after_move(source_path, moved_path, catalog)
+        rewritten_paths, rewritten_links = await _rewrite_links_after_move(
+            source_path, moved_path, catalog
+        )
         git_add_all_and_commit(f"web: move {source_path} -> {moved_path}")
     else:
-        git_stage_move_and_commit(source_path, moved_path, f"web: move {source_path} -> {moved_path}")
+        git_stage_move_and_commit(
+            source_path, moved_path, f"web: move {source_path} -> {moved_path}"
+        )
     await full_reindex(db)
     return MovePathResponse(
         path=moved_path,
@@ -453,8 +510,9 @@ async def get_backlinks(
 ) -> list[BacklinkItem]:
     catalog = await load_resolver_catalog(db)
     result = await db.execute(
-        select(Link.source_path, Link.target_path, Link.alias, Document.title)
-        .join(Document, Document.path == Link.source_path)
+        select(Link.source_path, Link.target_path, Link.alias, Document.title).join(
+            Document, Document.path == Link.source_path
+        )
     )
 
     grouped: dict[str, dict[str, object]] = defaultdict(

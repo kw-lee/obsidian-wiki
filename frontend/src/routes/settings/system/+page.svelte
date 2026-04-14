@@ -17,6 +17,8 @@
   let error = $state("");
   let success = $state("");
   let timezone = $state("");
+  let folderNoteEnabled = $state(false);
+  let templaterEnabled = $state(false);
 
   onMount(async () => {
     await loadSystem();
@@ -50,6 +52,8 @@
       system = systemData;
       logs = logData.entries;
       timezone = systemData.timezone;
+      folderNoteEnabled = systemData.folder_note_enabled;
+      templaterEnabled = systemData.templater_enabled;
     } catch (err) {
       error = err instanceof Error ? err.message : t("system.loadFailed");
     } finally {
@@ -66,12 +70,16 @@
     }
   }
 
-  async function handleSaveTimezone() {
+  async function handleSaveSystem() {
     saving = true;
     error = "";
     success = "";
     try {
-      system = await updateSystemSettings({ timezone });
+      system = await updateSystemSettings({
+        timezone,
+        folder_note_enabled: folderNoteEnabled,
+        templater_enabled: templaterEnabled,
+      });
       success = t("system.saveSuccess");
     } catch (err) {
       error = err instanceof Error ? err.message : t("system.saveFailed");
@@ -118,6 +126,22 @@
         <strong>{system.timezone}</strong>
       </article>
       <article>
+        <span>{t("system.folderNotes")}</span>
+        <strong
+          >{system.folder_note_enabled
+            ? t("system.enabled")
+            : t("system.disabled")}</strong
+        >
+      </article>
+      <article>
+        <span>{t("system.templater")}</span>
+        <strong
+          >{system.templater_enabled
+            ? t("system.enabled")
+            : t("system.disabled")}</strong
+        >
+      </article>
+      <article>
         <span>{t("system.syncBackend")}</span>
         <strong>{system.sync_backend}</strong>
         <small
@@ -145,7 +169,52 @@
       <button
         type="button"
         class="save-button"
-        onclick={handleSaveTimezone}
+        onclick={handleSaveSystem}
+        disabled={saving}
+      >
+        {saving ? t("common.saving") : t("common.save")}
+      </button>
+    </article>
+
+    <article class="detail-card">
+      <div class="detail-head">
+        <span>{t("system.templaterSettings")}</span>
+        <strong>{t("system.templaterDescription")}</strong>
+      </div>
+      <label class="toggle-field">
+        <div>
+          <span>{t("system.templaterLabel")}</span>
+          <p class="detail-note">{t("system.templaterHelp")}</p>
+          <p class="detail-note">{t("system.templaterScope")}</p>
+        </div>
+        <input type="checkbox" bind:checked={templaterEnabled} />
+      </label>
+      <button
+        type="button"
+        class="save-button"
+        onclick={handleSaveSystem}
+        disabled={saving}
+      >
+        {saving ? t("common.saving") : t("common.save")}
+      </button>
+    </article>
+
+    <article class="detail-card">
+      <div class="detail-head">
+        <span>{t("system.folderNotesSettings")}</span>
+        <strong>{t("system.folderNotesDescription")}</strong>
+      </div>
+      <label class="toggle-field">
+        <div>
+          <span>{t("system.folderNotesLabel")}</span>
+          <p class="detail-note">{t("system.folderNotesHelp")}</p>
+        </div>
+        <input type="checkbox" bind:checked={folderNoteEnabled} />
+      </label>
+      <button
+        type="button"
+        class="save-button"
+        onclick={handleSaveSystem}
         disabled={saving}
       >
         {saving ? t("common.saving") : t("common.save")}
@@ -357,6 +426,13 @@
     gap: 0.45rem;
   }
 
+  .toggle-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
   .field span {
     font-size: 0.85rem;
     color: var(--text-muted);
@@ -370,6 +446,13 @@
     background: color-mix(in srgb, var(--bg) 88%, transparent);
     color: var(--text-primary);
     font: inherit;
+  }
+
+  .toggle-field input {
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
+    accent-color: var(--accent);
   }
 
   .stats-grid span,

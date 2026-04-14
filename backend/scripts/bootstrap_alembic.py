@@ -26,9 +26,7 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_alembic_version_table:
-        current_version = await conn.scalar(
-            text("SELECT version_num FROM alembic_version LIMIT 1")
-        )
+        current_version = await conn.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
         if current_version:
             return None
 
@@ -45,6 +43,66 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
     )
     if not has_app_settings:
         return None
+
+    has_templater_enabled = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'templater_enabled'
+        )
+        """,
+    )
+    if has_templater_enabled:
+        return "20260414_0008"
+
+    has_folder_note_enabled = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'folder_note_enabled'
+        )
+        """,
+    )
+    if has_folder_note_enabled:
+        return "20260414_0007"
+
+    has_theme_preset = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'theme_preset'
+        )
+        """,
+    )
+    if has_theme_preset:
+        return "20260413_0006"
+
+    has_timezone = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'timezone'
+        )
+        """,
+    )
+    if has_timezone:
+        return "20260413_0005"
 
     has_default_theme = await _scalar_bool(
         conn,

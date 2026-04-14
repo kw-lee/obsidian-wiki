@@ -32,6 +32,8 @@ CREATE TABLE app_settings (
                           CHECK (default_theme IN ('light', 'dark', 'system')),
     theme_preset          TEXT NOT NULL DEFAULT 'obsidian'
                           CHECK (theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')),
+    folder_note_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+    templater_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_app_settings_single_row CHECK (id = 1)
 );

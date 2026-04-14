@@ -73,6 +73,12 @@ class AppSettings(Base):
     theme_preset: Mapped[str] = mapped_column(
         Text, nullable=False, default="obsidian", server_default="obsidian"
     )
+    folder_note_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    templater_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

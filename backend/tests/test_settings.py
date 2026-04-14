@@ -394,6 +394,8 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     assert data["version"] == "0.1.0"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
     assert data["timezone"] == "Asia/Seoul"
+    assert data["folder_note_enabled"] is False
+    assert data["templater_enabled"] is False
     assert data["sync_backend"] == "git"
     assert data["sync_auto_enabled"] is True
     assert data["database"] == {"ok": True, "detail": "Database connection successful"}
@@ -407,20 +409,30 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
 async def test_update_system_settings_persists_timezone(client, auth_headers, setup_vault):
     resp = await client.put(
         "/api/settings/system",
-        json={"timezone": "America/New_York"},
+        json={
+            "timezone": "America/New_York",
+            "folder_note_enabled": True,
+            "templater_enabled": True,
+        },
         headers=auth_headers,
     )
     assert resp.status_code == 200
     assert resp.json()["timezone"] == "America/New_York"
+    assert resp.json()["folder_note_enabled"] is True
+    assert resp.json()["templater_enabled"] is True
 
     read_resp = await client.get("/api/settings/system", headers=auth_headers)
     assert read_resp.status_code == 200
     assert read_resp.json()["timezone"] == "America/New_York"
+    assert read_resp.json()["folder_note_enabled"] is True
+    assert read_resp.json()["templater_enabled"] is True
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.timezone == "America/New_York"
+        assert row.folder_note_enabled is True
+        assert row.templater_enabled is True
 
 
 @pytest.mark.asyncio

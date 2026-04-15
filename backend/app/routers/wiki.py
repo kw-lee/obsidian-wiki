@@ -6,14 +6,15 @@ from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user, get_current_user_context
-from app.db.models import Document, Link
+from app.db.models import AuditLog, Document, Link
 from app.db.session import get_db
 from app.schemas import (
     BacklinkItem,
+    DocAuditResponse,
     DocCreateRequest,
     DocDetail,
     DocSaveRequest,
@@ -21,6 +22,7 @@ from app.schemas import (
     FolderCreateResponse,
     MovePathRequest,
     MovePathResponse,
+    ProfileAuditEntry,
     TreeNode,
 )
 from app.services import vault
@@ -140,6 +142,54 @@ def _reverse_translate_moved_path(path: str, source_root: str, destination_root:
     if path.startswith(destination_prefix):
         return f"{source_root}/{path.removeprefix(destination_prefix)}"
     return path
+
+
+def _parse_audit_move_path(raw_path: str) -> tuple[str | None, str | None]:
+    source_root, separator, destination_root = raw_path.partition("->")
+    if not separator:
+        return None, None
+
+    source_root = source_root.strip()
+    destination_root = destination_root.strip()
+    if not source_root or not destination_root:
+        return None, None
+    return source_root, destination_root
+
+
+def _path_is_affected_by_move(path: str, source_root: str, destination_root: str) -> bool:
+    return (
+        _translate_moved_path(path, source_root, destination_root) != path
+        or _reverse_translate_moved_path(path, source_root, destination_root) != path
+    )
+
+
+def _collect_doc_audit_paths(path: str, move_rows: list[AuditLog]) -> set[str]:
+    known_paths = {path}
+    expanded = True
+    while expanded:
+        expanded = False
+        for row in move_rows:
+            source_root, destination_root = _parse_audit_move_path(row.path)
+            if not source_root or not destination_root:
+                continue
+            for candidate in tuple(known_paths):
+                previous_path = _reverse_translate_moved_path(
+                    candidate, source_root, destination_root
+                )
+                if previous_path != candidate and previous_path not in known_paths:
+                    known_paths.add(previous_path)
+                    expanded = True
+    return known_paths
+
+
+def _audit_row_matches_doc_paths(row: AuditLog, doc_paths: set[str]) -> bool:
+    if row.action != "wiki.move":
+        return row.path in doc_paths
+
+    source_root, destination_root = _parse_audit_move_path(row.path)
+    if not source_root or not destination_root:
+        return False
+    return any(_path_is_affected_by_move(path, source_root, destination_root) for path in doc_paths)
 
 
 def _split_subpath(raw_target: str) -> tuple[str, str | None, str | None]:
@@ -350,6 +400,61 @@ async def get_doc(
         base_commit=head_commit_sha(),
         outgoing_links=outgoing_links,
     )
+
+
+@router.get("/history/{path:path}", response_model=DocAuditResponse)
+async def get_doc_history(
+    path: str,
+    limit: int = 6,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> DocAuditResponse:
+    full = _resolve_or_400(path)
+    if not full.exists() or not full.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    bounded_limit = max(1, min(limit, 20))
+    move_rows = (
+        (
+            await db.execute(
+                select(AuditLog)
+                .where(AuditLog.action == "wiki.move")
+                .order_by(desc(AuditLog.created_at), desc(AuditLog.id))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    doc_paths = _collect_doc_audit_paths(path, move_rows)
+    other_rows = (
+        (
+            await db.execute(
+                select(AuditLog)
+                .where(AuditLog.action != "wiki.move", AuditLog.path.in_(sorted(doc_paths)))
+                .order_by(desc(AuditLog.created_at), desc(AuditLog.id))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    rows = [
+        *other_rows,
+        *(row for row in move_rows if _audit_row_matches_doc_paths(row, doc_paths)),
+    ]
+    rows.sort(key=lambda row: (row.created_at, row.id), reverse=True)
+    entries = [
+        ProfileAuditEntry(
+            created_at=row.created_at,
+            action=row.action,
+            path=row.path,
+            commit_sha=row.commit_sha,
+            username=row.username,
+            git_display_name=row.git_display_name,
+            git_email=row.git_email,
+        )
+        for row in rows[:bounded_limit]
+    ]
+    return DocAuditResponse(entries=entries)
 
 
 @router.put("/doc/{path:path}", response_model=DocDetail)

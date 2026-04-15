@@ -9,6 +9,7 @@ import { api } from "./client";
 import {
   fetchTree,
   fetchDoc,
+  fetchDocHistory,
   saveDoc,
   createDoc,
   createFolder,
@@ -45,6 +46,14 @@ describe("Wiki API functions", () => {
     mockApi.mockResolvedValueOnce({ path: "test.md" });
     await fetchDoc("folder/test.md");
     expect(mockApi).toHaveBeenCalledWith("/wiki/doc/folder/test.md");
+  });
+
+  it("fetchDocHistory calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ entries: [] });
+    await fetchDocHistory("folder/test.md", 8);
+    expect(mockApi).toHaveBeenCalledWith(
+      "/wiki/history/folder/test.md?limit=8",
+    );
   });
 
   it("saveDoc sends PUT with content and base_commit", async () => {

@@ -210,6 +210,10 @@ export interface AuditEntriesResponse {
   entries: AuditEntry[];
 }
 
+export interface DocAuditHistoryResponse {
+  entries: AuditEntry[];
+}
+
 export type SyncBackend = "git" | "webdav" | "none";
 export type SyncMode = "bidirectional" | "pull-only" | "push-only";
 export type WebdavObsidianPolicy = "remote-only" | "ignore" | "include";

@@ -5,6 +5,7 @@ vault and may use PostgreSQL-specific features. They are marked to accept 500 on
 """
 
 import subprocess
+from datetime import UTC, datetime
 
 import pytest
 from git import Repo
@@ -145,6 +146,90 @@ async def test_create_doc_auto_md_extension(client, auth_headers, setup_vault):
     assert resp.status_code in (201, 500)
     if resp.status_code == 201:
         assert resp.json()["path"] == "no-extension.md"
+
+
+@pytest.mark.asyncio
+async def test_get_doc_history_returns_current_path_and_renamed_history(
+    client, auth_headers, setup_vault
+):
+    vault = setup_vault
+    (vault / "archive").mkdir()
+    (vault / "archive" / "renamed.md").write_text("# Renamed", encoding="utf-8")
+
+    async with session_mod.async_session() as session:
+        user = await session.scalar(select(User).where(User.username == "admin"))
+        assert user is not None
+        session.add_all(
+            [
+                AuditLog(
+                    user_id=user.id,
+                    username=user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.create",
+                    path="notes/original.md",
+                    commit_sha="aaa111",
+                    created_at=datetime(2026, 4, 15, 11, 0, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=user.id,
+                    username=user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.update",
+                    path="notes/original.md",
+                    commit_sha="bbb222",
+                    created_at=datetime(2026, 4, 15, 11, 5, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=user.id,
+                    username=user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.move",
+                    path="notes/original.md -> archive/renamed.md",
+                    commit_sha="ccc333",
+                    created_at=datetime(2026, 4, 15, 11, 10, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=user.id,
+                    username=user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.update",
+                    path="archive/renamed.md",
+                    commit_sha="ddd444",
+                    created_at=datetime(2026, 4, 15, 11, 15, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=user.id,
+                    username=user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.update",
+                    path="notes/other.md",
+                    commit_sha="eee555",
+                    created_at=datetime(2026, 4, 15, 11, 20, tzinfo=UTC),
+                ),
+            ]
+        )
+        await session.commit()
+
+    resp = await client.get("/api/wiki/history/archive/renamed.md?limit=10", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [entry["path"] for entry in data["entries"]] == [
+        "archive/renamed.md",
+        "notes/original.md -> archive/renamed.md",
+        "notes/original.md",
+        "notes/original.md",
+    ]
+    assert [entry["action"] for entry in data["entries"]] == [
+        "wiki.update",
+        "wiki.move",
+        "wiki.update",
+        "wiki.create",
+    ]
 
 
 @pytest.mark.asyncio

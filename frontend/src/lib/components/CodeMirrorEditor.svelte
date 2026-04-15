@@ -34,9 +34,10 @@
     content: string;
     onchange?: (value: string) => void;
     onsave?: () => void;
+    fillHeight?: boolean;
   }
 
-  let { content, onchange, onsave }: Props = $props();
+  let { content, onchange, onsave, fillHeight = false }: Props = $props();
 
   let containerEl: HTMLDivElement;
   let view: EditorView | undefined;
@@ -212,13 +213,21 @@
   });
 </script>
 
-<div class="cm-wrapper" bind:this={containerEl}></div>
+<div
+  class="cm-wrapper"
+  class:fill-height={fillHeight}
+  bind:this={containerEl}
+></div>
 
 <style>
   .cm-wrapper {
     width: 100%;
-    height: calc(100vh - 200px);
+    height: calc(100dvh - 200px);
     background: var(--bg-primary);
+  }
+  .cm-wrapper.fill-height {
+    height: 100%;
+    min-height: 0;
   }
   .cm-wrapper :global(.cm-editor) {
     height: 100%;

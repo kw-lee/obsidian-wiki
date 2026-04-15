@@ -56,6 +56,20 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         )
         """,
     )
+    has_editor_split_preview_enabled = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'editor_split_preview_enabled'
+        )
+        """,
+    )
+    if has_editor_split_preview_enabled:
+        return "20260415_0011"
     if has_editor_font:
         return "20260415_0010"
 

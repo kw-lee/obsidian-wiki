@@ -1,11 +1,16 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { fetchPluginSettings, rebuildVaultIndex } from "$lib/api/settings";
+  import {
+    fetchPluginSettings,
+    fetchSystemSettings,
+    rebuildVaultIndex,
+  } from "$lib/api/settings";
   import {
     createDoc,
     createFolder,
     fetchDoc,
+    fetchDocHistory,
     fetchTree,
     movePath,
     saveDoc,
@@ -13,10 +18,14 @@
   import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
-  import type { DocDetail, TreeNode } from "$lib/types";
+  import type { AuditEntry, DocDetail, TreeNode } from "$lib/types";
   import { findTreeNode, resolveFolderNotePath } from "$lib/utils/folder-notes";
   import { stripYamlFrontmatter } from "$lib/utils/markdown";
   import { describeMoveToast } from "$lib/utils/move";
+  import {
+    resolveRequestedNotePath,
+    suggestNewNotePath,
+  } from "$lib/utils/note-path";
   import { buildWikiRoute, isNotePath } from "$lib/utils/routes";
   import {
     getWorkspaceState,
@@ -33,6 +42,7 @@
   import BacklinksPanel from "./BacklinksPanel.svelte";
   import CodeMirrorEditor from "./CodeMirrorEditor.svelte";
   import CommandPalette from "./CommandPalette.svelte";
+  import DocumentMetaPanel from "./DocumentMetaPanel.svelte";
   import DocumentViewer from "./DocumentViewer.svelte";
   import FileExplorer from "./FileExplorer.svelte";
   import Header from "./Header.svelte";
@@ -77,7 +87,12 @@
   let dataviewShowSource = $state(false);
   let revealNonce = $state(0);
   let folderNoteEnabled = $state(false);
+  let editorSplitPreviewEnabled = $state(false);
+  let previewContent = $state("");
   let documentSurface = $state<HTMLElement | null>(null);
+  let docAuditEntries = $state<AuditEntry[]>([]);
+  let docAuditLoading = $state(false);
+  let docAuditError = $state("");
 
   const activePath = $derived(initialPath?.trim() ?? "");
   const isEditable = $derived(Boolean(doc && isNotePath(doc.path)));
@@ -88,7 +103,26 @@
     isMobileViewport && mobileSidebarOpen,
   );
   const outlineItems = $derived(
-    doc && isNotePath(doc.path) ? extractOutlineItems(doc.content) : [],
+    doc && isNotePath(doc.path)
+      ? extractOutlineItems(editing ? editContent : doc.content)
+      : [],
+  );
+  const showSplitEditorPreview = $derived(
+    editing && editorSplitPreviewEnabled && !isMobileViewport && isEditable,
+  );
+  const previewDoc = $derived(
+    doc && showSplitEditorPreview
+      ? {
+          ...doc,
+          content: previewContent,
+          rendered_content: null,
+        }
+      : null,
+  );
+  const docHistoryKey = $derived(
+    doc && isNotePath(doc.path)
+      ? `${doc.path}:${doc.base_commit ?? ""}:${doc.updated_at ?? ""}`
+      : "",
   );
 
   onMount(() => {
@@ -130,11 +164,19 @@
     function handleKeydown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
-        searchOpen = !searchOpen;
+        const nextSearchOpen = !searchOpen;
+        searchOpen = nextSearchOpen;
+        if (nextSearchOpen) {
+          commandOpen = false;
+        }
       }
       if ((event.metaKey || event.ctrlKey) && event.key === "p") {
         event.preventDefault();
-        commandOpen = !commandOpen;
+        const nextCommandOpen = !commandOpen;
+        commandOpen = nextCommandOpen;
+        if (nextCommandOpen) {
+          searchOpen = false;
+        }
       }
       if ((event.metaKey || event.ctrlKey) && event.key === "s" && editing) {
         event.preventDefault();
@@ -174,6 +216,49 @@
       setLastWikiPath(selectedPath);
       ensureOpenTab(selectedPath);
     }
+  });
+
+  $effect(() => {
+    const historyKey = docHistoryKey;
+    const currentDoc = doc;
+
+    if (!historyKey || !currentDoc || !isNotePath(currentDoc.path)) {
+      docAuditEntries = [];
+      docAuditLoading = false;
+      docAuditError = "";
+      return;
+    }
+
+    let cancelled = false;
+    docAuditLoading = true;
+    docAuditError = "";
+
+    void fetchDocHistory(currentDoc.path, 6)
+      .then((history) => {
+        if (cancelled) {
+          return;
+        }
+        docAuditEntries = history.entries;
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        docAuditEntries = [];
+        docAuditError =
+          error instanceof Error
+            ? error.message
+            : t("workspace.historyLoadFailed");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          docAuditLoading = false;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   });
 
   $effect(() => {
@@ -219,7 +304,7 @@
   });
 
   async function initializeWorkspace() {
-    await Promise.all([loadTree(), loadPluginSettings()]);
+    await Promise.all([loadTree(), loadPluginSettings(), loadSystemSettings()]);
     ready = true;
   }
 
@@ -241,6 +326,15 @@
       dataviewEnabled = true;
       dataviewShowSource = false;
       folderNoteEnabled = false;
+    }
+  }
+
+  async function loadSystemSettings() {
+    try {
+      const system = await fetchSystemSettings();
+      editorSplitPreviewEnabled = system.editor_split_preview_enabled;
+    } catch {
+      editorSplitPreviewEnabled = false;
     }
   }
 
@@ -289,8 +383,24 @@
   function startEdit() {
     if (!doc || !isEditable) return;
     editContent = doc.content;
+    previewContent = doc.content;
     editing = true;
   }
+
+  $effect(() => {
+    if (!editing) {
+      return;
+    }
+
+    const nextContent = editContent;
+    const timer = window.setTimeout(() => {
+      previewContent = nextContent;
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  });
 
   async function handleSave() {
     if (!doc || !isEditable) return;
@@ -312,6 +422,18 @@
       const created = await createDoc(missingPath, "");
       await loadTree();
       await navigateTo(created.path);
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : t("home.newDocFailed"),
+      );
+    }
+  }
+
+  async function createNoteAtPath(path: string) {
+    try {
+      const newDoc = await createDoc(path);
+      await loadTree();
+      await navigateTo(newDoc.path);
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : t("home.newDocFailed"),
@@ -381,18 +503,23 @@
     rightSidebarOpen = true;
   }
 
-  async function promptCreateNote() {
-    const name = prompt(t("home.newDocPrompt"), suggestNewNotePath());
-    if (!name) return;
-    try {
-      const newDoc = await createDoc(name);
-      await loadTree();
-      await navigateTo(newDoc.path);
-    } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : t("home.newDocFailed"),
-      );
-    }
+  async function promptCreateNote(
+    initialValue = suggestNewNotePath(selectedPath),
+  ) {
+    const name = prompt(t("home.newDocPrompt"), initialValue);
+    const requestedPath = resolveRequestedNotePath(name ?? "", selectedPath);
+    if (!requestedPath) return;
+    await createNoteAtPath(requestedPath);
+  }
+
+  async function promptCreateFolder() {
+    const name = prompt(
+      t("fileExplorer.newFolderPrompt"),
+      suggestNewFolderPath(),
+    );
+    const requestedPath = resolveRequestedFolderPath(name ?? "", selectedPath);
+    if (!requestedPath) return;
+    await handleCreateFolder(requestedPath);
   }
 
   async function handleCreateFolder(path: string) {
@@ -469,6 +596,8 @@
     }, 3000);
   }
 
+  function ignorePreviewNavigation(_path: string) {}
+
   async function handleAction(action: string, payload?: string) {
     if (action === "search") {
       commandOpen = false;
@@ -526,9 +655,36 @@
       revealNonce += 1;
       return;
     }
+    if (action === "rename-current") {
+      const sourcePath = payload ?? selectedPath;
+      if (!sourcePath || !isNotePath(sourcePath)) {
+        return;
+      }
+
+      const destinationInput = prompt(
+        t("commandPalette.renamePrompt"),
+        sourcePath,
+      );
+      const destinationPath = resolveRequestedNotePath(
+        destinationInput ?? "",
+        sourcePath,
+      );
+      if (!destinationPath || destinationPath === sourcePath) {
+        return;
+      }
+
+      const rewriteLinks = confirm(t("commandPalette.renameRewriteConfirm"));
+      await handleMovePath(sourcePath, destinationPath, rewriteLinks);
+      return;
+    }
     if (action === "new-doc") {
       commandOpen = false;
+      if (payload) {
+        await createNoteAtPath(payload);
+        return;
+      }
       await promptCreateNote();
+      return;
     }
   }
 
@@ -546,18 +702,6 @@
       base_commit: null,
       outgoing_links: [],
     };
-  }
-
-  function suggestNewNotePath() {
-    if (!selectedPath) {
-      return "untitled.md";
-    }
-    const parts = selectedPath.split("/");
-    if (selectedPath.includes(".")) {
-      parts.pop();
-    }
-    const folder = parts.join("/");
-    return folder ? `${folder}/untitled.md` : "untitled.md";
   }
 
   function getTabLabel(path: string) {
@@ -651,12 +795,54 @@
       occurrence += 1;
     }
   }
+
+  function resolveRequestedFolderPath(input: string, currentPath: string) {
+    const normalizedInput = input
+      .trim()
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "")
+      .replace(/\/{2,}/g, "/")
+      .replace(/\/+$/, "");
+    if (!normalizedInput) {
+      return null;
+    }
+
+    const folder = selectedFolderPath(currentPath);
+    if (normalizedInput.includes("/") || !folder) {
+      return normalizedInput;
+    }
+    return `${folder}/${normalizedInput}`;
+  }
+
+  function suggestNewFolderPath() {
+    const folder = selectedFolderPath(selectedPath);
+    return folder ? `${folder}/new-folder` : "new-folder";
+  }
+
+  function selectedFolderPath(path: string) {
+    if (!path) {
+      return "";
+    }
+    if (!path.includes(".")) {
+      return path;
+    }
+    const parts = path.split("/");
+    parts.pop();
+    return parts.join("/");
+  }
 </script>
 
 <div class="app-layout" style={`--workspace-header-offset: ${headerHeight}px;`}>
   <div bind:clientHeight={headerHeight}>
     <Header
-      onsearch={() => (searchOpen = true)}
+      onsearch={() => {
+        commandOpen = false;
+        searchOpen = true;
+      }}
+      oncommand={() => {
+        searchOpen = false;
+        commandOpen = true;
+      }}
       onsidebartoggle={toggleSidebar}
       showSidebarToggle={isMobileViewport}
       sidebarOpen={sidebarVisible}
@@ -691,17 +877,39 @@
             type="button"
             class="rail-btn"
             title={t("header.search")}
-            onclick={() => (searchOpen = true)}
+            onclick={() => {
+              commandOpen = false;
+              searchOpen = true;
+            }}
           >
             ⌕
           </button>
           <button
             type="button"
             class="rail-btn"
+            title={t("header.commandPalette")}
+            onclick={() => {
+              searchOpen = false;
+              commandOpen = true;
+            }}
+          >
+            ⌘
+          </button>
+          <button
+            type="button"
+            class="rail-btn"
             title={t("fileExplorer.newNote")}
-            onclick={promptCreateNote}
+            onclick={() => void promptCreateNote()}
           >
             ＋
+          </button>
+          <button
+            type="button"
+            class="rail-btn"
+            title={t("fileExplorer.newFolder")}
+            onclick={() => void promptCreateFolder()}
+          >
+            ▣
           </button>
           <button
             type="button"
@@ -752,12 +960,6 @@
             onsortmodechange={(mode) => {
               treeSortMode = mode;
             }}
-            oncreateNote={async (path) => {
-              const newDoc = await createDoc(path);
-              await loadTree();
-              await navigateTo(newDoc.path);
-            }}
-            oncreateFolder={handleCreateFolder}
             onmove={handleMovePath}
             oninvalidmove={() => {
               showToast(t("fileExplorer.moveInvalid"));
@@ -802,7 +1004,7 @@
             type="button"
             class="tab-create"
             title={t("workspace.newTab")}
-            onclick={promptCreateNote}
+            onclick={() => void promptCreateNote()}
           >
             ＋
           </button>
@@ -852,11 +1054,46 @@
 
             <div class="document-surface" bind:this={documentSurface}>
               {#if editing}
-                <CodeMirrorEditor
-                  content={editContent}
-                  onchange={(value) => (editContent = value)}
-                  onsave={handleSave}
-                />
+                {#if showSplitEditorPreview}
+                  <div class="editing-split-layout">
+                    <section class="editing-pane editor-pane">
+                      <div class="editing-pane-head">
+                        <span>{t("workspace.editorPane")}</span>
+                      </div>
+                      <div class="editing-pane-body">
+                        <CodeMirrorEditor
+                          content={editContent}
+                          fillHeight={true}
+                          onchange={(value) => (editContent = value)}
+                          onsave={handleSave}
+                        />
+                      </div>
+                    </section>
+
+                    <section class="editing-pane preview-pane">
+                      <div class="editing-pane-head">
+                        <span>{t("workspace.previewPane")}</span>
+                      </div>
+                      <div class="editing-pane-body preview-body">
+                        {#if previewDoc}
+                          <DocumentViewer
+                            path={previewDoc.path}
+                            doc={previewDoc}
+                            {dataviewEnabled}
+                            {dataviewShowSource}
+                            onnavigate={ignorePreviewNavigation}
+                          />
+                        {/if}
+                      </div>
+                    </section>
+                  </div>
+                {:else}
+                  <CodeMirrorEditor
+                    content={editContent}
+                    onchange={(value) => (editContent = value)}
+                    onsave={handleSave}
+                  />
+                {/if}
               {:else}
                 <DocumentViewer
                   path={selectedPath}
@@ -889,6 +1126,12 @@
         <aside class="right-panel" class:closed={!rightSidebarOpen}>
           <div class="right-panel-inner">
             {#if doc && isNotePath(doc.path)}
+              <DocumentMetaPanel
+                {doc}
+                auditEntries={docAuditEntries}
+                loading={docAuditLoading}
+                error={docAuditError}
+              />
               {#if rightPanelTab === "outline"}
                 <OutlinePanel
                   headings={outlineItems}
@@ -971,6 +1214,7 @@
   currentPath={doc?.path ?? ""}
   onclose={() => (commandOpen = false)}
   onaction={handleAction}
+  onselect={navigateTo}
 />
 
 {#if toast}
@@ -1260,6 +1504,50 @@
     min-height: 0;
   }
 
+  .editing-split-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: calc(100dvh - var(--workspace-header-offset) - 11rem);
+  }
+
+  .editing-pane {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  }
+
+  .preview-pane {
+    border-left: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  }
+
+  .editing-pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+    background: color-mix(in srgb, var(--bg-panel-strong) 90%, transparent);
+  }
+
+  .editing-pane-head span {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .editing-pane-body {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .preview-body {
+    overflow: auto;
+    background: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+  }
+
   .btn {
     padding: 0.45rem 0.85rem;
     border: none;
@@ -1412,6 +1700,11 @@
 
     .tags {
       padding: 0.2rem 1rem 0.65rem;
+    }
+
+    .editing-split-layout {
+      grid-template-columns: 1fr;
+      min-height: auto;
     }
   }
 </style>

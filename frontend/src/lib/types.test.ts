@@ -9,6 +9,7 @@ import type {
   DataviewContextResponse,
   DataviewPageSnapshot,
   DataviewQueryResponse,
+  DocAuditHistoryResponse,
   DocDetail,
   SearchResponse,
   BacklinkItem,
@@ -248,6 +249,24 @@ describe("Type contracts", () => {
     };
     expect(audit.entries[0].action).toBe("wiki.update");
     expect(audit.entries[0].git_email).toBe("admin@example.com");
+  });
+
+  it("DocAuditHistoryResponse has expected shape", () => {
+    const audit: DocAuditHistoryResponse = {
+      entries: [
+        {
+          created_at: "2026-04-15T12:10:00Z",
+          action: "wiki.move",
+          path: "notes/today.md -> archive/today.md",
+          commit_sha: "def67890",
+          username: "admin",
+          git_display_name: "Admin Writer",
+          git_email: "admin@example.com",
+        },
+      ],
+    };
+    expect(audit.entries[0].action).toBe("wiki.move");
+    expect(audit.entries[0].commit_sha).toBe("def67890");
   });
 
   it("SyncSettings has expected shape", () => {

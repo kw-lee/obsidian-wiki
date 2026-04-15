@@ -133,10 +133,22 @@
     <a href="/" class="logo">{t("common.appName")}</a>
   </div>
   <div class="header-center">
-    <button class="search-trigger" onclick={onsearch}>
-      <span class="search-icon">⌘K</span>
-      <span>{t("header.search")}</span>
-    </button>
+    <div class="header-triggers">
+      <button type="button" class="search-trigger" onclick={onsearch}>
+        <span class="search-icon">⌘K</span>
+        <span>{t("header.search")}</span>
+      </button>
+      <button
+        type="button"
+        class="command-trigger"
+        title={t("header.commandPalette")}
+        aria-label={t("header.commandPalette")}
+        onclick={oncommand}
+      >
+        <span class="search-icon">⌘P</span>
+        <span>{t("header.commandPalette")}</span>
+      </button>
+    </div>
   </div>
   <div class="header-right">
     <div class="sync-surface" bind:this={syncSurface}>
@@ -324,6 +336,12 @@
     display: flex;
     justify-content: center;
   }
+  .header-triggers {
+    width: min(100%, 36rem);
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
   .sync-surface {
     position: relative;
     display: flex;
@@ -347,13 +365,31 @@
     cursor: pointer;
     min-width: 240px;
     font-size: 0.875rem;
-    width: min(100%, 28rem);
+    flex: 1 1 auto;
+  }
+  .command-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-input) 82%, transparent);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.84rem;
+    white-space: nowrap;
   }
   .search-icon {
     font-size: 0.75rem;
     padding: 0.1rem 0.3rem;
     background: var(--bg-panel-hover);
     border-radius: 3px;
+  }
+  .search-trigger:hover,
+  .command-trigger:hover {
+    border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+    background: color-mix(in srgb, var(--bg-input) 78%, var(--bg-panel-hover));
   }
   .icon-btn {
     background: transparent;
@@ -608,8 +644,11 @@
     }
 
     .search-trigger {
-      width: 100%;
       min-width: 0;
+    }
+
+    .header-triggers {
+      width: 100%;
     }
 
     .sync-pill {
@@ -628,6 +667,10 @@
 
     .search-trigger {
       padding-inline: 0.85rem;
+    }
+
+    .command-trigger span:last-child {
+      display: none;
     }
 
     .sync-label {

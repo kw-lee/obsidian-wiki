@@ -10,6 +10,7 @@ import type {
   GraphData,
   SyncStatus,
   SyncJob,
+  DocAuditHistoryResponse,
   TaskListResponse,
   DataviewContextResponse,
   DataviewQueryResponse,
@@ -18,6 +19,9 @@ import type {
 export const fetchTree = () => api<TreeNode[]>("/wiki/tree");
 
 export const fetchDoc = (path: string) => api<DocDetail>(`/wiki/doc/${path}`);
+
+export const fetchDocHistory = (path: string, limit = 6) =>
+  api<DocAuditHistoryResponse>(`/wiki/history/${path}?limit=${limit}`);
 
 export const saveDoc = (
   path: string,

@@ -11,8 +11,6 @@
     sortMode = "folders-first",
     revealNonce = 0,
     onselect,
-    oncreateNote,
-    oncreateFolder,
     onmove,
     oninvalidmove = undefined,
     onexpandedchange = undefined,
@@ -24,8 +22,6 @@
     sortMode?: WorkspaceTreeSortMode;
     revealNonce?: number;
     onselect: (path: string) => void | Promise<void>;
-    oncreateNote: (path: string) => void | Promise<void>;
-    oncreateFolder: (path: string) => void | Promise<void>;
     onmove: (
       sourcePath: string,
       destinationPath: string,
@@ -78,22 +74,6 @@
     updateExpandedPaths(next);
   }
 
-  function handleCreateNote() {
-    const suggestion = defaultNotePath(selectedPath);
-    const path = prompt(t("fileExplorer.newNotePrompt"), suggestion);
-    if (path) {
-      void oncreateNote(path);
-    }
-  }
-
-  function handleCreateFolder() {
-    const suggestion = defaultFolderPath(selectedPath);
-    const path = prompt(t("fileExplorer.newFolderPrompt"), suggestion);
-    if (path) {
-      void oncreateFolder(path);
-    }
-  }
-
   function expandAll() {
     setExpanded(allFolderPaths(nodes));
   }
@@ -110,26 +90,6 @@
       );
       element?.scrollIntoView({ block: "nearest" });
     });
-  }
-
-  function defaultNotePath(path: string) {
-    const folder = currentFolder(path);
-    return folder ? `${folder}/untitled.md` : "untitled.md";
-  }
-
-  function defaultFolderPath(path: string) {
-    const folder = currentFolder(path);
-    return folder ? `${folder}/new-folder` : "new-folder";
-  }
-
-  function currentFolder(path: string) {
-    if (!path) return "";
-    const parts = path.split("/");
-    if (!path.includes(".")) {
-      return path;
-    }
-    parts.pop();
-    return parts.join("/");
   }
 
   function ancestorFolders(path: string) {
@@ -202,7 +162,10 @@
     return true;
   }
 
-  function sortNodes(items: TreeNode[], mode: WorkspaceTreeSortMode): TreeNode[] {
+  function sortNodes(
+    items: TreeNode[],
+    mode: WorkspaceTreeSortMode,
+  ): TreeNode[] {
     return items
       .map((node) => ({
         ...node,
@@ -211,11 +174,17 @@
       .sort((left, right) => compareNodes(left, right, mode));
   }
 
-  function compareNodes(left: TreeNode, right: TreeNode, mode: WorkspaceTreeSortMode) {
+  function compareNodes(
+    left: TreeNode,
+    right: TreeNode,
+    mode: WorkspaceTreeSortMode,
+  ) {
     if (mode === "folders-first" && left.is_dir !== right.is_dir) {
       return left.is_dir ? -1 : 1;
     }
-    return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+    return left.name.localeCompare(right.name, undefined, {
+      sensitivity: "base",
+    });
   }
 
   function buildDestinationPath(sourcePath: string, targetFolderPath: string) {
@@ -226,8 +195,6 @@
 
 <div class="explorer">
   <div class="toolbar">
-    <button type="button" onclick={handleCreateNote} title={t("fileExplorer.newNote")}>＋</button>
-    <button type="button" onclick={handleCreateFolder} title={t("fileExplorer.newFolder")}>▣</button>
     <button
       type="button"
       onclick={toggleSortMode}
@@ -239,16 +206,27 @@
       <input bind:checked={rewriteLinksEnabled} type="checkbox" />
       <span>↻</span>
     </label>
-    <button type="button" onclick={expandAll} title={t("fileExplorer.expandAll")}>⤢</button>
-    <button type="button" onclick={collapseAll} title={t("fileExplorer.collapseAll")}>⤡</button>
-    <button type="button" onclick={revealSelected} title={t("fileExplorer.revealCurrent")}>◎</button>
+    <button
+      type="button"
+      onclick={expandAll}
+      title={t("fileExplorer.expandAll")}
+    >
+      ⤢
+    </button>
+    <button
+      type="button"
+      onclick={collapseAll}
+      title={t("fileExplorer.collapseAll")}
+    >
+      ⤡
+    </button>
   </div>
 
   <FileTree
     nodes={sortedNodes}
     {selectedPath}
     expandedPaths={localExpandedPaths}
-    onselect={onselect}
+    {onselect}
     ontoggle={toggleFolder}
     onmove={handleMove}
     {rewriteLinksEnabled}
@@ -275,7 +253,7 @@
     top: 0;
     z-index: 2;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.35rem;
     padding: 0.4rem 0 0.2rem;
     background: linear-gradient(
@@ -347,13 +325,13 @@
 
   @media (max-width: 1024px) {
     .toolbar {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 768px) {
     .toolbar {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       padding-top: 0;
       background: transparent;
       backdrop-filter: none;

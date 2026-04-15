@@ -337,28 +337,95 @@ async def test_sync_test_endpoint_uses_webdav_backend(
 async def test_get_appearance_settings_defaults_to_system(client, auth_headers, setup_vault):
     resp = await client.get("/api/settings/appearance", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.json() == {"default_theme": "system", "theme_preset": "obsidian"}
+    assert resp.json() == {
+        "default_theme": "system",
+        "theme_preset": "obsidian",
+        "ui_font": "system",
+        "editor_font": "system",
+    }
 
 
 @pytest.mark.asyncio
 async def test_update_appearance_settings_persists_and_is_public(client, auth_headers, setup_vault):
     resp = await client.put(
         "/api/settings/appearance",
-        json={"default_theme": "light", "theme_preset": "dawn"},
+        json={
+            "default_theme": "light",
+            "theme_preset": "dawn",
+            "ui_font": "nanum-square",
+            "editor_font": "d2coding",
+        },
         headers=auth_headers,
     )
     assert resp.status_code == 200
-    assert resp.json() == {"default_theme": "light", "theme_preset": "dawn"}
+    assert resp.json() == {
+        "default_theme": "light",
+        "theme_preset": "dawn",
+        "ui_font": "nanum-square",
+        "editor_font": "d2coding",
+    }
 
     public_resp = await client.get("/api/settings/appearance/public")
     assert public_resp.status_code == 200
-    assert public_resp.json() == {"default_theme": "light", "theme_preset": "dawn"}
+    assert public_resp.json() == {
+        "default_theme": "light",
+        "theme_preset": "dawn",
+        "ui_font": "nanum-square",
+        "editor_font": "d2coding",
+    }
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.default_theme == "light"
         assert row.theme_preset == "dawn"
+        assert row.ui_font == "nanum-square"
+        assert row.editor_font == "d2coding"
+
+
+@pytest.mark.asyncio
+async def test_get_plugin_settings(client, auth_headers, setup_vault):
+    resp = await client.get("/api/settings/plugin", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "dataview_enabled": True,
+        "folder_note_enabled": False,
+        "templater_enabled": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_plugin_settings_persists_values(client, auth_headers, setup_vault):
+    resp = await client.put(
+        "/api/settings/plugin",
+        json={
+            "dataview_enabled": False,
+            "folder_note_enabled": True,
+            "templater_enabled": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "dataview_enabled": False,
+        "folder_note_enabled": True,
+        "templater_enabled": True,
+    }
+
+    read_resp = await client.get("/api/settings/plugin", headers=auth_headers)
+    assert read_resp.status_code == 200
+    assert read_resp.json() == {
+        "dataview_enabled": False,
+        "folder_note_enabled": True,
+        "templater_enabled": True,
+    }
+
+    async with session_mod.async_session() as session:
+        row = await session.get(AppSettings, 1)
+        assert row is not None
+        assert row.dataview_enabled is False
+        assert row.folder_note_enabled is True
+        assert row.templater_enabled is True
 
 
 @pytest.mark.asyncio
@@ -394,8 +461,6 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     assert data["version"] == "0.1.0"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
     assert data["timezone"] == "Asia/Seoul"
-    assert data["folder_note_enabled"] is False
-    assert data["templater_enabled"] is False
     assert data["sync_backend"] == "git"
     assert data["sync_auto_enabled"] is True
     assert data["database"] == {"ok": True, "detail": "Database connection successful"}
@@ -409,30 +474,20 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
 async def test_update_system_settings_persists_timezone(client, auth_headers, setup_vault):
     resp = await client.put(
         "/api/settings/system",
-        json={
-            "timezone": "America/New_York",
-            "folder_note_enabled": True,
-            "templater_enabled": True,
-        },
+        json={"timezone": "America/New_York"},
         headers=auth_headers,
     )
     assert resp.status_code == 200
     assert resp.json()["timezone"] == "America/New_York"
-    assert resp.json()["folder_note_enabled"] is True
-    assert resp.json()["templater_enabled"] is True
 
     read_resp = await client.get("/api/settings/system", headers=auth_headers)
     assert read_resp.status_code == 200
     assert read_resp.json()["timezone"] == "America/New_York"
-    assert read_resp.json()["folder_note_enabled"] is True
-    assert read_resp.json()["templater_enabled"] is True
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.timezone == "America/New_York"
-        assert row.folder_note_enabled is True
-        assert row.templater_enabled is True
 
 
 @pytest.mark.asyncio

@@ -73,6 +73,15 @@ class AppSettings(Base):
     theme_preset: Mapped[str] = mapped_column(
         Text, nullable=False, default="obsidian", server_default="obsidian"
     )
+    ui_font: Mapped[str] = mapped_column(
+        Text, nullable=False, default="system", server_default="system"
+    )
+    editor_font: Mapped[str] = mapped_column(
+        Text, nullable=False, default="system", server_default="system"
+    )
+    dataview_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     folder_note_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
@@ -97,6 +106,14 @@ class AppSettings(Base):
         CheckConstraint(
             "theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')",
             name="ck_app_settings_theme_preset",
+        ),
+        CheckConstraint(
+            "ui_font IN ('system', 'nanum-square', 'nanum-square-ac')",
+            name="ck_app_settings_ui_font",
+        ),
+        CheckConstraint(
+            "editor_font IN ('system', 'd2coding')",
+            name="ck_app_settings_editor_font",
         ),
     )
 

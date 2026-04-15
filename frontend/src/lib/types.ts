@@ -200,10 +200,20 @@ export interface RebuildIndexResult {
 export type ThemePreference = "light" | "dark" | "system";
 export type ThemeMode = "light" | "dark";
 export type ThemePreset = "obsidian" | "graphite" | "dawn" | "forest";
+export type UIFont = "system" | "nanum-square" | "nanum-square-ac";
+export type EditorFont = "system" | "d2coding";
 
 export interface AppearanceSettings {
   default_theme: ThemePreference;
   theme_preset: ThemePreset;
+  ui_font: UIFont;
+  editor_font: EditorFont;
+}
+
+export interface PluginSettings {
+  dataview_enabled: boolean;
+  folder_note_enabled: boolean;
+  templater_enabled: boolean;
 }
 
 export interface SystemDependencyStatus {
@@ -224,8 +234,6 @@ export interface SystemSettings {
   version: string;
   started_at: string;
   timezone: string;
-  folder_note_enabled: boolean;
-  templater_enabled: boolean;
   uptime_seconds: number;
   sync_backend: SyncBackend;
   sync_auto_enabled: boolean;

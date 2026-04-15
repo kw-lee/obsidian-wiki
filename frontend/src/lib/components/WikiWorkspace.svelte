@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { fetchSystemSettings, rebuildVaultIndex } from "$lib/api/settings";
+  import { fetchPluginSettings, rebuildVaultIndex } from "$lib/api/settings";
   import {
     createDoc,
     createFolder,
@@ -73,6 +73,7 @@
   let ready = $state(false);
   let workspaceReady = $state(false);
   let openedPath = $state<string | null>(null);
+  let dataviewEnabled = $state(true);
   let revealNonce = $state(0);
   let folderNoteEnabled = $state(false);
   let documentSurface = $state<HTMLElement | null>(null);
@@ -217,7 +218,7 @@
   });
 
   async function initializeWorkspace() {
-    await Promise.all([loadTree(), loadWorkspaceSettings()]);
+    await Promise.all([loadTree(), loadPluginSettings()]);
     ready = true;
   }
 
@@ -229,11 +230,13 @@
     }
   }
 
-  async function loadWorkspaceSettings() {
+  async function loadPluginSettings() {
     try {
-      const system = await fetchSystemSettings();
-      folderNoteEnabled = system.folder_note_enabled;
+      const plugin = await fetchPluginSettings();
+      dataviewEnabled = plugin.dataview_enabled;
+      folderNoteEnabled = plugin.folder_note_enabled;
     } catch {
+      dataviewEnabled = true;
       folderNoteEnabled = false;
     }
   }
@@ -673,7 +676,9 @@
           <button
             type="button"
             class="rail-btn"
-            title={t(sidebarOpen ? "header.closeSidebar" : "header.openSidebar")}
+            title={t(
+              sidebarOpen ? "header.closeSidebar" : "header.openSidebar",
+            )}
             aria-pressed={sidebarOpen}
             onclick={toggleSidebar}
           >
@@ -811,7 +816,12 @@
               </div>
               <div class="doc-actions">
                 {#if editing}
-                  <button class="btn" type="button" onclick={handleSave} disabled={saving}>
+                  <button
+                    class="btn"
+                    type="button"
+                    onclick={handleSave}
+                    disabled={saving}
+                  >
                     {saving ? t("home.buttonSaving") : t("home.buttonSave")}
                   </button>
                   <button
@@ -845,7 +855,12 @@
                   onsave={handleSave}
                 />
               {:else}
-                <DocumentViewer path={selectedPath} {doc} onnavigate={navigateTo} />
+                <DocumentViewer
+                  path={selectedPath}
+                  {doc}
+                  {dataviewEnabled}
+                  onnavigate={navigateTo}
+                />
               {/if}
             </div>
           {:else if missingPath}
@@ -871,7 +886,10 @@
           <div class="right-panel-inner">
             {#if doc && isNotePath(doc.path)}
               {#if rightPanelTab === "outline"}
-                <OutlinePanel headings={outlineItems} onselect={scrollToHeading} />
+                <OutlinePanel
+                  headings={outlineItems}
+                  onselect={scrollToHeading}
+                />
               {:else}
                 <BacklinksPanel
                   docPath={doc.path}
@@ -896,7 +914,11 @@
           <button
             type="button"
             class="rail-btn"
-            title={t(rightSidebarOpen ? "workspace.closeContext" : "workspace.openContext")}
+            title={t(
+              rightSidebarOpen
+                ? "workspace.closeContext"
+                : "workspace.openContext",
+            )}
             aria-pressed={rightSidebarOpen}
             onclick={toggleRightSidebar}
           >
@@ -1106,7 +1128,8 @@
     padding: 0.55rem 0.8rem;
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-panel-strong) 92%, transparent);
-    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--border) 45%, transparent);
+    box-shadow: inset 0 -1px 0
+      color-mix(in srgb, var(--border) 45%, transparent);
     backdrop-filter: blur(16px);
   }
 

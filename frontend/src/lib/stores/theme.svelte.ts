@@ -1,9 +1,11 @@
 import { fetchPublicAppearanceSettings } from "$lib/api/settings";
 import type {
   AppearanceSettings,
+  EditorFont,
   ThemeMode,
   ThemePreference,
   ThemePreset,
+  UIFont,
 } from "$lib/types";
 
 const STORAGE_THEME_KEY = "theme";
@@ -11,11 +13,15 @@ const STORAGE_THEME_KEY = "theme";
 const DEFAULT_APPEARANCE: AppearanceSettings = {
   default_theme: "system",
   theme_preset: "obsidian",
+  ui_font: "system",
+  editor_font: "system",
 };
 
 let resolvedTheme = $state<ThemeMode>("dark");
 let themePreset = $state<ThemePreset>("obsidian");
 let activePreference = $state<ThemePreference>("system");
+let uiFont = $state<UIFont>("system");
+let editorFont = $state<EditorFont>("system");
 let systemThemeQuery: MediaQueryList | null = null;
 
 function handleSystemThemeChange(event: MediaQueryListEvent) {
@@ -45,6 +51,8 @@ function applyTheme() {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", resolvedTheme);
   document.documentElement.setAttribute("data-theme-preset", themePreset);
+  document.documentElement.setAttribute("data-ui-font", uiFont);
+  document.documentElement.setAttribute("data-editor-font", editorFont);
   document.documentElement.style.colorScheme = resolvedTheme;
 }
 
@@ -54,6 +62,8 @@ function applyAppearance(
 ) {
   activePreference = appearance.default_theme;
   themePreset = appearance.theme_preset;
+  uiFont = appearance.ui_font;
+  editorFont = appearance.editor_font;
   resolvedTheme =
     options.respectStoredTheme === false
       ? resolveTheme(activePreference)
@@ -111,4 +121,12 @@ export function getThemePreset() {
 
 export function getThemePreference() {
   return activePreference;
+}
+
+export function getUIFont() {
+  return uiFont;
+}
+
+export function getEditorFont() {
+  return editorFont;
 }

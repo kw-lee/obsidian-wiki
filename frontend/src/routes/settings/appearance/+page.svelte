@@ -10,7 +10,12 @@
     previewAppearance,
     resetThemePreview,
   } from "$lib/stores/theme.svelte";
-  import type { ThemePreference, ThemePreset } from "$lib/types";
+  import type {
+    EditorFont,
+    ThemePreference,
+    ThemePreset,
+    UIFont,
+  } from "$lib/types";
   import type { Locale } from "$lib/i18n/messages";
 
   const themePresets: Array<{
@@ -50,8 +55,49 @@
     },
   ];
 
+  const uiFontOptions: Array<{
+    value: UIFont;
+    titleKey: string;
+    copyKey: string;
+  }> = [
+    {
+      value: "system",
+      titleKey: "appearance.font.ui.system",
+      copyKey: "appearance.font.ui.systemHelp",
+    },
+    {
+      value: "nanum-square",
+      titleKey: "appearance.font.ui.nanumSquare",
+      copyKey: "appearance.font.ui.nanumSquareHelp",
+    },
+    {
+      value: "nanum-square-ac",
+      titleKey: "appearance.font.ui.nanumSquareAc",
+      copyKey: "appearance.font.ui.nanumSquareAcHelp",
+    },
+  ];
+
+  const editorFontOptions: Array<{
+    value: EditorFont;
+    titleKey: string;
+    copyKey: string;
+  }> = [
+    {
+      value: "system",
+      titleKey: "appearance.font.editor.system",
+      copyKey: "appearance.font.editor.systemHelp",
+    },
+    {
+      value: "d2coding",
+      titleKey: "appearance.font.editor.d2coding",
+      copyKey: "appearance.font.editor.d2codingHelp",
+    },
+  ];
+
   let defaultTheme = $state<ThemePreference>("system");
   let themePreset = $state<ThemePreset>("obsidian");
+  let uiFont = $state<UIFont>("system");
+  let editorFont = $state<EditorFont>("system");
   let locale = $state<Locale>("ko");
   let loading = $state(true);
   let saving = $state(false);
@@ -75,6 +121,8 @@
     previewAppearance({
       default_theme: defaultTheme,
       theme_preset: themePreset,
+      ui_font: uiFont,
+      editor_font: editorFont,
     });
   });
 
@@ -85,6 +133,8 @@
       const data = await fetchAppearanceSettings();
       defaultTheme = data.default_theme;
       themePreset = data.theme_preset;
+      uiFont = data.ui_font;
+      editorFont = data.editor_font;
       previewReady = true;
     } catch (err) {
       error = err instanceof Error ? err.message : t("appearance.loadFailed");
@@ -101,6 +151,8 @@
       const appearance = await updateAppearanceSettings({
         default_theme: defaultTheme,
         theme_preset: themePreset,
+        ui_font: uiFont,
+        editor_font: editorFont,
       });
       applySavedAppearance(appearance);
       success = t("appearance.saveSuccess");
@@ -124,6 +176,14 @@
     themePreset = value;
   }
 
+  function selectUiFont(value: UIFont) {
+    uiFont = value;
+  }
+
+  function selectEditorFont(value: EditorFont) {
+    editorFont = value;
+  }
+
   function previewTitle(index: number) {
     return `${index + 1}. ${t("appearance.previewLine.one")}`;
   }
@@ -137,12 +197,16 @@
   function previewStyle(preset: (typeof themePresets)[number]) {
     return `--preset-accent:${preset.accent}; --preset-glow:${preset.glow};`;
   }
+
+  function fontSampleStyle(kind: "ui" | "editor", value: string) {
+    return `font-family: var(--font-${kind}-${value});`;
+  }
 </script>
 
 <section class="panel">
   <div class="panel-header">
     <div>
-      <p class="eyebrow">Appearance</p>
+      <p class="eyebrow">{t("settings.tabs.appearance")}</p>
       <h2>{t("appearance.title")}</h2>
       <p class="copy">{t("appearance.description")}</p>
     </div>
@@ -218,8 +282,14 @@
               <div class="preset-glow"></div>
               <div class="preset-window">
                 <span class="preset-dot"></span>
-                <span class="preset-line strong">{previewTitle(index)}</span>
-                <span class="preset-line">{previewSubtitle(index)}</span>
+                <div class="preset-preview">
+                  <span class="preset-bar strong"></span>
+                  <strong class="preset-label">{previewTitle(index)}</strong>
+                  <span class="preset-bar"></span>
+                  <span class="preset-label muted"
+                    >{previewSubtitle(index)}</span
+                  >
+                </div>
               </div>
             </div>
             <div class="preset-copy">
@@ -228,6 +298,73 @@
             </div>
           </button>
         {/each}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-copy">
+        <p class="eyebrow">{t("appearance.font.title")}</p>
+        <h3>{t("appearance.font.heading")}</h3>
+        <p class="copy">{t("appearance.font.description")}</p>
+      </div>
+
+      <div class="font-sections">
+        <div class="font-group">
+          <div class="font-group-copy">
+            <strong>{t("appearance.font.uiTitle")}</strong>
+            <span>{t("appearance.font.uiDescription")}</span>
+          </div>
+          <div class="font-grid">
+            {#each uiFontOptions as option}
+              <button
+                type="button"
+                class="font-card"
+                class:active={uiFont === option.value}
+                onclick={() => selectUiFont(option.value)}
+              >
+                <div class="font-card-copy">
+                  <strong>{t(option.titleKey)}</strong>
+                  <span>{t(option.copyKey)}</span>
+                </div>
+                <div
+                  class="font-sample"
+                  style={fontSampleStyle("ui", option.value)}
+                >
+                  <strong>{t("appearance.font.uiSampleTitle")}</strong>
+                  <span>{t("appearance.font.uiSampleBody")}</span>
+                </div>
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <div class="font-group">
+          <div class="font-group-copy">
+            <strong>{t("appearance.font.editorTitle")}</strong>
+            <span>{t("appearance.font.editorDescription")}</span>
+          </div>
+          <div class="font-grid compact">
+            {#each editorFontOptions as option}
+              <button
+                type="button"
+                class="font-card"
+                class:active={editorFont === option.value}
+                onclick={() => selectEditorFont(option.value)}
+              >
+                <div class="font-card-copy">
+                  <strong>{t(option.titleKey)}</strong>
+                  <span>{t(option.copyKey)}</span>
+                </div>
+                <div
+                  class="font-sample editor"
+                  style={fontSampleStyle("editor", option.value)}
+                >
+                  <code>{t("appearance.font.editorSample")}</code>
+                </div>
+              </button>
+            {/each}
+          </div>
+        </div>
       </div>
     </section>
 
@@ -318,6 +455,7 @@
     border-radius: 999px;
     background: var(--accent);
     color: white;
+    font: inherit;
     cursor: pointer;
     transition:
       transform 0.18s ease,
@@ -437,7 +575,7 @@
     padding: 1rem;
     display: grid;
     align-content: start;
-    gap: 0.55rem;
+    gap: 0.75rem;
     backdrop-filter: blur(12px);
   }
 
@@ -449,16 +587,34 @@
     opacity: 0.9;
   }
 
-  .preset-line {
+  .preset-preview {
+    display: grid;
+    gap: 0.35rem;
+    align-content: start;
+  }
+
+  .preset-bar {
+    display: block;
     height: 0.65rem;
     width: 70%;
     border-radius: 999px;
     background: color-mix(in srgb, white 14%, var(--bg-tertiary));
   }
 
-  .preset-line.strong {
+  .preset-bar.strong {
     width: 54%;
     background: color-mix(in srgb, white 12%, var(--accent));
+  }
+
+  .preset-label {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  .preset-label.muted {
+    color: var(--text-secondary);
+    font-weight: 500;
   }
 
   .preset-copy {
@@ -469,6 +625,97 @@
   .preset-copy span {
     color: var(--text-secondary);
     line-height: 1.5;
+  }
+
+  .font-sections,
+  .font-group,
+  .font-group-copy {
+    display: grid;
+  }
+
+  .font-sections {
+    gap: 1.5rem;
+  }
+
+  .font-group {
+    gap: 0.85rem;
+  }
+
+  .font-group-copy {
+    gap: 0.3rem;
+  }
+
+  .font-group-copy span,
+  .font-card-copy span {
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .font-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  .font-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .font-card {
+    padding: 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+    color: inherit;
+    text-align: left;
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .font-card.active {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-secondary));
+    box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .font-card-copy {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .font-sample {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 76%, transparent),
+      color-mix(in srgb, var(--bg-secondary) 92%, transparent)
+    );
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
+  }
+
+  .font-sample strong {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .font-sample span {
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .font-sample.editor {
+    min-height: 4.75rem;
+    align-content: center;
+  }
+
+  .font-sample code {
+    font: inherit;
+    color: var(--text-primary);
+    white-space: nowrap;
   }
 
   .locale-row {
@@ -512,8 +759,14 @@
       grid-template-columns: 1fr;
     }
 
+    .font-grid,
+    .font-grid.compact {
+      grid-template-columns: 1fr;
+    }
+
     button,
-    .preset-card {
+    .preset-card,
+    .font-card {
       width: 100%;
     }
   }

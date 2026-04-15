@@ -12,6 +12,7 @@ import type {
   TagInfo,
   GraphData,
   AppearanceSettings,
+  PluginSettings,
   ProfileSettings,
   ResolvedWikiLink,
   RebuildIndexResult,
@@ -254,9 +255,23 @@ describe("Type contracts", () => {
     const appearance: AppearanceSettings = {
       default_theme: "system",
       theme_preset: "obsidian",
+      ui_font: "system",
+      editor_font: "system",
     };
     expect(appearance.default_theme).toBe("system");
     expect(appearance.theme_preset).toBe("obsidian");
+    expect(appearance.ui_font).toBe("system");
+    expect(appearance.editor_font).toBe("system");
+  });
+
+  it("PluginSettings has expected shape", () => {
+    const plugin: PluginSettings = {
+      dataview_enabled: true,
+      folder_note_enabled: true,
+      templater_enabled: false,
+    };
+    expect(plugin.dataview_enabled).toBe(true);
+    expect(plugin.folder_note_enabled).toBe(true);
   });
 
   it("SystemSettings has expected shape", () => {
@@ -264,8 +279,6 @@ describe("Type contracts", () => {
       version: "0.1.0",
       started_at: "2026-04-13T02:00:00Z",
       timezone: "Asia/Seoul",
-      folder_note_enabled: true,
-      templater_enabled: true,
       uptime_seconds: 42,
       sync_backend: "git",
       sync_auto_enabled: true,
@@ -291,8 +304,7 @@ describe("Type contracts", () => {
       },
     };
     expect(system.vault_git.has_origin).toBe(true);
-    expect(system.folder_note_enabled).toBe(true);
-    expect(system.templater_enabled).toBe(true);
+    expect(system.timezone).toBe("Asia/Seoul");
   });
 
   it("SystemLogs has expected shape", () => {

@@ -16,6 +16,7 @@
     { href: "/settings/sync", label: t("settings.tabs.sync") },
     { href: "/settings/vault", label: t("settings.tabs.vault") },
     { href: "/settings/appearance", label: t("settings.tabs.appearance") },
+    { href: "/settings/plugin", label: t("settings.tabs.plugin") },
     { href: "/settings/system", label: t("settings.tabs.system") },
   ]);
   const backToWikiHref = $derived(buildWikiRoute(getLastWikiPath() ?? ""));

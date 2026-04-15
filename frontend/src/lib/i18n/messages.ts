@@ -147,14 +147,15 @@ export const messages: Record<Locale, Record<string, string>> = {
     "settings.tabs.profile": "프로필",
     "settings.tabs.sync": "동기화",
     "settings.tabs.vault": "볼트",
-    "settings.tabs.appearance": "모양",
+    "settings.tabs.appearance": "테마",
+    "settings.tabs.plugin": "Plugin",
     "settings.tabs.system": "시스템",
-    "appearance.title": "기본 테마",
+    "appearance.title": "테마와 글꼴",
     "appearance.description":
-      "옵시디언처럼 분위기를 바꿀 수 있도록 기본 모드와 프리셋을 함께 설정합니다.",
-    "appearance.saveSuccess": "기본 테마 설정을 저장했습니다.",
-    "appearance.loadFailed": "테마 설정을 불러오지 못했습니다.",
-    "appearance.saveFailed": "테마 설정 저장에 실패했습니다.",
+      "기본 모드, 프리셋, 인터페이스 글꼴, 에디터 글꼴을 한곳에서 조정합니다.",
+    "appearance.saveSuccess": "테마와 글꼴 설정을 저장했습니다.",
+    "appearance.loadFailed": "테마와 글꼴 설정을 불러오지 못했습니다.",
+    "appearance.saveFailed": "테마와 글꼴 설정 저장에 실패했습니다.",
     "appearance.mode.title": "모드",
     "appearance.mode.heading": "기본 밝기",
     "appearance.mode.description":
@@ -184,6 +185,35 @@ export const messages: Record<Locale, Record<string, string>> = {
     "appearance.previewLine.one": "Daily notes",
     "appearance.previewLine.two": "Backlinks and graph",
     "appearance.previewLine.three": "Canvas-ready workspace",
+    "appearance.font.title": "글꼴",
+    "appearance.font.heading": "텍스트 스타일",
+    "appearance.font.description":
+      "일반 인터페이스와 마크다운 에디터에 사용할 글꼴을 따로 선택할 수 있습니다.",
+    "appearance.font.uiTitle": "인터페이스 글꼴",
+    "appearance.font.uiDescription":
+      "탐색기, 설정, 문서 보기 같은 일반 UI에 적용합니다.",
+    "appearance.font.editorTitle": "에디터 글꼴",
+    "appearance.font.editorDescription":
+      "CodeMirror 기반 마크다운 에디터에서만 사용합니다.",
+    "appearance.font.ui.system": "기본 sans-serif",
+    "appearance.font.ui.systemHelp":
+      "현재 시스템 글꼴 스택을 그대로 사용합니다.",
+    "appearance.font.ui.nanumSquare": "NanumSquare",
+    "appearance.font.ui.nanumSquareHelp":
+      "단정한 직선형 나눔스퀘어 패밀리를 사용합니다.",
+    "appearance.font.ui.nanumSquareAc": "NanumSquare Ac",
+    "appearance.font.ui.nanumSquareAcHelp":
+      "조금 더 또렷한 Ac 계열 나눔스퀘어를 사용합니다.",
+    "appearance.font.editor.system": "기본 monospace",
+    "appearance.font.editor.systemHelp":
+      "브라우저 기본 고정폭 글꼴 스택을 유지합니다.",
+    "appearance.font.editor.d2coding": "D2Coding",
+    "appearance.font.editor.d2codingHelp":
+      "한글 코드 가독성에 맞춘 D2Coding을 사용합니다.",
+    "appearance.font.uiSampleTitle": "오늘의 작업 공간",
+    "appearance.font.uiSampleBody":
+      "문서, 링크, 설정 패널을 더 편하게 읽을 수 있습니다.",
+    "appearance.font.editorSample": "const title = [[Daily notes]];",
     "appearance.language.title": "인터페이스 언어",
     "appearance.language.description":
       "브라우저 기본 언어 대신 사용할 UI 언어를 선택합니다.",
@@ -292,6 +322,41 @@ export const messages: Record<Locale, Record<string, string>> = {
     "vault.documents": "문서",
     "vault.attachments": "첨부파일",
     "vault.tags": "태그",
+    "plugin.title": "플러그인 호환 설정",
+    "plugin.description":
+      "웹 뷰어에서 Obsidian 플러그인 호환 레이어를 켜고 끕니다.",
+    "plugin.loadFailed": "플러그인 설정을 불러오지 못했습니다.",
+    "plugin.saveSuccess": "플러그인 설정을 저장했습니다.",
+    "plugin.saveFailed": "플러그인 설정 저장에 실패했습니다.",
+    "plugin.summaryTitle": "활성화된 호환 기능",
+    "plugin.summaryDescription":
+      "Dataview, Templater, Folder Note처럼 웹에서 흉내 내는 기능을 한곳에서 관리합니다.",
+    "plugin.enabledCount": "{count}개 사용 중",
+    "plugin.upstream": "Upstream 보기",
+    "plugin.dataview.title": "Dataview",
+    "plugin.dataview.description":
+      "지원되는 Dataview 쿼리를 문서 미리보기 안에서 서버 렌더링으로 표시합니다.",
+    "plugin.dataview.supportedSubset":
+      '현재는 `LIST/TABLE FROM "folder"` 와 `FROM #tag` 형태의 정적 쿼리를 지원합니다.',
+    "plugin.dataview.limits":
+      "DataviewJS, TASK 쿼리, 정렬, 그룹핑, 인라인 표현식은 아직 실행하지 않습니다.",
+    "plugin.dataview.toggle": "Dataview 호환 모드 사용",
+    "plugin.templater.title": "Templater",
+    "plugin.templater.description":
+      "문서 보기에서 안전한 범위의 Templater 표현식을 렌더링합니다.",
+    "plugin.templater.supportedSubset":
+      "`tp.date`, `tp.file`, `tp.frontmatter`, `tp.file.include`를 렌더링합니다.",
+    "plugin.templater.limits":
+      "보안을 위해 JavaScript 실행 블록(`<%* ... %>`)은 그대로 표시됩니다.",
+    "plugin.templater.toggle": "Templater 호환 모드 사용",
+    "plugin.folderNote.title": "Folder Note",
+    "plugin.folderNote.description":
+      "폴더를 열 때 같은 이름의 노트를 랜딩 페이지처럼 대신 엽니다.",
+    "plugin.folderNote.supportedSubset":
+      "예: `Projects/Projects.md`가 있으면 `Projects` 폴더 클릭 시 그 노트를 엽니다.",
+    "plugin.folderNote.limits":
+      "대응 노트가 없는 폴더는 기존처럼 디렉터리만 펼쳐집니다.",
+    "plugin.folderNote.toggle": "Folder Note 호환 모드 사용",
     "system.title": "서버 상태",
     "system.description":
       "애플리케이션 버전, 의존 서비스 연결 상태, 로컬 vault git 상태를 확인합니다.",
@@ -609,14 +674,15 @@ export const messages: Record<Locale, Record<string, string>> = {
     "settings.tabs.profile": "Profile",
     "settings.tabs.sync": "Sync",
     "settings.tabs.vault": "Vault",
-    "settings.tabs.appearance": "Appearance",
+    "settings.tabs.appearance": "Theme",
+    "settings.tabs.plugin": "Plugin",
     "settings.tabs.system": "System",
-    "appearance.title": "Default Theme",
+    "appearance.title": "Theme & Fonts",
     "appearance.description":
-      "Set both the base mode and a visual preset so the wiki feels closer to an Obsidian theme.",
-    "appearance.saveSuccess": "Saved the default theme.",
-    "appearance.loadFailed": "Failed to load theme settings.",
-    "appearance.saveFailed": "Failed to save theme settings.",
+      "Adjust the base mode, preset, interface font, and editor font in one place.",
+    "appearance.saveSuccess": "Saved the theme and font settings.",
+    "appearance.loadFailed": "Failed to load theme and font settings.",
+    "appearance.saveFailed": "Failed to save theme and font settings.",
     "appearance.mode.title": "Mode",
     "appearance.mode.heading": "Base brightness",
     "appearance.mode.description":
@@ -646,6 +712,35 @@ export const messages: Record<Locale, Record<string, string>> = {
     "appearance.previewLine.one": "Daily notes",
     "appearance.previewLine.two": "Backlinks and graph",
     "appearance.previewLine.three": "Canvas-ready workspace",
+    "appearance.font.title": "Fonts",
+    "appearance.font.heading": "Text styling",
+    "appearance.font.description":
+      "Pick separate fonts for the main interface and the markdown editor.",
+    "appearance.font.uiTitle": "Interface font",
+    "appearance.font.uiDescription":
+      "Applies to navigation, settings, and the document reader UI.",
+    "appearance.font.editorTitle": "Editor font",
+    "appearance.font.editorDescription":
+      "Used only inside the CodeMirror markdown editor.",
+    "appearance.font.ui.system": "Default sans-serif",
+    "appearance.font.ui.systemHelp":
+      "Keep using the current system UI font stack.",
+    "appearance.font.ui.nanumSquare": "NanumSquare",
+    "appearance.font.ui.nanumSquareHelp":
+      "Use the clean NanumSquare family across the interface.",
+    "appearance.font.ui.nanumSquareAc": "NanumSquare Ac",
+    "appearance.font.ui.nanumSquareAcHelp":
+      "Use the sharper NanumSquare Ac family across the interface.",
+    "appearance.font.editor.system": "Default monospace",
+    "appearance.font.editor.systemHelp":
+      "Keep the browser's default code font stack.",
+    "appearance.font.editor.d2coding": "D2Coding",
+    "appearance.font.editor.d2codingHelp":
+      "Use D2Coding for Korean-friendly code readability.",
+    "appearance.font.uiSampleTitle": "Today's workspace",
+    "appearance.font.uiSampleBody":
+      "Notes, links, and setting panels stay easier to scan.",
+    "appearance.font.editorSample": "const title = [[Daily notes]];",
     "appearance.language.title": "Interface Language",
     "appearance.language.description":
       "Choose the UI language used in this browser.",
@@ -755,6 +850,41 @@ export const messages: Record<Locale, Record<string, string>> = {
     "vault.documents": "Documents",
     "vault.attachments": "Attachments",
     "vault.tags": "Tags",
+    "plugin.title": "Plugin Compatibility",
+    "plugin.description":
+      "Enable or disable the Obsidian plugin compatibility layers used by the web viewer.",
+    "plugin.loadFailed": "Failed to load plugin settings.",
+    "plugin.saveSuccess": "Saved the plugin settings.",
+    "plugin.saveFailed": "Failed to save the plugin settings.",
+    "plugin.summaryTitle": "Enabled Compatibility Layers",
+    "plugin.summaryDescription":
+      "Manage the web-side compatibility features for Dataview, Templater, and Folder Note in one place.",
+    "plugin.enabledCount": "{count} enabled",
+    "plugin.upstream": "View upstream",
+    "plugin.dataview.title": "Dataview",
+    "plugin.dataview.description":
+      "Render the supported subset of Dataview queries directly inside note previews.",
+    "plugin.dataview.supportedSubset":
+      'Currently supports static `LIST/TABLE FROM "folder"` and `FROM #tag` queries.',
+    "plugin.dataview.limits":
+      "DataviewJS, TASK queries, sorting, grouping, and inline expressions are not executed yet.",
+    "plugin.dataview.toggle": "Enable Dataview compatibility",
+    "plugin.templater.title": "Templater",
+    "plugin.templater.description":
+      "Render a safe subset of Obsidian Templater expressions in the document viewer.",
+    "plugin.templater.supportedSubset":
+      "Renders `tp.date`, `tp.file`, `tp.frontmatter`, and `tp.file.include`.",
+    "plugin.templater.limits":
+      "For safety, JavaScript execution blocks (`<%* ... %>`) are left untouched.",
+    "plugin.templater.toggle": "Enable Templater compatibility",
+    "plugin.folderNote.title": "Folder Note",
+    "plugin.folderNote.description":
+      "Open a same-named note inside a folder as that folder's landing page.",
+    "plugin.folderNote.supportedSubset":
+      "Example: if `Projects/Projects.md` exists, opening `Projects` routes to that note.",
+    "plugin.folderNote.limits":
+      "Folders without a matching note keep the default directory behavior.",
+    "plugin.folderNote.toggle": "Enable Folder Note compatibility",
     "system.title": "Server Status",
     "system.description":
       "Review the app version, dependency health, and local vault git status.",

@@ -44,6 +44,36 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
     if not has_app_settings:
         return None
 
+    has_editor_font = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'editor_font'
+        )
+        """,
+    )
+    if has_editor_font:
+        return "20260415_0010"
+
+    has_dataview_enabled = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'dataview_enabled'
+        )
+        """,
+    )
+    if has_dataview_enabled:
+        return "20260415_0009"
+
     has_templater_enabled = await _scalar_bool(
         conn,
         """

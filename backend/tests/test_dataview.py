@@ -3,6 +3,9 @@ import subprocess
 import pytest
 from sqlalchemy.exc import OperationalError
 
+import app.db.session as session_mod
+from app.services.settings import ensure_app_settings
+
 
 def _git_init(vault_path):
     subprocess.run(["git", "init", str(vault_path)], capture_output=True, check=True)
@@ -65,7 +68,10 @@ async def test_dataview_table_from_folder(client, auth_headers, setup_vault):
     try:
         resp = await client.post(
             "/api/wiki/doc",
-            json={"path": "notes/status.md", "content": "---\nstatus: active\ndue: 2026-04-30\n---\n# Status"},
+            json={
+                "path": "notes/status.md",
+                "content": "---\nstatus: active\ndue: 2026-04-30\n---\n# Status",
+            },
             headers=auth_headers,
         )
     except OperationalError:
@@ -90,7 +96,7 @@ async def test_dataview_table_from_folder(client, auth_headers, setup_vault):
 async def test_dataview_rejects_unsupported_query(client, auth_headers, setup_vault):
     resp = await client.post(
         "/api/dataview/query",
-        json={"query": "TASK FROM \"projects\""},
+        json={"query": 'TASK FROM "projects"'},
         headers=auth_headers,
     )
     assert resp.status_code == 400
@@ -100,3 +106,19 @@ async def test_dataview_rejects_unsupported_query(client, auth_headers, setup_va
 async def test_dataview_requires_auth(client, setup_vault):
     resp = await client.post("/api/dataview/query", json={"query": 'LIST FROM "projects"'})
     assert resp.status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_dataview_rejects_queries_when_plugin_disabled(client, auth_headers, setup_vault):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.dataview_enabled = False
+        await session.commit()
+
+    resp = await client.post(
+        "/api/dataview/query",
+        json={"query": 'LIST FROM "projects"'},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "Dataview compatibility is disabled"

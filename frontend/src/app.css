@@ -1,11 +1,104 @@
+@font-face {
+  font-family: "NanumSquare";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareL.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareR.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareB.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareEB.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareAc";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareAcL.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareAc";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareAcR.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareAc";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareAcB.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "NanumSquareAc";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/nanum-square/NanumSquareAcEB.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "D2Coding";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/d2coding/D2Coding-Ver1.3.2-20180524.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "D2Coding";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/d2coding/D2CodingBold-Ver1.3.2-20180524.ttf")
+    format("truetype");
+}
+
 /* Theme layout tokens */
 :root {
   --sidebar-width: 260px;
   --right-panel-width: 280px;
   --header-height: 48px;
-  --font-ui:
+  --font-ui-system:
     "Avenir Next", "Pretendard", "Spoqa Han Sans Neo", "Noto Sans KR",
     sans-serif;
+  --font-ui-nanum-square:
+    "NanumSquare", "Pretendard", "Spoqa Han Sans Neo", "Noto Sans KR",
+    sans-serif;
+  --font-ui-nanum-square-ac:
+    "NanumSquareAc", "Pretendard", "Spoqa Han Sans Neo", "Noto Sans KR",
+    sans-serif;
+  --font-editor-system:
+    "SF Mono", "JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace;
+  --font-editor-d2coding:
+    "D2Coding", "SF Mono", "JetBrains Mono", "Fira Code", "Menlo", monospace;
+  --font-ui: var(--font-ui-system);
+  --font-editor: var(--font-editor-system);
   --bg-primary: #1e1e2e;
   --bg-secondary: #282838;
   --bg-tertiary: #313145;
@@ -29,6 +122,26 @@
   --bg-accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.16);
   --shadow-strong: 0 28px 80px rgba(15, 23, 42, 0.24);
+}
+
+[data-ui-font="system"] {
+  --font-ui: var(--font-ui-system);
+}
+
+[data-ui-font="nanum-square"] {
+  --font-ui: var(--font-ui-nanum-square);
+}
+
+[data-ui-font="nanum-square-ac"] {
+  --font-ui: var(--font-ui-nanum-square-ac);
+}
+
+[data-editor-font="system"] {
+  --font-editor: var(--font-editor-system);
+}
+
+[data-editor-font="d2coding"] {
+  --font-editor: var(--font-editor-d2coding);
 }
 
 [data-theme="dark"][data-theme-preset="obsidian"] {

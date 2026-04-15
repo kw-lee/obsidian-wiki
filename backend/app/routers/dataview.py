@@ -5,6 +5,7 @@ from app.auth import get_current_user
 from app.db.session import get_db
 from app.schemas import DataviewQueryRequest, DataviewQueryResponse
 from app.services.dataview import run_dataview_query
+from app.services.settings import get_runtime_sync_settings
 
 router = APIRouter()
 
@@ -15,6 +16,12 @@ async def query_dataview(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> DataviewQueryResponse:
+    runtime = await get_runtime_sync_settings(db)
+    if not runtime.dataview_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Dataview compatibility is disabled",
+        )
     try:
         return await run_dataview_query(db, body.query)
     except ValueError as exc:

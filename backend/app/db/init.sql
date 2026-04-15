@@ -32,6 +32,11 @@ CREATE TABLE app_settings (
                           CHECK (default_theme IN ('light', 'dark', 'system')),
     theme_preset          TEXT NOT NULL DEFAULT 'obsidian'
                           CHECK (theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')),
+    ui_font               TEXT NOT NULL DEFAULT 'system'
+                          CHECK (ui_font IN ('system', 'nanum-square', 'nanum-square-ac')),
+    editor_font           TEXT NOT NULL DEFAULT 'system'
+                          CHECK (editor_font IN ('system', 'd2coding')),
+    dataview_enabled      BOOLEAN NOT NULL DEFAULT TRUE,
     folder_note_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
     templater_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -103,7 +108,8 @@ INSERT INTO app_settings (
     sync_auto_enabled,
     git_remote_url,
     git_branch,
-    timezone
+    timezone,
+    dataview_enabled
 )
-VALUES (1, 'git', 300, TRUE, '', 'main', 'Asia/Seoul')
+VALUES (1, 'git', 300, TRUE, '', 'main', 'Asia/Seoul', TRUE)
 ON CONFLICT (id) DO NOTHING;

@@ -267,11 +267,27 @@ class RebuildIndexResponse(BaseModel):
 class AppearanceSettingsResponse(BaseModel):
     default_theme: Literal["light", "dark", "system"]
     theme_preset: Literal["obsidian", "graphite", "dawn", "forest"]
+    ui_font: Literal["system", "nanum-square", "nanum-square-ac"]
+    editor_font: Literal["system", "d2coding"]
 
 
 class AppearanceSettingsUpdateRequest(BaseModel):
     default_theme: Literal["light", "dark", "system"]
     theme_preset: Literal["obsidian", "graphite", "dawn", "forest"]
+    ui_font: Literal["system", "nanum-square", "nanum-square-ac"]
+    editor_font: Literal["system", "d2coding"]
+
+
+class PluginSettingsResponse(BaseModel):
+    dataview_enabled: bool = True
+    folder_note_enabled: bool = False
+    templater_enabled: bool = False
+
+
+class PluginSettingsUpdateRequest(BaseModel):
+    dataview_enabled: bool = True
+    folder_note_enabled: bool = False
+    templater_enabled: bool = False
 
 
 class SystemDependencyStatus(BaseModel):
@@ -292,8 +308,6 @@ class SystemSettingsResponse(BaseModel):
     version: str
     started_at: datetime
     timezone: str
-    folder_note_enabled: bool = False
-    templater_enabled: bool = False
     uptime_seconds: int = Field(ge=0)
     sync_backend: Literal["git", "webdav", "none"]
     sync_auto_enabled: bool
@@ -312,8 +326,6 @@ class SystemLogEntry(BaseModel):
 
 class SystemSettingsUpdateRequest(BaseModel):
     timezone: str
-    folder_note_enabled: bool = False
-    templater_enabled: bool = False
 
 
 class SystemLogsResponse(BaseModel):

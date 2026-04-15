@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -16,6 +17,8 @@ from app.schemas import (
     AppearanceSettingsResponse,
     AppearanceSettingsUpdateRequest,
     AuthTokenPair,
+    PluginSettingsResponse,
+    PluginSettingsUpdateRequest,
     ProfileSettingsResponse,
     ProfileSettingsUpdateRequest,
     RebuildIndexResponse,
@@ -332,7 +335,8 @@ async def test_sync_settings(
     existing = await ensure_app_settings(db)
     runtime = await get_runtime_sync_settings(db)
     git_remote_url, webdav_url = _validate_sync_targets(body.git_remote_url, body.webdav_url)
-    runtime = runtime.__class__(
+    runtime = replace(
+        runtime,
         sync_backend=body.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -347,11 +351,6 @@ async def test_sync_settings(
         ),
         webdav_remote_root=_normalize_remote_root(body.webdav_remote_root),
         webdav_verify_tls=body.webdav_verify_tls,
-        timezone=runtime.timezone,
-        default_theme=runtime.default_theme,
-        theme_preset=runtime.theme_preset,
-        folder_note_enabled=runtime.folder_note_enabled,
-        templater_enabled=runtime.templater_enabled,
     )
     return await test_sync_backend(db, runtime_override=runtime)
 
@@ -391,6 +390,8 @@ async def get_appearance_settings(
     return AppearanceSettingsResponse(
         default_theme=row.default_theme,
         theme_preset=row.theme_preset,
+        ui_font=row.ui_font,
+        editor_font=row.editor_font,
     )
 
 
@@ -403,11 +404,15 @@ async def update_appearance_settings(
     row = await ensure_app_settings(db)
     row.default_theme = body.default_theme
     row.theme_preset = body.theme_preset
+    row.ui_font = body.ui_font
+    row.editor_font = body.editor_font
     await db.commit()
     invalidate_settings_cache()
     return AppearanceSettingsResponse(
         default_theme=row.default_theme,
         theme_preset=row.theme_preset,
+        ui_font=row.ui_font,
+        editor_font=row.editor_font,
     )
 
 
@@ -419,6 +424,40 @@ async def get_public_appearance_settings(
     return AppearanceSettingsResponse(
         default_theme=row.default_theme,
         theme_preset=row.theme_preset,
+        ui_font=row.ui_font,
+        editor_font=row.editor_font,
+    )
+
+
+@router.get("/plugin", response_model=PluginSettingsResponse)
+async def get_plugin_settings(
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PluginSettingsResponse:
+    row = await ensure_app_settings(db)
+    return PluginSettingsResponse(
+        dataview_enabled=row.dataview_enabled,
+        folder_note_enabled=row.folder_note_enabled,
+        templater_enabled=row.templater_enabled,
+    )
+
+
+@router.put("/plugin", response_model=PluginSettingsResponse)
+async def update_plugin_settings(
+    body: PluginSettingsUpdateRequest,
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PluginSettingsResponse:
+    row = await ensure_app_settings(db)
+    row.dataview_enabled = body.dataview_enabled
+    row.folder_note_enabled = body.folder_note_enabled
+    row.templater_enabled = body.templater_enabled
+    await db.commit()
+    invalidate_settings_cache()
+    return PluginSettingsResponse(
+        dataview_enabled=row.dataview_enabled,
+        folder_note_enabled=row.folder_note_enabled,
+        templater_enabled=row.templater_enabled,
     )
 
 
@@ -440,8 +479,6 @@ async def get_system_settings(
         version=get_app_version(),
         started_at=started_at,
         timezone=row.timezone,
-        folder_note_enabled=row.folder_note_enabled,
-        templater_enabled=row.templater_enabled,
         uptime_seconds=uptime_seconds,
         sync_backend=runtime.sync_backend,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -460,8 +497,6 @@ async def update_system_settings(
 ) -> SystemSettingsResponse:
     row = await ensure_app_settings(db)
     row.timezone = _normalize_timezone(body.timezone)
-    row.folder_note_enabled = body.folder_note_enabled
-    row.templater_enabled = body.templater_enabled
     await db.commit()
     invalidate_settings_cache()
     return await get_system_settings(db=db, _username=_username)

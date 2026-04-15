@@ -7,6 +7,7 @@ vi.mock("./client", () => ({
 import { api } from "./client";
 import {
   fetchAppearanceSettings,
+  fetchPluginSettings,
   fetchProfileSettings,
   fetchPublicAppearanceSettings,
   fetchSystemLogs,
@@ -16,6 +17,7 @@ import {
   rebuildVaultIndex,
   testSyncConnection,
   updateAppearanceSettings,
+  updatePluginSettings,
   updateProfileSettings,
   updateSystemSettings,
   updateSyncSettings,
@@ -135,6 +137,8 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({
       default_theme: "system",
       theme_preset: "obsidian",
+      ui_font: "system",
+      editor_font: "system",
     });
     await fetchAppearanceSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance");
@@ -144,14 +148,23 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({
       default_theme: "dark",
       theme_preset: "graphite",
+      ui_font: "nanum-square-ac",
+      editor_font: "d2coding",
     });
     await updateAppearanceSettings({
       default_theme: "dark",
       theme_preset: "graphite",
+      ui_font: "nanum-square-ac",
+      editor_font: "d2coding",
     });
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance", {
       method: "PUT",
-      body: JSON.stringify({ default_theme: "dark", theme_preset: "graphite" }),
+      body: JSON.stringify({
+        default_theme: "dark",
+        theme_preset: "graphite",
+        ui_font: "nanum-square-ac",
+        editor_font: "d2coding",
+      }),
     });
   });
 
@@ -159,9 +172,42 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({
       default_theme: "light",
       theme_preset: "dawn",
+      ui_font: "nanum-square",
+      editor_font: "system",
     });
     await fetchPublicAppearanceSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/appearance/public");
+  });
+
+  it("fetchPluginSettings calls the plugin endpoint", async () => {
+    mockApi.mockResolvedValueOnce({
+      dataview_enabled: true,
+      folder_note_enabled: false,
+      templater_enabled: false,
+    });
+    await fetchPluginSettings();
+    expect(mockApi).toHaveBeenCalledWith("/settings/plugin");
+  });
+
+  it("updatePluginSettings sends PUT payload", async () => {
+    mockApi.mockResolvedValueOnce({
+      dataview_enabled: false,
+      folder_note_enabled: true,
+      templater_enabled: true,
+    });
+    await updatePluginSettings({
+      dataview_enabled: false,
+      folder_note_enabled: true,
+      templater_enabled: true,
+    });
+    expect(mockApi).toHaveBeenCalledWith("/settings/plugin", {
+      method: "PUT",
+      body: JSON.stringify({
+        dataview_enabled: false,
+        folder_note_enabled: true,
+        templater_enabled: true,
+      }),
+    });
   });
 
   it("fetchSystemSettings calls the system endpoint", async () => {
@@ -174,15 +220,11 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({ timezone: "Asia/Seoul" });
     await updateSystemSettings({
       timezone: "Asia/Seoul",
-      folder_note_enabled: true,
-      templater_enabled: true,
     });
     expect(mockApi).toHaveBeenCalledWith("/settings/system", {
       method: "PUT",
       body: JSON.stringify({
         timezone: "Asia/Seoul",
-        folder_note_enabled: true,
-        templater_enabled: true,
       }),
     });
   });

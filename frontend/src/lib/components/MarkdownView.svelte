@@ -19,11 +19,13 @@
     path,
     content,
     links = [],
+    dataviewEnabled = true,
     onnavigate,
   }: {
     path: string;
     content: string;
     links?: ResolvedWikiLink[];
+    dataviewEnabled?: boolean;
     onnavigate: (path: string) => void;
   } = $props();
 
@@ -61,7 +63,11 @@
     | { type: "markdown"; content: string }
     | { type: "dataview"; query: string };
 
-  function splitSegments(source: string): Segment[] {
+  function splitSegments(source: string, dataviewEnabled: boolean): Segment[] {
+    if (!dataviewEnabled) {
+      return [{ type: "markdown", content: source }];
+    }
+
     const segments: Segment[] = [];
     const regex = /```dataview\s*\n([\s\S]*?)```/g;
     let lastIndex = 0;
@@ -85,7 +91,7 @@
   }
 
   let renderedContent = $derived(stripYamlFrontmatter(content));
-  let segments = $derived(splitSegments(renderedContent));
+  let segments = $derived(splitSegments(renderedContent, dataviewEnabled));
 
   $effect(() => {
     path;

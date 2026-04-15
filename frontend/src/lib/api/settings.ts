@@ -2,6 +2,7 @@ import { api } from "./client";
 import type {
   AuthTokenPair,
   AppearanceSettings,
+  PluginSettings,
   ProfileSettings,
   RebuildIndexResult,
   SystemLogs,
@@ -78,14 +79,19 @@ export const updateAppearanceSettings = (payload: AppearanceSettings) =>
 export const fetchPublicAppearanceSettings = () =>
   api<AppearanceSettings>("/settings/appearance/public");
 
+export const fetchPluginSettings = () =>
+  api<PluginSettings>("/settings/plugin");
+
+export const updatePluginSettings = (payload: PluginSettings) =>
+  api<PluginSettings>("/settings/plugin", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
 export const fetchSystemSettings = () =>
   api<SystemSettings>("/settings/system");
 
-export const updateSystemSettings = (payload: {
-  timezone: string;
-  folder_note_enabled: boolean;
-  templater_enabled: boolean;
-}) =>
+export const updateSystemSettings = (payload: { timezone: string }) =>
   api<SystemSettings>("/settings/system", {
     method: "PUT",
     body: JSON.stringify(payload),

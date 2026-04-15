@@ -33,7 +33,7 @@ def parse_dataview_query(query: str) -> ParsedDataviewQuery:
     normalized = _normalize_query(query)
     match = _QUERY_RE.match(normalized)
     if not match:
-        raise ValueError("Only LIST/TABLE FROM \"folder\" or FROM #tag queries are supported")
+        raise ValueError('Only LIST/TABLE FROM "folder" or FROM #tag queries are supported')
 
     kind = match.group("kind").lower()
     fields_text = (match.group("fields") or "").strip()
@@ -47,10 +47,20 @@ def parse_dataview_query(query: str) -> ParsedDataviewQuery:
         fields = ["file.link"]
 
     if source.startswith("#"):
-        return ParsedDataviewQuery(kind=kind, fields=fields, source_kind="tag", source_value=source[1:])
+        return ParsedDataviewQuery(
+            kind=kind,
+            fields=fields,
+            source_kind="tag",
+            source_value=source[1:],
+        )
 
     source_value = source.strip('"').strip()
-    return ParsedDataviewQuery(kind=kind, fields=fields, source_kind="folder", source_value=source_value)
+    return ParsedDataviewQuery(
+        kind=kind,
+        fields=fields,
+        source_kind="folder",
+        source_value=source_value,
+    )
 
 
 def _normalize_tags(value) -> list[str]:
@@ -78,6 +88,26 @@ def _serialize_value(value) -> str:
     return str(value)
 
 
+def _normalize_frontmatter(value) -> dict:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    try:
+        return dict(value)
+    except (TypeError, ValueError):
+        return {}
+
+
 def _frontmatter_lookup(frontmatter: dict, field: str):
     if field in frontmatter:
         return frontmatter[field]
@@ -88,7 +118,7 @@ def _frontmatter_lookup(frontmatter: dict, field: str):
 def _build_cell(doc: Document, field: str) -> DataviewCell:
     normalized = field.strip()
     lowered = normalized.lower()
-    frontmatter = dict(doc.frontmatter or {})
+    frontmatter = _normalize_frontmatter(doc.frontmatter)
     tags = _normalize_tags(doc.tags)
 
     if lowered == "file.link":
@@ -119,14 +149,7 @@ async def run_dataview_query(db: AsyncSession, query: str) -> DataviewQueryRespo
                 or doc.path.startswith(f"{folder}.")
             ]
     else:
-        docs = [
-            doc
-            for doc in docs
-            if parsed.source_value in _normalize_tags(doc.tags)
-        ]
+        docs = [doc for doc in docs if parsed.source_value in _normalize_tags(doc.tags)]
 
-    rows = [
-        DataviewRow(cells=[_build_cell(doc, field) for field in parsed.fields])
-        for doc in docs
-    ]
+    rows = [DataviewRow(cells=[_build_cell(doc, field) for field in parsed.fields]) for doc in docs]
     return DataviewQueryResponse(kind=parsed.kind, columns=parsed.fields, rows=rows)

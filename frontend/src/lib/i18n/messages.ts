@@ -239,8 +239,17 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.pushSuccess": "Push 완료",
     "sync.actionFailed": "{kind} 실행에 실패했습니다.",
     "sync.testFailed": "연결 테스트에 실패했습니다.",
-    "sync.auto": "자동 동기화",
-    "sync.interval": "동기화 주기 (초)",
+    "sync.auto": "주기 자동 동기화",
+    "sync.interval": "주기 실행 간격 (초)",
+    "sync.advancedTitle": "고급 동기화 설정",
+    "sync.advancedDescription":
+      "자동 실행 방식과 WebDAV 전용 정책을 조정합니다.",
+    "sync.mode": "동기화 방향",
+    "sync.modeHelp":
+      "헤더의 동기화 버튼과 자동 실행은 이 방향을 따릅니다. 개별 Pull/Push는 아래 버튼으로 따로 실행할 수 있습니다.",
+    "sync.mode.bidirectional": "양방향",
+    "sync.mode.pullOnly": "Pull만",
+    "sync.mode.pushOnly": "Push만",
     "sync.gitSettings": "Git 설정",
     "sync.remoteUrl": "Remote URL",
     "sync.branch": "브랜치",
@@ -252,6 +261,23 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.passwordPlaceholderNew": "새 비밀번호 또는 앱 토큰",
     "sync.remoteRoot": "원격 루트",
     "sync.tlsVerify": "TLS 검증",
+    "sync.runOnStartup": "서버 시작 후 1회 실행",
+    "sync.runOnStartupHelp":
+      "프로세스가 시작된 뒤 한 번만 백그라운드 동기화를 예약합니다.",
+    "sync.startupDelay": "시작 지연 (초)",
+    "sync.startupDelayHelp":
+      "서버 시작 직후 vault와 네트워크가 안정될 시간을 둡니다.",
+    "sync.syncOnSave": "웹 저장 후 동기화",
+    "sync.syncOnSaveHelp":
+      "노트 저장, 생성, 이동, 삭제, 첨부 업로드 뒤 백그라운드 동기화를 시도합니다.",
+    "sync.obsidianPolicy": "WebDAV .obsidian 정책",
+    "sync.obsidianPolicyHelp":
+      "WebDAV에서만 적용됩니다. Git 백엔드는 저장소 내용을 그대로 따릅니다.",
+    "sync.obsidianPolicy.remoteOnly": "원격 기준 반영",
+    "sync.obsidianPolicy.ignore": "무시",
+    "sync.obsidianPolicy.include": "양방향 포함",
+    "sync.obsidianPolicyGitNotice":
+      "Git 백엔드는 저장소 전체를 동기화하므로 .obsidian 정책을 따로 나눌 수 없습니다.",
     "sync.gitNotice":
       "Git pull/push도 기존 로컬 vault와 원격 브랜치가 이미 다른 상태에서 시작하면 rebase 충돌이나 non-fast-forward 문제가 날 수 있습니다. 첫 동기화 전에 어느 쪽을 기준으로 맞출지 먼저 정해 주세요.",
     "sync.webdavNotice":
@@ -261,10 +287,14 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.saveButton": "설정 저장",
     "sync.testButton": "연결 테스트",
     "sync.testingButton": "테스트 중...",
+    "sync.syncButton": "동기화",
+    "sync.syncNowButton": "지금 동기화",
+    "sync.syncingButton": "동기화 중...",
     "sync.pullButton": "Pull",
     "sync.pullingButton": "Pull 중...",
     "sync.pushButton": "Push",
     "sync.pushingButton": "Push 중...",
+    "sync.jobSyncStarted": "백그라운드 동기화를 시작했습니다.",
     "sync.jobPullStarted": "백그라운드 Pull을 시작했습니다.",
     "sync.jobPushStarted": "백그라운드 Push를 시작했습니다.",
     "sync.jobBootstrapRemoteStarted": "원격 기준 초기 동기화를 시작했습니다.",
@@ -767,8 +797,17 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.pushSuccess": "Push complete",
     "sync.actionFailed": "Failed to run {kind}.",
     "sync.testFailed": "Connection test failed.",
-    "sync.auto": "Automatic sync",
-    "sync.interval": "Sync interval (seconds)",
+    "sync.auto": "Scheduled sync",
+    "sync.interval": "Scheduled interval (seconds)",
+    "sync.advancedTitle": "Advanced Sync Settings",
+    "sync.advancedDescription":
+      "Adjust automatic trigger behavior and WebDAV-specific policies.",
+    "sync.mode": "Sync direction",
+    "sync.modeHelp":
+      "The header sync button and automatic runs follow this direction. Individual Pull and Push actions still work separately below.",
+    "sync.mode.bidirectional": "Bidirectional",
+    "sync.mode.pullOnly": "Pull only",
+    "sync.mode.pushOnly": "Push only",
     "sync.gitSettings": "Git Settings",
     "sync.remoteUrl": "Remote URL",
     "sync.branch": "Branch",
@@ -780,6 +819,23 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.passwordPlaceholderNew": "New password or app token",
     "sync.remoteRoot": "Remote root",
     "sync.tlsVerify": "Verify TLS",
+    "sync.runOnStartup": "Run once on startup",
+    "sync.runOnStartupHelp":
+      "Queue one background sync after the server process starts.",
+    "sync.startupDelay": "Startup delay (seconds)",
+    "sync.startupDelayHelp":
+      "Give the vault and network a little time to settle after startup.",
+    "sync.syncOnSave": "Sync after web saves",
+    "sync.syncOnSaveHelp":
+      "Try a background sync after note saves, creates, moves, deletes, and attachment uploads.",
+    "sync.obsidianPolicy": "WebDAV .obsidian policy",
+    "sync.obsidianPolicyHelp":
+      "This only applies to WebDAV. Git follows the repository contents as-is.",
+    "sync.obsidianPolicy.remoteOnly": "Remote only",
+    "sync.obsidianPolicy.ignore": "Ignore",
+    "sync.obsidianPolicy.include": "Include both ways",
+    "sync.obsidianPolicyGitNotice":
+      "The Git backend syncs the whole repository, so .obsidian cannot be split into a separate policy.",
     "sync.gitNotice":
       "Git pull/push can also fail with rebase or non-fast-forward conflicts if the local vault and remote branch already diverged before the first sync. Decide which side should become the baseline first.",
     "sync.webdavNotice":
@@ -789,10 +845,14 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.saveButton": "Save settings",
     "sync.testButton": "Test connection",
     "sync.testingButton": "Testing...",
+    "sync.syncButton": "Sync",
+    "sync.syncNowButton": "Sync now",
+    "sync.syncingButton": "Syncing...",
     "sync.pullButton": "Pull",
     "sync.pullingButton": "Pulling...",
     "sync.pushButton": "Push",
     "sync.pushingButton": "Pushing...",
+    "sync.jobSyncStarted": "Started a background sync.",
     "sync.jobPullStarted": "Started a background pull.",
     "sync.jobPushStarted": "Started a background push.",
     "sync.jobBootstrapRemoteStarted": "Started applying the remote baseline.",

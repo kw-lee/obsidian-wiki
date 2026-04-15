@@ -2,7 +2,7 @@ import mimetypes
 from pathlib import Path, PurePosixPath
 
 import aiofiles
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from app.auth import get_current_user
 from app.db.session import get_db
 from app.services.git_ops import git_add_and_commit
 from app.services.indexer import index_attachment_file
+from app.services.sync_triggers import maybe_enqueue_sync_on_write
 from app.services.vault import resolve
 
 router = APIRouter()
@@ -85,6 +86,7 @@ async def get_attachment(
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_attachment(
     file: UploadFile,
+    request: Request,
     folder: str = "attachments",
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
@@ -107,5 +109,6 @@ async def upload_attachment(
     git_add_and_commit([relative], f"web: upload {relative}")
     await index_attachment_file(db, relative, full)
     await db.commit()
+    await maybe_enqueue_sync_on_write(request, db)
 
     return {"path": relative, "size": size}

@@ -12,6 +12,7 @@ from app.schemas import SyncStatus, SyncTestResult
 from app.services.settings import ensure_app_settings
 from app.services.sync.crypto import decrypt_secret, encrypt_secret
 from app.services.sync_scheduler import SyncScheduler
+from app.services.sync_triggers import enqueue_startup_sync_if_enabled
 from app.services.vault import write_doc
 
 
@@ -95,8 +96,18 @@ async def test_sync_settings_persist(client, auth_headers, setup_vault):
             "sync_backend": "git",
             "sync_interval_seconds": 120,
             "sync_auto_enabled": False,
+            "sync_mode": "pull-only",
+            "sync_run_on_startup": True,
+            "sync_startup_delay_seconds": 15,
+            "sync_on_save": True,
             "git_remote_url": "git@github.com:test/vault.git",
             "git_branch": "develop",
+            "webdav_url": "",
+            "webdav_username": "",
+            "webdav_password": "",
+            "webdav_remote_root": "/",
+            "webdav_verify_tls": True,
+            "webdav_obsidian_policy": "ignore",
         },
         headers=auth_headers,
     )
@@ -105,8 +116,13 @@ async def test_sync_settings_persist(client, auth_headers, setup_vault):
     assert data["sync_backend"] == "git"
     assert data["sync_interval_seconds"] == 120
     assert data["sync_auto_enabled"] is False
+    assert data["sync_mode"] == "pull-only"
+    assert data["sync_run_on_startup"] is True
+    assert data["sync_startup_delay_seconds"] == 15
+    assert data["sync_on_save"] is True
     assert data["git_remote_url"] == "git@github.com:test/vault.git"
     assert data["git_branch"] == "develop"
+    assert data["webdav_obsidian_policy"] == "ignore"
     assert data["status"]["message"] == "Automatic sync is disabled"
 
     read_resp = await client.get("/api/settings/sync", headers=auth_headers)
@@ -114,12 +130,20 @@ async def test_sync_settings_persist(client, auth_headers, setup_vault):
     read_data = read_resp.json()
     assert read_data["sync_interval_seconds"] == 120
     assert read_data["git_branch"] == "develop"
+    assert read_data["sync_mode"] == "pull-only"
+    assert read_data["sync_run_on_startup"] is True
+    assert read_data["sync_on_save"] is True
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.git_remote_url == "git@github.com:test/vault.git"
         assert row.sync_auto_enabled is False
+        assert row.sync_mode == "pull-only"
+        assert row.sync_run_on_startup is True
+        assert row.sync_startup_delay_seconds == 15
+        assert row.sync_on_save is True
+        assert row.webdav_obsidian_policy == "ignore"
 
 
 @pytest.mark.asyncio
@@ -565,6 +589,39 @@ async def test_get_vault_settings(client, auth_headers, setup_vault):
     (setup_vault / ".obsidian" / "workspace.json").write_text("{}", encoding="utf-8")
 
     async with session_mod.async_session() as session:
+@pytest.mark.asyncio
+async def test_enqueue_startup_sync_if_enabled_queues_automatic_sync(client):
+    del client
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_auto_enabled = False
+        row.sync_run_on_startup = True
+        row.sync_startup_delay_seconds = 12
+        await session.commit()
+
+    sleep_calls: list[float] = []
+    job_calls: list[tuple[str, str]] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    class FakeManager:
+        async def start_job(self, *, action, source="manual", bootstrap_strategy=None):  # noqa: ANN001
+            del bootstrap_strategy
+            job_calls.append((action, source))
+            return None
+
+    await enqueue_startup_sync_if_enabled(
+        session_mod.async_session,
+        FakeManager(),  # type: ignore[arg-type]
+        sleep=fake_sleep,  # type: ignore[call-arg]
+    )
+
+    assert sleep_calls == [12]
+    assert job_calls == [("sync", "automatic")]
+
+
         session.add(
             Document(
                 path="notes/test.md",

@@ -1,4 +1,8 @@
-import { fetchCurrentSyncJob, fetchSyncStatus, startSyncJob } from "$lib/api/wiki";
+import {
+  fetchCurrentSyncJob,
+  fetchSyncStatus,
+  startSyncJob,
+} from "$lib/api/wiki";
 import type { SyncJob, SyncStatus } from "$lib/types";
 import { getAuth } from "$lib/stores/auth.svelte";
 import { getSyncSurfaceSummary } from "$lib/utils/sync-indicator";
@@ -140,7 +144,9 @@ export async function refreshSyncJob() {
 
     if (jobResult.status === "fulfilled") {
       rememberRecentJob(jobResult.value);
-      state.currentJob = shouldShowJob(jobResult.value) ? jobResult.value : null;
+      state.currentJob = shouldShowJob(jobResult.value)
+        ? jobResult.value
+        : null;
     }
 
     if (statusResult.status === "fulfilled") {
@@ -155,7 +161,9 @@ export async function refreshSyncJob() {
             ? statusResult.reason
             : null;
       state.error =
-        reason instanceof Error ? reason.message : "Failed to fetch sync status";
+        reason instanceof Error
+          ? reason.message
+          : "Failed to fetch sync status";
     } else {
       state.error = null;
     }
@@ -168,7 +176,7 @@ export async function refreshSyncJob() {
 }
 
 export async function enqueueSyncJob(payload: {
-  action: "pull" | "push" | "bootstrap";
+  action: "pull" | "push" | "bootstrap" | "sync";
   bootstrap_strategy?: "remote" | "local";
 }) {
   const job = await startSyncJob(payload);

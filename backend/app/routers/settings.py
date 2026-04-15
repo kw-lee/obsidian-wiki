@@ -137,12 +137,17 @@ def _build_sync_settings_response(
     sync_backend: str,
     sync_interval_seconds: int,
     sync_auto_enabled: bool,
+    sync_mode: str,
+    sync_run_on_startup: bool,
+    sync_startup_delay_seconds: int,
+    sync_on_save: bool,
     git_remote_url: str,
     git_branch: str,
     webdav_url: str,
     webdav_username: str,
     webdav_remote_root: str,
     webdav_verify_tls: bool,
+    webdav_obsidian_policy: str,
     has_webdav_password: bool,
     status_data: SyncStatus,
 ) -> SyncSettingsResponse:
@@ -150,12 +155,17 @@ def _build_sync_settings_response(
         sync_backend=sync_backend,
         sync_interval_seconds=sync_interval_seconds,
         sync_auto_enabled=sync_auto_enabled,
+        sync_mode=sync_mode,
+        sync_run_on_startup=sync_run_on_startup,
+        sync_startup_delay_seconds=sync_startup_delay_seconds,
+        sync_on_save=sync_on_save,
         git_remote_url=_redact_sync_url(git_remote_url),
         git_branch=git_branch,
         webdav_url=_redact_sync_url(webdav_url),
         webdav_username=webdav_username,
         webdav_remote_root=webdav_remote_root,
         webdav_verify_tls=webdav_verify_tls,
+        webdav_obsidian_policy=webdav_obsidian_policy,
         has_webdav_password=has_webdav_password,
         status=status_data,
     )
@@ -267,12 +277,17 @@ async def get_sync_settings(
         sync_backend=row.sync_backend,
         sync_interval_seconds=row.sync_interval_seconds,
         sync_auto_enabled=row.sync_auto_enabled,
+        sync_mode=row.sync_mode,
+        sync_run_on_startup=row.sync_run_on_startup,
+        sync_startup_delay_seconds=row.sync_startup_delay_seconds,
+        sync_on_save=row.sync_on_save,
         git_remote_url=row.git_remote_url,
         git_branch=row.git_branch,
         webdav_url=row.webdav_url,
         webdav_username=row.webdav_username,
         webdav_remote_root=row.webdav_remote_root,
         webdav_verify_tls=row.webdav_verify_tls,
+        webdav_obsidian_policy=row.webdav_obsidian_policy,
         has_webdav_password=bool(row.webdav_password_enc),
         status_data=status_data,
     )
@@ -292,12 +307,17 @@ async def update_sync_settings(
     row.sync_backend = body.sync_backend
     row.sync_interval_seconds = body.sync_interval_seconds
     row.sync_auto_enabled = body.sync_auto_enabled
+    row.sync_mode = body.sync_mode
+    row.sync_run_on_startup = body.sync_run_on_startup
+    row.sync_startup_delay_seconds = body.sync_startup_delay_seconds
+    row.sync_on_save = body.sync_on_save
     row.git_remote_url = git_remote_url
     row.git_branch = git_branch
     row.webdav_url = webdav_url
     row.webdav_username = body.webdav_username.strip()
     row.webdav_remote_root = _normalize_remote_root(body.webdav_remote_root)
     row.webdav_verify_tls = body.webdav_verify_tls
+    row.webdav_obsidian_policy = body.webdav_obsidian_policy
     if body.webdav_password:
         row.webdav_password_enc = encrypt_secret(body.webdav_password)
     await db.commit()
@@ -315,12 +335,17 @@ async def update_sync_settings(
         sync_backend=runtime.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,
         sync_auto_enabled=runtime.sync_auto_enabled,
+        sync_mode=runtime.sync_mode,
+        sync_run_on_startup=runtime.sync_run_on_startup,
+        sync_startup_delay_seconds=runtime.sync_startup_delay_seconds,
+        sync_on_save=runtime.sync_on_save,
         git_remote_url=runtime.git_remote_url,
         git_branch=runtime.git_branch,
         webdav_url=runtime.webdav_url,
         webdav_username=runtime.webdav_username,
         webdav_remote_root=runtime.webdav_remote_root,
         webdav_verify_tls=runtime.webdav_verify_tls,
+        webdav_obsidian_policy=runtime.webdav_obsidian_policy,
         has_webdav_password=bool(runtime.webdav_password_enc),
         status_data=status_data,
     )

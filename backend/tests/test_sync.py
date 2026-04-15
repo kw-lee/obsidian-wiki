@@ -185,6 +185,63 @@ async def test_get_current_sync_job_endpoint_returns_latest_job(
 
 
 @pytest.mark.asyncio
+async def test_manual_sync_job_runs_bidirectional_cycle_even_when_auto_sync_is_disabled(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_auto_enabled = False
+        await session.commit()
+
+    calls: list[str] = []
+    statuses = iter(
+        [
+            SyncStatus(backend="git", head="before", ahead=1, behind=1, dirty=False),
+            SyncStatus(backend="git", head="after-pull", ahead=1, behind=0, dirty=False),
+            SyncStatus(backend="git", head="after-push", ahead=0, behind=0, dirty=False),
+        ]
+    )
+
+    async def fake_status(self, db):  # noqa: ANN001
+        del db
+        calls.append("status")
+        return next(statuses)
+
+    async def fake_pull(self, db, *, progress=None):  # noqa: ANN001
+        del db
+        calls.append("pull")
+        if progress is not None:
+            await progress(phase="pulling", message="Fetching remote changes", current=1, total=2)
+        return ("after-pull", ["note.md"])
+
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
+        del db
+        calls.append("push")
+        if progress is not None:
+            await progress(phase="pushing", message="Pushing local changes", current=2, total=2)
+
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.status", fake_status)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.pull", fake_pull)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.push", fake_push)
+
+    start_resp = await client.post(
+        "/api/sync/job",
+        json={"action": "sync"},
+        headers=auth_headers,
+    )
+    assert start_resp.status_code == 202
+    assert start_resp.json()["action"] == "sync"
+
+    job = await _wait_for_job(client, auth_headers)
+    assert calls == ["status", "pull", "status", "push", "status"]
+    assert job["status"] == "succeeded"
+    assert job["action"] == "sync"
+    assert job["head"] == "after-push"
+    assert job["changed_files"] == 1
+
+
+@pytest.mark.asyncio
 async def test_git_bootstrap_remote_job_applies_remote_baseline(
     client, auth_headers, setup_vault, git_remote_repo, stub_git_reindex
 ):
@@ -257,13 +314,15 @@ async def test_run_scheduled_sync_drives_git_bidirectionally(client, monkeypatch
         calls.append("status")
         return next(statuses)
 
-    async def fake_pull(self, db):  # noqa: ANN001
+    async def fake_pull(self, db, *, progress=None):  # noqa: ANN001
         del db
+        del progress
         calls.append("pull")
         return ("sha", ["note.md"])
 
-    async def fake_push(self, db):  # noqa: ANN001
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
         del db
+        del progress
         calls.append("push")
 
     monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.status", fake_status)
@@ -301,13 +360,15 @@ async def test_run_scheduled_sync_drives_webdav_bidirectionally(client, monkeypa
         calls.append("status")
         return next(statuses)
 
-    async def fake_pull(self, db):  # noqa: ANN001
+    async def fake_pull(self, db, *, progress=None):  # noqa: ANN001
         del db
+        del progress
         calls.append("pull")
         return ("webdav:1", ["note.md"])
 
-    async def fake_push(self, db):  # noqa: ANN001
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
         del db
+        del progress
         calls.append("push")
 
     monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.status", fake_status)
@@ -320,3 +381,90 @@ async def test_run_scheduled_sync_drives_webdav_bidirectionally(client, monkeypa
     assert calls == ["status", "pull", "status", "push", "status"]
     assert result.backend == "webdav"
     assert result.dirty is False
+
+
+@pytest.mark.asyncio
+async def test_run_scheduled_sync_pull_only_skips_push(client, monkeypatch, setup_vault):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_auto_enabled = True
+        row.sync_mode = "pull-only"
+        await session.commit()
+
+    calls: list[str] = []
+    statuses = iter(
+        [
+            SyncStatus(backend="git", ahead=1, behind=1, dirty=False),
+            SyncStatus(backend="git", ahead=1, behind=0, dirty=False),
+            SyncStatus(backend="git", ahead=1, behind=0, dirty=False),
+        ]
+    )
+
+    async def fake_status(self, db):  # noqa: ANN001
+        del db
+        calls.append("status")
+        return next(statuses)
+
+    async def fake_pull(self, db, *, progress=None):  # noqa: ANN001
+        del db, progress
+        calls.append("pull")
+        return ("sha", ["note.md"])
+
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
+        del db, progress
+        calls.append("push")
+
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.status", fake_status)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.pull", fake_pull)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.push", fake_push)
+
+    async with session_mod.async_session() as session:
+        result = await run_scheduled_sync(session)
+
+    assert calls == ["status", "pull", "status", "status"]
+    assert result.ahead == 1
+    assert result.behind == 0
+
+
+@pytest.mark.asyncio
+async def test_run_scheduled_sync_push_only_skips_pull(client, monkeypatch, setup_vault):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_auto_enabled = True
+        row.sync_mode = "push-only"
+        await session.commit()
+
+    calls: list[str] = []
+    statuses = iter(
+        [
+            SyncStatus(backend="git", ahead=1, behind=1, dirty=False),
+            SyncStatus(backend="git", ahead=0, behind=1, dirty=False),
+        ]
+    )
+
+    async def fake_status(self, db):  # noqa: ANN001
+        del db
+        calls.append("status")
+        return next(statuses)
+
+    async def fake_pull(self, db, *, progress=None):  # noqa: ANN001
+        del db, progress
+        calls.append("pull")
+        return ("sha", ["note.md"])
+
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
+        del db, progress
+        calls.append("push")
+
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.status", fake_status)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.pull", fake_pull)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.push", fake_push)
+
+    async with session_mod.async_session() as session:
+        result = await run_scheduled_sync(session)
+
+    assert calls == ["status", "push", "status"]
+    assert result.ahead == 0
+    assert result.behind == 1

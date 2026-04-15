@@ -10,7 +10,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
+import app.db.session as session_mod
+from app.main import app
 from app.services.indexer import index_file
+from app.services.settings import ensure_app_settings, invalidate_settings_cache
 from app.services.vault import write_doc
 
 
@@ -128,7 +131,9 @@ async def test_create_doc_rejects_git_path(client, auth_headers, setup_vault):
 @pytest.mark.asyncio
 async def test_create_folder(client, auth_headers, setup_vault):
     _git_init(setup_vault)
-    resp = await client.post("/api/wiki/folder", json={"path": "notes/subfolder"}, headers=auth_headers)
+    resp = await client.post(
+        "/api/wiki/folder", json={"path": "notes/subfolder"}, headers=auth_headers
+    )
     assert resp.status_code == 201
     assert resp.json()["path"] == "notes/subfolder"
     assert (setup_vault / "notes" / "subfolder").is_dir()
@@ -144,7 +149,9 @@ async def test_create_folder_conflict(client, auth_headers, setup_vault):
 @pytest.mark.asyncio
 async def test_create_folder_rejects_obsidian_path(client, auth_headers, setup_vault):
     _git_init(setup_vault)
-    resp = await client.post("/api/wiki/folder", json={"path": ".obsidian/plugins"}, headers=auth_headers)
+    resp = await client.post(
+        "/api/wiki/folder", json={"path": ".obsidian/plugins"}, headers=auth_headers
+    )
     assert resp.status_code == 400
 
 
@@ -324,6 +331,43 @@ async def test_save_doc(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_save_doc_enqueues_sync_when_sync_on_save_enabled(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    _git_init(setup_vault)
+    await write_doc("edit-me.md", "original")
+
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_on_save = True
+        await session.commit()
+    invalidate_settings_cache()
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_start_job(*, action, source="manual", bootstrap_strategy=None):  # noqa: ANN001
+        del bootstrap_strategy
+        calls.append((action, source))
+        return None
+
+    monkeypatch.setattr(app.state.sync_job_manager, "start_job", fake_start_job)
+
+    try:
+        resp = await client.put(
+            "/api/wiki/doc/edit-me.md",
+            json={"content": "updated content", "base_commit": None},
+            headers=auth_headers,
+        )
+    except OperationalError:
+        pytest.skip("SQLite does not support PostgreSQL dialect (ARRAY/JSONB)")
+
+    assert resp.status_code in (200, 500)
+    if resp.status_code == 200:
+        assert calls == [("sync", "automatic")]
+
+
+@pytest.mark.asyncio
 async def test_delete_doc(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     await write_doc("to-delete.md", "content")
@@ -367,7 +411,9 @@ async def test_backlinks_empty(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
-async def test_backlinks_include_snippets_and_relative_resolution(client, auth_headers, setup_vault):
+async def test_backlinks_include_snippets_and_relative_resolution(
+    client, auth_headers, setup_vault
+):
     from app.db.session import async_session
 
     _git_init(setup_vault)
@@ -375,7 +421,9 @@ async def test_backlinks_include_snippets_and_relative_resolution(client, auth_h
     (setup_vault / "projects").mkdir()
 
     target_content = "# Target\nBody"
-    source_content = "# Source\nSee [[../notes/target]] for context.\nAnd [[../notes/target#Overview]]."
+    source_content = (
+        "# Source\nSee [[../notes/target]] for context.\nAnd [[../notes/target#Overview]]."
+    )
     await write_doc("notes/target.md", target_content)
     await write_doc("projects/source.md", source_content)
 

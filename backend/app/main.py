@@ -1,5 +1,6 @@
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 import bcrypt
 from fastapi import FastAPI
@@ -15,16 +16,19 @@ from app.routers import (
     auth,
     dataview,
     search,
-    settings as settings_router,
     sync,
     tags,
     tasks,
     wiki,
 )
+from app.routers import (
+    settings as settings_router,
+)
 from app.services.log_buffer import install_log_buffer
 from app.services.settings import ensure_app_settings
 from app.services.sync_job_manager import SyncJobManager
 from app.services.sync_scheduler import SyncScheduler
+from app.services.sync_triggers import enqueue_startup_sync_if_enabled
 
 
 async def _ensure_initial_admin() -> None:
@@ -66,10 +70,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler = SyncScheduler(async_session)
     app.state.sync_job_manager = SyncJobManager(async_session)
     app.state.sync_scheduler = scheduler
+    app.state.sync_startup_task = asyncio.create_task(
+        enqueue_startup_sync_if_enabled(async_session, app.state.sync_job_manager),
+        name="sync-startup",
+    )
     await scheduler.start()
     try:
         yield
     finally:
+        startup_task = getattr(app.state, "sync_startup_task", None)
+        if isinstance(startup_task, asyncio.Task):
+            startup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await startup_task
         await scheduler.stop()
         await engine.dispose()
 

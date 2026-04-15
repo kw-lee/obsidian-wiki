@@ -20,6 +20,12 @@ CREATE TABLE app_settings (
     sync_interval_seconds INTEGER NOT NULL DEFAULT 300
                           CHECK (sync_interval_seconds >= 60),
     sync_auto_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+    sync_mode             TEXT NOT NULL DEFAULT 'bidirectional'
+                          CHECK (sync_mode IN ('bidirectional', 'pull-only', 'push-only')),
+    sync_run_on_startup   BOOLEAN NOT NULL DEFAULT FALSE,
+    sync_startup_delay_seconds INTEGER NOT NULL DEFAULT 10
+                          CHECK (sync_startup_delay_seconds >= 0),
+    sync_on_save          BOOLEAN NOT NULL DEFAULT FALSE,
     git_remote_url        TEXT NOT NULL DEFAULT '',
     git_branch            TEXT NOT NULL DEFAULT 'main',
     webdav_url            TEXT NOT NULL DEFAULT '',
@@ -27,6 +33,8 @@ CREATE TABLE app_settings (
     webdav_password_enc   TEXT NOT NULL DEFAULT '',
     webdav_remote_root    TEXT NOT NULL DEFAULT '/',
     webdav_verify_tls     BOOLEAN NOT NULL DEFAULT TRUE,
+    webdav_obsidian_policy TEXT NOT NULL DEFAULT 'remote-only'
+                          CHECK (webdav_obsidian_policy IN ('remote-only', 'ignore', 'include')),
     timezone              TEXT NOT NULL DEFAULT 'Asia/Seoul',
     default_theme         TEXT NOT NULL DEFAULT 'system'
                           CHECK (default_theme IN ('light', 'dark', 'system')),

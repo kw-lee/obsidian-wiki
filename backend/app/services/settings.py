@@ -14,6 +14,10 @@ class SyncRuntimeSettings:
     sync_backend: str
     sync_interval_seconds: int
     sync_auto_enabled: bool
+    sync_mode: str
+    sync_run_on_startup: bool
+    sync_startup_delay_seconds: int
+    sync_on_save: bool
     git_remote_url: str
     git_branch: str
     webdav_url: str
@@ -21,6 +25,7 @@ class SyncRuntimeSettings:
     webdav_password_enc: str
     webdav_remote_root: str
     webdav_verify_tls: bool
+    webdav_obsidian_policy: str
     timezone: str
     default_theme: str
     theme_preset: str
@@ -41,6 +46,10 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         sync_interval_seconds=row.sync_interval_seconds,
         sync_auto_enabled=row.sync_auto_enabled,
         git_remote_url=row.git_remote_url,
+        sync_mode=row.sync_mode,
+        sync_run_on_startup=row.sync_run_on_startup,
+        sync_startup_delay_seconds=row.sync_startup_delay_seconds,
+        sync_on_save=row.sync_on_save,
         git_branch=row.git_branch,
         webdav_url=row.webdav_url,
         webdav_username=row.webdav_username,
@@ -48,6 +57,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         webdav_remote_root=row.webdav_remote_root,
         webdav_verify_tls=row.webdav_verify_tls,
         timezone=row.timezone,
+        webdav_obsidian_policy=row.webdav_obsidian_policy,
         default_theme=row.default_theme,
         theme_preset=row.theme_preset,
         ui_font=row.ui_font,
@@ -70,6 +80,10 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         sync_auto_enabled=True,
         git_remote_url=settings.bootstrap_git_remote_url,
         git_branch=settings.bootstrap_git_branch,
+        sync_mode="bidirectional",
+        sync_run_on_startup=False,
+        sync_startup_delay_seconds=10,
+        sync_on_save=False,
         webdav_url="",
         webdav_username="",
         webdav_password_enc="",
@@ -77,6 +91,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         webdav_verify_tls=True,
         timezone=settings.app_timezone,
         default_theme="system",
+        webdav_obsidian_policy="remote-only",
         theme_preset="obsidian",
         ui_font="system",
         editor_font="system",

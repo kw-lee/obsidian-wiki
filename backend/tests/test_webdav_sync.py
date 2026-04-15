@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 import app.db.session as session_mod
 from app.db.models import WebDAVManifest
+from app.services.settings import ensure_app_settings, invalidate_settings_cache
 
 
 class _WebDAVState:
@@ -389,6 +390,53 @@ async def test_webdav_status_reports_divergence(client, auth_headers, webdav_ser
     assert data["backend"] == "webdav"
     assert data["ahead"] >= 1
     assert data["behind"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_webdav_ignore_obsidian_policy_skips_remote_config_files(
+    client, auth_headers, webdav_server, setup_vault
+):
+    state, base_url = webdav_server
+    state.set_file(".obsidian/workspace.json", b'{"theme":"obsidian"}')
+    await _configure_webdav(client, auth_headers, base_url)
+
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.webdav_obsidian_policy = "ignore"
+        await session.commit()
+    invalidate_settings_cache()
+
+    resp = await client.post("/api/sync/pull", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["changed_files"] == 0
+    assert not (setup_vault / ".obsidian" / "workspace.json").exists()
+
+    status_resp = await client.get("/api/sync/status", headers=auth_headers)
+    assert status_resp.status_code == 200
+    assert status_resp.json()["behind"] == 0
+
+
+@pytest.mark.asyncio
+async def test_webdav_include_obsidian_policy_uploads_local_config_files(
+    client, auth_headers, webdav_server, setup_vault
+):
+    state, base_url = webdav_server
+    (setup_vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    (setup_vault / ".obsidian" / "workspace.json").write_text(
+        '{"theme":"obsidian"}',
+        encoding="utf-8",
+    )
+    await _configure_webdav(client, auth_headers, base_url)
+
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.webdav_obsidian_policy = "include"
+        await session.commit()
+    invalidate_settings_cache()
+
+    resp = await client.post("/api/sync/push", headers=auth_headers)
+    assert resp.status_code == 200
+    assert state.files[".obsidian/workspace.json"] == b'{"theme":"obsidian"}'
 
 
 @pytest.mark.asyncio

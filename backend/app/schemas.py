@@ -164,7 +164,7 @@ class SyncStatus(BaseModel):
 
 class SyncJobResponse(BaseModel):
     id: str
-    action: Literal["pull", "push", "bootstrap"]
+    action: Literal["pull", "push", "bootstrap", "sync"]
     source: Literal["manual", "automatic"]
     backend: str | None = None
     status: Literal["queued", "running", "succeeded", "failed", "conflict"]
@@ -183,7 +183,7 @@ class SyncJobResponse(BaseModel):
 
 
 class SyncJobStartRequest(BaseModel):
-    action: Literal["pull", "push", "bootstrap"]
+    action: Literal["pull", "push", "bootstrap", "sync"]
     bootstrap_strategy: Literal["remote", "local"] | None = None
 
 
@@ -212,12 +212,17 @@ class SyncSettingsResponse(BaseModel):
     sync_backend: Literal["git", "webdav", "none"]
     sync_interval_seconds: int = Field(ge=60)
     sync_auto_enabled: bool = True
+    sync_mode: Literal["bidirectional", "pull-only", "push-only"] = "bidirectional"
+    sync_run_on_startup: bool = False
+    sync_startup_delay_seconds: int = Field(default=10, ge=0)
+    sync_on_save: bool = False
     git_remote_url: str = ""
     git_branch: str = "main"
     webdav_url: str = ""
     webdav_username: str = ""
     webdav_remote_root: str = "/"
     webdav_verify_tls: bool = True
+    webdav_obsidian_policy: Literal["remote-only", "ignore", "include"] = "remote-only"
     has_webdav_password: bool = False
     status: SyncStatus
 
@@ -226,6 +231,10 @@ class SyncSettingsUpdateRequest(BaseModel):
     sync_backend: Literal["git", "webdav", "none"]
     sync_interval_seconds: int = Field(ge=60)
     sync_auto_enabled: bool = True
+    sync_mode: Literal["bidirectional", "pull-only", "push-only"] = "bidirectional"
+    sync_run_on_startup: bool = False
+    sync_startup_delay_seconds: int = Field(default=10, ge=0)
+    sync_on_save: bool = False
     git_remote_url: str = ""
     git_branch: str = "main"
     webdav_url: str = ""
@@ -233,6 +242,7 @@ class SyncSettingsUpdateRequest(BaseModel):
     webdav_password: str | None = None
     webdav_remote_root: str = "/"
     webdav_verify_tls: bool = True
+    webdav_obsidian_policy: Literal["remote-only", "ignore", "include"] = "remote-only"
 
 
 class SyncSettingsTestRequest(BaseModel):

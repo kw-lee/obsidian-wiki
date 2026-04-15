@@ -182,11 +182,11 @@ describe("Wiki API functions", () => {
   });
 
   it("startSyncJob posts a sync job request", async () => {
-    mockApi.mockResolvedValueOnce({ id: "job-1", action: "pull" });
-    await startSyncJob({ action: "pull" });
+    mockApi.mockResolvedValueOnce({ id: "job-1", action: "sync" });
+    await startSyncJob({ action: "sync" });
     expect(mockApi).toHaveBeenCalledWith("/sync/job", {
       method: "POST",
-      body: JSON.stringify({ action: "pull" }),
+      body: JSON.stringify({ action: "sync" }),
     });
   });
 

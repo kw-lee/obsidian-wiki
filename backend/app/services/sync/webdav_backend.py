@@ -101,6 +101,24 @@ class WebDAVSyncBackend(SyncBackend):
         self.root_url = build_webdav_url(runtime.webdav_url, runtime.webdav_remote_root)
         self.root_path = urlsplit(self.root_url).path.rstrip("/") or "/"
 
+    def _ignore_obsidian_path(self, path: str) -> bool:
+        return _is_obsidian_path(path) and self.runtime.webdav_obsidian_policy == "ignore"
+
+    def _pushes_obsidian_path(self, path: str) -> bool:
+        return not _is_obsidian_path(path) or self.runtime.webdav_obsidian_policy == "include"
+
+    def _local_changed(
+        self,
+        path: str,
+        local_sha: str | None,
+        manifest_sha: str | None,
+    ) -> bool:
+        if local_sha is None:
+            return False
+        if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
+            return False
+        return local_sha != manifest_sha
+
     async def pull(
         self,
         db: AsyncSession,
@@ -139,15 +157,18 @@ class WebDAVSyncBackend(SyncBackend):
                     or manifest.etag != remote.etag
                     or not _mtime_equal(manifest.mtime, remote.mtime)
                 )
-                local_changed = local_sha is not None and local_sha != manifest_sha
+                local_changed = self._local_changed(path, local_sha, manifest_sha)
 
                 if not remote_changed:
+                    continue
+
+                if self._ignore_obsidian_path(path):
                     continue
 
                 remote_content = await self._download_file(client, path)
                 remote_sha = _hash_bytes(remote_content)
 
-                if _is_obsidian_path(path):
+                if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
                     if local_sha != remote_sha:
                         local_writes[path] = remote_content
                         changed_paths.add(path)
@@ -230,8 +251,10 @@ class WebDAVSyncBackend(SyncBackend):
                     total=total,
                 )
                 local_sha = local_hashes.get(path)
-                local_changed = local_sha is not None and local_sha != manifest.sha256
-                if _is_obsidian_path(path):
+                local_changed = self._local_changed(path, local_sha, manifest.sha256)
+                if self._ignore_obsidian_path(path):
+                    continue
+                if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
                     if local_sha is not None:
                         local_deletes.add(path)
                         changed_paths.add(path)
@@ -309,7 +332,7 @@ class WebDAVSyncBackend(SyncBackend):
             processed = 0
 
             for path, local_sha in local_hashes.items():
-                if _is_obsidian_path(path):
+                if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
                     continue
                 processed += 1
                 await emit_progress(
@@ -375,7 +398,9 @@ class WebDAVSyncBackend(SyncBackend):
                 touched_paths.add(path)
 
             for path, manifest in manifests.items():
-                if path in local_hashes or _is_obsidian_path(path):
+                if path in local_hashes:
+                    continue
+                if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
                     continue
                 processed += 1
                 await emit_progress(
@@ -460,15 +485,13 @@ class WebDAVSyncBackend(SyncBackend):
 
         all_paths = set(remote_files) | set(manifests) | set(local_hashes)
         for path in all_paths:
+            if self._ignore_obsidian_path(path):
+                continue
             manifest = manifests.get(path)
             remote = remote_files.get(path)
             local_sha = local_hashes.get(path)
             manifest_sha = manifest.sha256 if manifest else None
-            local_changed = (
-                False
-                if _is_obsidian_path(path)
-                else local_sha is not None and local_sha != manifest_sha
-            )
+            local_changed = self._local_changed(path, local_sha, manifest_sha)
 
             if remote is None:
                 remote_changed = manifest is not None
@@ -479,7 +502,7 @@ class WebDAVSyncBackend(SyncBackend):
                     manifest.mtime, remote.mtime
                 )
 
-            if _is_obsidian_path(path):
+            if _is_obsidian_path(path) and not self._pushes_obsidian_path(path):
                 if remote_changed:
                     behind += 1
                 continue

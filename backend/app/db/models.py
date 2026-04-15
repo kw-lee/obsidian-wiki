@@ -47,6 +47,18 @@ class AppSettings(Base):
     sync_auto_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    sync_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, default="bidirectional", server_default="bidirectional"
+    )
+    sync_run_on_startup: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    sync_startup_delay_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=10, server_default="10"
+    )
+    sync_on_save: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     git_remote_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     git_branch: Mapped[str] = mapped_column(
         Text, nullable=False, default="main", server_default="main"
@@ -63,6 +75,9 @@ class AppSettings(Base):
     )
     webdav_verify_tls: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
+    )
+    webdav_obsidian_policy: Mapped[str] = mapped_column(
+        Text, nullable=False, default="remote-only", server_default="remote-only"
     )
     timezone: Mapped[str] = mapped_column(
         Text, nullable=False, default="Asia/Seoul", server_default="Asia/Seoul"
@@ -102,6 +117,18 @@ class AppSettings(Base):
         ),
         CheckConstraint(
             "default_theme IN ('light', 'dark', 'system')", name="ck_app_settings_default_theme"
+        ),
+        CheckConstraint(
+            "sync_mode IN ('bidirectional', 'pull-only', 'push-only')",
+            name="ck_app_settings_sync_mode",
+        ),
+        CheckConstraint(
+            "sync_startup_delay_seconds >= 0",
+            name="ck_app_settings_sync_startup_delay_seconds",
+        ),
+        CheckConstraint(
+            "webdav_obsidian_policy IN ('remote-only', 'ignore', 'include')",
+            name="ck_app_settings_webdav_obsidian_policy",
         ),
         CheckConstraint(
             "theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')",

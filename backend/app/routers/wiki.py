@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from pathlib import PurePosixPath
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +35,7 @@ from app.services.git_ops import (
 )
 from app.services.indexer import full_reindex, index_file
 from app.services.settings import ensure_app_settings
+from app.services.sync_triggers import maybe_enqueue_sync_on_write
 from app.services.templater import TemplaterRenderContext, render_template_markdown
 from app.services.wiki_links import (
     ParsedWikiLink,
@@ -345,6 +346,7 @@ async def get_doc(
 async def save_doc(
     path: str,
     body: DocSaveRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> DocDetail:
@@ -380,6 +382,7 @@ async def save_doc(
 
     await index_file(db, path, body.content)
     await db.commit()
+    await maybe_enqueue_sync_on_write(request, db)
 
     return await get_doc(path, db)
 
@@ -387,6 +390,7 @@ async def save_doc(
 @router.post("/doc", response_model=DocDetail, status_code=status.HTTP_201_CREATED)
 async def create_doc(
     body: DocCreateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> DocDetail:
@@ -402,6 +406,7 @@ async def create_doc(
 
     await index_file(db, path, body.content)
     await db.commit()
+    await maybe_enqueue_sync_on_write(request, db)
 
     return await get_doc(path, db)
 
@@ -409,6 +414,8 @@ async def create_doc(
 @router.post("/folder", response_model=FolderCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     body: FolderCreateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> FolderCreateResponse:
     path = body.path.strip().strip("/")
@@ -423,12 +430,14 @@ async def create_folder(
 
     placeholder_path = await vault.create_folder(path)
     git_add_and_commit([placeholder_path], f"web: create folder {path}")
+    await maybe_enqueue_sync_on_write(request, db)
     return FolderCreateResponse(path=path)
 
 
 @router.post("/move", response_model=MovePathResponse)
 async def move_path(
     body: MovePathRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> MovePathResponse:
@@ -479,6 +488,7 @@ async def move_path(
             source_path, moved_path, f"web: move {source_path} -> {moved_path}"
         )
     await full_reindex(db)
+    await maybe_enqueue_sync_on_write(request, db)
     return MovePathResponse(
         path=moved_path,
         rewrite_links=body.rewrite_links,
@@ -490,6 +500,7 @@ async def move_path(
 @router.delete("/doc/{path:path}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_doc(
     path: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> None:
@@ -500,6 +511,7 @@ async def delete_doc(
     await db.execute(sql_delete(Link).where(Link.source_path == path))
     await db.execute(sql_delete(Document).where(Document.path == path))
     await db.commit()
+    await maybe_enqueue_sync_on_write(request, db)
 
 
 @router.get("/backlinks/{path:path}", response_model=list[BacklinkItem])

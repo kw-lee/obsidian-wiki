@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getSyncIndicatorState,
-  getSyncSurfaceSummary,
-} from "./sync-indicator";
+import { getSyncIndicatorState, getSyncSurfaceSummary } from "./sync-indicator";
 
 describe("sync indicator", () => {
   it("shows a running state for active jobs", () => {
@@ -143,6 +140,31 @@ describe("sync indicator", () => {
       progressTotal: 12,
       progressPercent: 25,
     });
+  });
+
+  it("returns the generic sync label for combined sync jobs", () => {
+    expect(
+      getSyncSurfaceSummary({
+        currentJob: {
+          id: "job-3b",
+          action: "sync",
+          source: "manual",
+          status: "running",
+          current: 1,
+          total: 2,
+          changed_files: 0,
+          message: "Checking sync status",
+        },
+        error: null,
+        status: {
+          backend: "git",
+          last_sync: "2026-04-13T10:00:00Z",
+          ahead: 0,
+          behind: 0,
+          dirty: false,
+        },
+      }).jobLabel,
+    ).toBe("sync.syncButton");
   });
 
   it("prefers conflict and error details for issue summaries", () => {

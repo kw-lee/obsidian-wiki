@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.schemas import SyncJobResponse
 from app.services.settings import get_runtime_sync_settings
-from app.services.sync_service import build_sync_backend
+from app.services.sync_service import build_sync_backend, run_backend_sync_cycle
 
 logger = logging.getLogger(__name__)
 
-SyncAction = Literal["pull", "push", "bootstrap"]
+SyncAction = Literal["pull", "push", "bootstrap", "sync"]
 SyncSource = Literal["manual", "automatic"]
 SyncJobStatus = Literal["queued", "running", "succeeded", "failed", "conflict"]
 
@@ -203,6 +203,22 @@ class SyncJobManager:
                         status="succeeded",
                         phase="complete",
                         message=f"Bootstrap finished ({strategy})",
+                        finished_at=_utcnow(),
+                    )
+                elif self._jobs[job_id].action == "sync":
+                    sync_status, changed_files = await run_backend_sync_cycle(
+                        db,
+                        runtime=runtime,
+                        backend=backend,
+                        progress=reporter,
+                    )
+                    await self._update_job(
+                        job_id,
+                        head=sync_status.head,
+                        changed_files=changed_files,
+                        status="succeeded",
+                        phase="complete",
+                        message="Sync finished",
                         finished_at=_utcnow(),
                     )
         except asyncio.CancelledError:

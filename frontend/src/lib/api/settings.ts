@@ -9,8 +9,10 @@ import type {
   SystemSettings,
   SyncSettings,
   SyncBackend,
+  SyncMode,
   SyncTestResult,
   VaultSettings,
+  WebdavObsidianPolicy,
 } from "$lib/types";
 
 export const fetchProfileSettings = () =>
@@ -32,6 +34,10 @@ export const updateSyncSettings = (payload: {
   sync_backend: SyncBackend;
   sync_interval_seconds: number;
   sync_auto_enabled: boolean;
+  sync_mode: SyncMode;
+  sync_run_on_startup: boolean;
+  sync_startup_delay_seconds: number;
+  sync_on_save: boolean;
   git_remote_url: string;
   git_branch: string;
   webdav_url: string;
@@ -39,6 +45,7 @@ export const updateSyncSettings = (payload: {
   webdav_password?: string;
   webdav_remote_root: string;
   webdav_verify_tls: boolean;
+  webdav_obsidian_policy: WebdavObsidianPolicy;
 }) =>
   api<SyncSettings>("/settings/sync", {
     method: "PUT",

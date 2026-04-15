@@ -11,13 +11,23 @@
     getSyncMonitor,
     isSyncJobActive,
   } from "$lib/stores/sync.svelte";
-  import type { SyncBackend, SyncJob, SyncSettings } from "$lib/types";
+  import type {
+    SyncBackend,
+    SyncJob,
+    SyncMode,
+    SyncSettings,
+    WebdavObsidianPolicy,
+  } from "$lib/types";
   import { formatDateTime } from "$lib/utils/datetime";
 
   let settings = $state<SyncSettings | null>(null);
   let syncBackend = $state<SyncBackend>("git");
   let syncIntervalSeconds = $state(300);
   let syncAutoEnabled = $state(true);
+  let syncMode = $state<SyncMode>("bidirectional");
+  let syncRunOnStartup = $state(false);
+  let syncStartupDelaySeconds = $state(10);
+  let syncOnSave = $state(false);
   let gitRemoteUrl = $state("");
   let gitBranch = $state("main");
   let webdavUrl = $state("");
@@ -25,6 +35,7 @@
   let webdavPassword = $state("");
   let webdavRemoteRoot = $state("/");
   let webdavVerifyTls = $state(true);
+  let webdavObsidianPolicy = $state<WebdavObsidianPolicy>("remote-only");
   let hasWebdavPassword = $state(false);
   let loading = $state(true);
   let saving = $state(false);
@@ -63,12 +74,17 @@
     syncBackend = data.sync_backend;
     syncIntervalSeconds = data.sync_interval_seconds;
     syncAutoEnabled = data.sync_auto_enabled;
+    syncMode = data.sync_mode;
+    syncRunOnStartup = data.sync_run_on_startup;
+    syncStartupDelaySeconds = data.sync_startup_delay_seconds;
+    syncOnSave = data.sync_on_save;
     gitRemoteUrl = data.git_remote_url;
     gitBranch = data.git_branch;
     webdavUrl = data.webdav_url;
     webdavUsername = data.webdav_username;
     webdavRemoteRoot = data.webdav_remote_root;
     webdavVerifyTls = data.webdav_verify_tls;
+    webdavObsidianPolicy = data.webdav_obsidian_policy;
     hasWebdavPassword = data.has_webdav_password;
     webdavPassword = "";
   }
@@ -100,6 +116,10 @@
         sync_backend: syncBackend,
         sync_interval_seconds: syncIntervalSeconds,
         sync_auto_enabled: syncAutoEnabled,
+        sync_mode: syncMode,
+        sync_run_on_startup: syncRunOnStartup,
+        sync_startup_delay_seconds: syncStartupDelaySeconds,
+        sync_on_save: syncOnSave,
         git_remote_url: gitRemoteUrl,
         git_branch: gitBranch,
         webdav_url: webdavUrl,
@@ -107,6 +127,7 @@
         webdav_password: webdavPassword || undefined,
         webdav_remote_root: webdavRemoteRoot,
         webdav_verify_tls: webdavVerifyTls,
+        webdav_obsidian_policy: webdavObsidianPolicy,
       });
       hydrate(updated);
       success = t("sync.saveSuccess");
@@ -117,17 +138,31 @@
     }
   }
 
-  async function runSyncAction(kind: "pull" | "push") {
+  async function runSyncAction(kind: "pull" | "push" | "sync") {
     error = "";
     success = "";
     try {
       await enqueueSyncJob({ action: kind });
       success = t(
-        kind === "pull" ? "sync.jobPullStarted" : "sync.jobPushStarted",
+        kind === "pull"
+          ? "sync.jobPullStarted"
+          : kind === "push"
+            ? "sync.jobPushStarted"
+            : "sync.jobSyncStarted",
       );
     } catch (err) {
       error =
-        err instanceof Error ? err.message : t("sync.actionFailed", { kind });
+        err instanceof Error
+          ? err.message
+          : t("sync.actionFailed", {
+              kind: t(
+                kind === "pull"
+                  ? "sync.pullButton"
+                  : kind === "push"
+                    ? "sync.pushButton"
+                    : "sync.syncButton",
+              ),
+            });
     }
   }
 
@@ -197,14 +232,22 @@
     pendingBackend = null;
   }
 
-  function syncJobTitle(job: SyncJob | null | undefined = syncMonitor.currentJob) {
+  function syncJobTitle(
+    job: SyncJob | null | undefined = syncMonitor.currentJob,
+  ) {
     if (!job) return "";
-    if (job.action === "bootstrap") {
-      return job.bootstrap_strategy === "remote"
-        ? t("sync.bootstrapRemoteTitle")
-        : t("sync.bootstrapLocalTitle");
+    switch (job.action) {
+      case "bootstrap":
+        return job.bootstrap_strategy === "remote"
+          ? t("sync.bootstrapRemoteTitle")
+          : t("sync.bootstrapLocalTitle");
+      case "sync":
+        return t("sync.syncButton");
+      case "pull":
+        return t("sync.pullButton");
+      case "push":
+        return t("sync.pushButton");
     }
-    return job.action === "pull" ? t("sync.pullButton") : t("sync.pushButton");
   }
 
   function formatSyncJobDuration(job: SyncJob) {
@@ -393,6 +436,68 @@
         <p class="notice">{t("sync.noneNotice")}</p>
       {/if}
 
+      {#if syncBackend !== "none"}
+        <div class="subpanel">
+          <h3>{t("sync.advancedTitle")}</h3>
+          <p class="subcopy">{t("sync.advancedDescription")}</p>
+
+          <label>
+            <span>{t("sync.mode")}</span>
+            <select bind:value={syncMode}>
+              <option value="bidirectional"
+                >{t("sync.mode.bidirectional")}</option
+              >
+              <option value="pull-only">{t("sync.mode.pullOnly")}</option>
+              <option value="push-only">{t("sync.mode.pushOnly")}</option>
+            </select>
+            <small class="field-help">{t("sync.modeHelp")}</small>
+          </label>
+
+          <label class="toggle">
+            <span>{t("sync.runOnStartup")}</span>
+            <input type="checkbox" bind:checked={syncRunOnStartup} />
+          </label>
+          <p class="notice">{t("sync.runOnStartupHelp")}</p>
+
+          <label>
+            <span>{t("sync.startupDelay")}</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              bind:value={syncStartupDelaySeconds}
+              disabled={!syncRunOnStartup}
+            />
+            <small class="field-help">{t("sync.startupDelayHelp")}</small>
+          </label>
+
+          <label class="toggle">
+            <span>{t("sync.syncOnSave")}</span>
+            <input type="checkbox" bind:checked={syncOnSave} />
+          </label>
+          <p class="notice">{t("sync.syncOnSaveHelp")}</p>
+
+          {#if syncBackend === "webdav"}
+            <label>
+              <span>{t("sync.obsidianPolicy")}</span>
+              <select bind:value={webdavObsidianPolicy}>
+                <option value="remote-only"
+                  >{t("sync.obsidianPolicy.remoteOnly")}</option
+                >
+                <option value="ignore">{t("sync.obsidianPolicy.ignore")}</option
+                >
+                <option value="include"
+                  >{t("sync.obsidianPolicy.include")}</option
+                >
+              </select>
+              <small class="field-help">{t("sync.obsidianPolicyHelp")}</small>
+            </label>
+          {:else if syncBackend === "git"}
+            <p class="notice">{t("sync.obsidianPolicyGitNotice")}</p>
+          {/if}
+        </div>
+      {/if}
+
       {#if error}
         <p class="feedback error">{error}</p>
       {/if}
@@ -411,6 +516,16 @@
           onclick={handleTestConnection}
         >
           {testing ? t("sync.testingButton") : t("sync.testButton")}
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          disabled={hasActiveSyncJob}
+          onclick={() => runSyncAction("sync")}
+        >
+          {hasActiveSyncJob && syncMonitor.currentJob?.action === "sync"
+            ? t("sync.syncingButton")
+            : t("sync.syncButton")}
         </button>
         <button
           type="button"
@@ -490,7 +605,11 @@
                       job.finished_at ?? job.updated_at ?? job.started_at,
                     )}</span
                   >
-                  <span>{t("sync.jobChangedFiles", { count: job.changed_files })}</span>
+                  <span
+                    >{t("sync.jobChangedFiles", {
+                      count: job.changed_files,
+                    })}</span
+                  >
                 </div>
               </summary>
 
@@ -510,7 +629,10 @@
                 <p>
                   <span>{t("sync.jobBackend")}</span>
                   <strong
-                    >{job.backend ?? settings?.status.backend ?? syncMonitor.status?.backend ?? "-"}</strong
+                    >{job.backend ??
+                      settings?.status.backend ??
+                      syncMonitor.status?.backend ??
+                      "-"}</strong
                   >
                 </p>
                 <p>
@@ -635,6 +757,7 @@
   }
 
   .copy,
+  .subcopy,
   .state {
     margin: 0.65rem 0 0;
     color: var(--text-muted);
@@ -658,7 +781,8 @@
 
   input[type="text"],
   input[type="number"],
-  input[type="password"] {
+  input[type="password"],
+  select {
     padding: 0.85rem 1rem;
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -736,6 +860,12 @@
   .bootstrap-panel p,
   .progress-copy {
     color: var(--text-secondary);
+  }
+
+  .field-help {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
 
   .history-card {

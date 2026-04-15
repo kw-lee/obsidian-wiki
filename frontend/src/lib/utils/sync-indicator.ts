@@ -38,13 +38,19 @@ const FINAL_STATUSES = new Set<SyncJob["status"]>([
   "conflict",
 ]);
 
-export function getSyncJobLabel(job: SyncJob | null | undefined): string | null {
+export function getSyncJobLabel(
+  job: SyncJob | null | undefined,
+): string | null {
   if (!job) return null;
 
   if (job.action === "bootstrap") {
     return job.bootstrap_strategy === "remote"
       ? "sync.bootstrapRemoteTitle"
       : "sync.bootstrapLocalTitle";
+  }
+
+  if (job.action === "sync") {
+    return "sync.syncButton";
   }
 
   return job.action === "pull" ? "sync.pullButton" : "sync.pushButton";
@@ -79,7 +85,8 @@ export function getSyncSurfaceSummary(input: {
   const progressTotal = currentJob?.total ?? null;
   const progressPercent =
     currentJob && currentJob.total > 0
-      ? currentJob.progress_percent ?? Math.round((currentJob.current / currentJob.total) * 100)
+      ? (currentJob.progress_percent ??
+        Math.round((currentJob.current / currentJob.total) * 100))
       : null;
 
   return {

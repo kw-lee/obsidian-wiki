@@ -132,7 +132,7 @@ export interface SyncStatus {
 
 export interface SyncJob {
   id: string;
-  action: "pull" | "push" | "bootstrap";
+  action: "pull" | "push" | "bootstrap" | "sync";
   source: "manual" | "automatic";
   backend?: string | null;
   status: "queued" | "running" | "succeeded" | "failed" | "conflict";
@@ -164,17 +164,24 @@ export interface ProfileSettings {
 }
 
 export type SyncBackend = "git" | "webdav" | "none";
+export type SyncMode = "bidirectional" | "pull-only" | "push-only";
+export type WebdavObsidianPolicy = "remote-only" | "ignore" | "include";
 
 export interface SyncSettings {
   sync_backend: SyncBackend;
   sync_interval_seconds: number;
   sync_auto_enabled: boolean;
+  sync_mode: SyncMode;
+  sync_run_on_startup: boolean;
+  sync_startup_delay_seconds: number;
+  sync_on_save: boolean;
   git_remote_url: string;
   git_branch: string;
   webdav_url: string;
   webdav_username: string;
   webdav_remote_root: string;
   webdav_verify_tls: boolean;
+  webdav_obsidian_policy: WebdavObsidianPolicy;
   has_webdav_password: boolean;
   status: SyncStatus;
 }

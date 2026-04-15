@@ -88,7 +88,7 @@ export const syncPush = () => api("/sync/push", { method: "POST" });
 export const fetchSyncStatus = () => api<SyncStatus>("/sync/status");
 
 export const startSyncJob = (payload: {
-  action: "pull" | "push" | "bootstrap";
+  action: "pull" | "push" | "bootstrap" | "sync";
   bootstrap_strategy?: "remote" | "local";
 }) =>
   api<SyncJob>("/sync/job", {

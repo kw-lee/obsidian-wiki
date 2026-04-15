@@ -4,8 +4,10 @@
   import { t } from "$lib/i18n/index.svelte";
   import { logout } from "$lib/stores/auth.svelte";
   import {
+    enqueueSyncJob,
     getSyncMonitor,
     getSyncMonitorSummary,
+    isSyncJobActive,
   } from "$lib/stores/sync.svelte";
   import { toggleTheme, getTheme } from "$lib/stores/theme.svelte";
   import { getSyncIndicatorState } from "$lib/utils/sync-indicator";
@@ -13,11 +15,13 @@
 
   let {
     onsearch,
+    oncommand = () => {},
     onsidebartoggle = () => {},
     showSidebarToggle = false,
     sidebarOpen = false,
   }: {
     onsearch: () => void;
+    oncommand?: () => void;
     onsidebartoggle?: () => void;
     showSidebarToggle?: boolean;
     sidebarOpen?: boolean;
@@ -72,12 +76,42 @@
   );
 
   const syncSummary = $derived(getSyncMonitorSummary(syncMonitor));
+  let manualSyncError = $state<string | null>(null);
+  let manualSyncStarting = $state(false);
+  const hasActiveSyncJob = $derived(isSyncJobActive(syncMonitor.currentJob));
+  const manualSyncDisabled = $derived(
+    syncMonitor.status?.backend === "none" ||
+      hasActiveSyncJob ||
+      manualSyncStarting,
+  );
 
   function syncPillLabel() {
     if (syncMonitor.currentJob?.message && syncIndicator.tone === "running") {
       return syncMonitor.currentJob.message;
     }
     return t(syncIndicator.messageKey);
+  }
+
+  $effect(() => {
+    if (!syncOpen) {
+      manualSyncError = null;
+    }
+  });
+
+  async function handleManualSync() {
+    manualSyncError = null;
+    manualSyncStarting = true;
+
+    try {
+      await enqueueSyncJob({ action: "sync" });
+    } catch (error) {
+      manualSyncError =
+        error instanceof Error
+          ? error.message
+          : t("sync.actionFailed", { kind: t("sync.syncButton") });
+    } finally {
+      manualSyncStarting = false;
+    }
   }
 </script>
 
@@ -222,9 +256,28 @@
               <p class="sync-issue warning">{syncMonitor.status.message}</p>
             {/if}
 
-            <a href="/settings/sync" class="sync-settings-link"
-              >{t("header.settings")}</a
-            >
+            {#if manualSyncError}
+              <p class="sync-issue error">{manualSyncError}</p>
+            {/if}
+
+            <div class="sync-popover-actions">
+              <button
+                type="button"
+                class="sync-action-btn"
+                disabled={manualSyncDisabled}
+                aria-busy={manualSyncStarting}
+                onclick={handleManualSync}
+              >
+                {manualSyncStarting ||
+                (hasActiveSyncJob && syncMonitor.currentJob?.action === "sync")
+                  ? t("sync.syncingButton")
+                  : t("sync.syncNowButton")}
+              </button>
+
+              <a href="/settings/sync" class="sync-settings-link"
+                >{t("header.settings")}</a
+              >
+            </div>
           </div>
         {/if}
       {/if}
@@ -495,8 +548,37 @@
   .sync-issue.error {
     color: #dc2626;
   }
+  .sync-popover-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .sync-action-btn {
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel-hover));
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      transform 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease;
+  }
+  .sync-action-btn:hover:enabled {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    background: color-mix(in srgb, var(--accent) 18%, var(--bg-panel-hover));
+  }
+  .sync-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
   .sync-settings-link {
-    justify-self: end;
     font-size: 0.78rem;
     color: var(--accent);
   }

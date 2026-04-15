@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -32,10 +33,8 @@ class SyncScheduler:
         if self._task is None:
             return
         self._task.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await self._task
-        except asyncio.CancelledError:
-            pass
         self._task = None
 
     async def reload(self) -> None:
@@ -48,7 +47,6 @@ class SyncScheduler:
                 async with self._session_factory() as db:
                     runtime = await get_runtime_sync_settings(db, use_cache=False)
                     interval = max(runtime.sync_interval_seconds, 60)
-                    await self._runner(db)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -56,3 +54,11 @@ class SyncScheduler:
                 interval = 60
 
             await asyncio.sleep(interval)
+
+            try:
+                async with self._session_factory() as db:
+                    await self._runner(db)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Scheduled sync iteration failed")

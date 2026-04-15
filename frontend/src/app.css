@@ -84,6 +84,9 @@
   --sidebar-width: 260px;
   --right-panel-width: 280px;
   --header-height: 48px;
+  --layer-header: 40;
+  --layer-popover: 50;
+  --layer-overlay: 60;
   --font-ui-system:
     "Avenir Next", "Pretendard", "Spoqa Han Sans Neo", "Noto Sans KR",
     sans-serif;
@@ -406,6 +409,20 @@ body::before {
     linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 28%),
     linear-gradient(0deg, rgba(0, 0, 0, 0.06), transparent 30%);
   opacity: 0.7;
+}
+
+body .header {
+  position: relative;
+  z-index: var(--layer-header);
+  isolation: isolate;
+}
+
+body .sync-popover {
+  z-index: var(--layer-popover);
+}
+
+body .overlay {
+  z-index: var(--layer-overlay);
 }
 
 a {

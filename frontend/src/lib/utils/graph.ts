@@ -1,6 +1,12 @@
 import type { GraphData, GraphEdge, GraphNode } from "$lib/types";
 
 export type GraphDepth = "all" | "1" | "2" | "3";
+export const DEFAULT_GRAPH_CONTROLS_OPEN = false;
+export const DEFAULT_GRAPH_DETAILS_OPEN = false;
+export const DEFAULT_GRAPH_CENTER_FORCE = 0.08;
+export const DEFAULT_GRAPH_REPEL_STRENGTH = 120;
+export const DEFAULT_GRAPH_LINK_STRENGTH = 0.35;
+export const DEFAULT_GRAPH_LINK_DISTANCE = 46;
 
 interface FilterGraphOptions {
   depth: GraphDepth;
@@ -15,19 +21,27 @@ export interface RankedGraphNode extends GraphNode {
   folder: string;
 }
 
-export function isUnresolvedGraphNode(node: GraphNode | null | undefined): boolean {
+export function isUnresolvedGraphNode(
+  node: GraphNode | null | undefined,
+): boolean {
   return node?.kind === "unresolved";
 }
 
-export function isAttachmentGraphNode(node: GraphNode | null | undefined): boolean {
+export function isAttachmentGraphNode(
+  node: GraphNode | null | undefined,
+): boolean {
   return node?.kind === "attachment";
 }
 
-export function isAmbiguousGraphNode(node: GraphNode | null | undefined): boolean {
+export function isAmbiguousGraphNode(
+  node: GraphNode | null | undefined,
+): boolean {
   return node?.kind === "ambiguous";
 }
 
-export function isNavigableGraphNode(node: GraphNode | null | undefined): boolean {
+export function isNavigableGraphNode(
+  node: GraphNode | null | undefined,
+): boolean {
   return node ? node.kind !== "ambiguous" : false;
 }
 
@@ -40,6 +54,12 @@ export interface GraphRouteState {
   query: string;
   showLabels: boolean;
   physicsEnabled: boolean;
+  showControls: boolean;
+  showDetails: boolean;
+  centerForce: number;
+  repelStrength: number;
+  linkStrength: number;
+  linkDistance: number;
 }
 
 export function filterGraphData(
@@ -87,7 +107,9 @@ export function filterGraphData(
   if (tag) {
     const matches = new Set(
       scopedNodes
-        .filter((node) => node.tags.some((entry) => normalizeTag(entry) === tag))
+        .filter((node) =>
+          node.tags.some((entry) => normalizeTag(entry) === tag),
+        )
         .map((node) => node.id),
     );
 
@@ -135,7 +157,8 @@ export function getNeighborNodes(
     return [];
   }
 
-  const neighborIds = buildAdjacency(data.edges).get(nodeId) ?? new Set<string>();
+  const neighborIds =
+    buildAdjacency(data.edges).get(nodeId) ?? new Set<string>();
   return data.nodes.filter((node) => neighborIds.has(node.id));
 }
 
@@ -239,22 +262,52 @@ export function parseGraphRouteState(
   const tagParam = searchParams.get("tag")?.trim() ?? "";
   const queryParam = searchParams.get("q")?.trim() ?? "";
   const depthParam = searchParams.get("depth")?.trim() ?? "";
+  const controlsParam = searchParams.get("controls")?.trim() ?? "";
+  const detailsParam = searchParams.get("details")?.trim() ?? "";
 
   return {
     focusPath: focusParam || fallbackFocusPath,
     selectedNodeId: selectedParam || null,
-    depth: isGraphDepth(depthParam) ? depthParam : fallbackFocusPath ? "2" : "all",
+    depth: isGraphDepth(depthParam)
+      ? depthParam
+      : fallbackFocusPath
+        ? "2"
+        : "all",
     folder: folderParam || "__all__",
     tag: tagParam || "__all__",
     query: queryParam,
     showLabels: searchParams.get("labels") !== "0",
     physicsEnabled: searchParams.get("physics") !== "0",
+    showControls: controlsParam === "1",
+    showDetails: detailsParam === "1",
+    centerForce: parseGraphNumber(
+      searchParams.get("center"),
+      DEFAULT_GRAPH_CENTER_FORCE,
+      0.01,
+      0.24,
+    ),
+    repelStrength: parseGraphNumber(
+      searchParams.get("repel"),
+      DEFAULT_GRAPH_REPEL_STRENGTH,
+      20,
+      320,
+    ),
+    linkStrength: parseGraphNumber(
+      searchParams.get("link"),
+      DEFAULT_GRAPH_LINK_STRENGTH,
+      0.05,
+      1,
+    ),
+    linkDistance: parseGraphNumber(
+      searchParams.get("distance"),
+      DEFAULT_GRAPH_LINK_DISTANCE,
+      24,
+      180,
+    ),
   };
 }
 
-export function buildGraphRouteSearch(
-  state: GraphRouteState,
-): URLSearchParams {
+export function buildGraphRouteSearch(state: GraphRouteState): URLSearchParams {
   const params = new URLSearchParams();
 
   if (state.focusPath) {
@@ -281,6 +334,24 @@ export function buildGraphRouteSearch(
   if (!state.physicsEnabled) {
     params.set("physics", "0");
   }
+  if (state.showControls) {
+    params.set("controls", "1");
+  }
+  if (state.showDetails) {
+    params.set("details", "1");
+  }
+  if (state.centerForce !== DEFAULT_GRAPH_CENTER_FORCE) {
+    params.set("center", formatGraphNumber(state.centerForce));
+  }
+  if (state.repelStrength !== DEFAULT_GRAPH_REPEL_STRENGTH) {
+    params.set("repel", formatGraphNumber(state.repelStrength));
+  }
+  if (state.linkStrength !== DEFAULT_GRAPH_LINK_STRENGTH) {
+    params.set("link", formatGraphNumber(state.linkStrength));
+  }
+  if (state.linkDistance !== DEFAULT_GRAPH_LINK_DISTANCE) {
+    params.set("distance", formatGraphNumber(state.linkDistance));
+  }
 
   return params;
 }
@@ -292,7 +363,9 @@ function collectNeighborhood(
 ): Set<string> {
   const maxDepth = Number(depth);
   const visited = new Set<string>([focusPath]);
-  const queue: Array<{ id: string; depth: number }> = [{ id: focusPath, depth: 0 }];
+  const queue: Array<{ id: string; depth: number }> = [
+    { id: focusPath, depth: 0 },
+  ];
   const adjacency = buildAdjacency(data.edges);
 
   while (queue.length > 0) {
@@ -366,8 +439,27 @@ function matchesFolder(nodeId: string, folder: string): boolean {
 }
 
 function normalizeTag(tag: string | null | undefined): string {
-  return (tag ?? "")
-    .trim()
-    .replace(/^#/, "")
-    .toLowerCase();
+  return (tag ?? "").trim().replace(/^#/, "").toLowerCase();
+}
+
+function parseGraphNumber(
+  rawValue: string | null,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function formatGraphNumber(value: number): string {
+  return Number(value.toFixed(2)).toString();
 }

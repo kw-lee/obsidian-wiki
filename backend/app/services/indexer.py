@@ -1,8 +1,9 @@
-"""Full and incremental indexing of vault markdown files into the database."""
+"""Full and incremental indexing of vault files into the database."""
 
 import hashlib
 import json
 import logging
+import mimetypes
 import re
 from pathlib import Path
 
@@ -13,12 +14,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.models import Document, Link, Tag
+from app.db.models import Attachment, Document, Link, Tag
 
 logger = logging.getLogger(__name__)
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 TAG_RE = re.compile(r"(?:^|\s)#([a-zA-Z0-9가-힣_/-]+)", re.MULTILINE)
+NOTE_EXTENSIONS = {".md", ".mdx"}
 
 
 def _extract_links(content: str) -> list[tuple[str, str | None]]:
@@ -95,6 +97,34 @@ def _storage_payloads(
     return frontmatter, tags
 
 
+def _is_indexed_attachment(path: Path, vault_root: Path) -> bool:
+    if not path.is_file():
+        return False
+    if path.suffix.lower() in NOTE_EXTENSIONS:
+        return False
+
+    relative_parts = path.relative_to(vault_root).parts
+    return not any(part.startswith(".") for part in relative_parts)
+
+
+async def index_attachment_file(session: AsyncSession, relative_path: str, full_path: Path) -> None:
+    mime_type = mimetypes.guess_type(relative_path)[0] or "application/octet-stream"
+    stmt = insert(Attachment).values(
+        path=relative_path,
+        mime_type=mime_type,
+        size_bytes=full_path.stat().st_size,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["path"],
+        set_={
+            "mime_type": stmt.excluded.mime_type,
+            "size_bytes": stmt.excluded.size_bytes,
+            "updated_at": func.now(),
+        },
+    )
+    await session.execute(stmt)
+
+
 async def index_file(session: AsyncSession, relative_path: str, content: str) -> None:
     """Index a single markdown file."""
     fm = frontmatter.loads(content)
@@ -146,23 +176,29 @@ async def index_file(session: AsyncSession, relative_path: str, content: str) ->
             .on_conflict_do_nothing()
         )
 
+    await session.execute(delete(Attachment).where(Attachment.path == relative_path))
     await session.flush()
 
 
 async def full_reindex(session: AsyncSession) -> int:
-    """Reindex all markdown files in the vault. Returns count."""
+    """Reindex all markdown files and attachments in the vault. Returns markdown count."""
     vault = Path(settings.vault_local_path)
     await session.execute(delete(Link))
     await session.execute(delete(Document))
+    await session.execute(delete(Attachment))
 
     count = 0
-    for md_file in vault.rglob("*.md"):
-        if md_file.name.startswith(".") or ".obsidian" in md_file.parts:
+    for path in vault.rglob("*"):
+        if path.name.startswith(".") or ".obsidian" in path.parts:
             continue
-        relative = str(md_file.relative_to(vault))
-        content = md_file.read_text(encoding="utf-8", errors="replace")
-        await index_file(session, relative, content)
-        count += 1
+        relative = path.relative_to(vault).as_posix()
+        if path.is_file() and path.suffix.lower() in NOTE_EXTENSIONS:
+            content = path.read_text(encoding="utf-8", errors="replace")
+            await index_file(session, relative, content)
+            count += 1
+            continue
+        if _is_indexed_attachment(path, vault):
+            await index_attachment_file(session, relative, path)
 
     # Refresh tag counts
     await _refresh_tag_counts(session)
@@ -176,13 +212,19 @@ async def incremental_reindex(session: AsyncSession, changed_paths: list[str]) -
     vault = Path(settings.vault_local_path)
     for rel in changed_paths:
         full_path = vault / rel
-        if full_path.exists() and full_path.suffix.lower() == ".md":
+        if full_path.exists() and full_path.suffix.lower() in NOTE_EXTENSIONS:
             content = full_path.read_text(encoding="utf-8", errors="replace")
             await index_file(session, rel, content)
+            await session.execute(delete(Attachment).where(Attachment.path == rel))
+        elif full_path.exists() and _is_indexed_attachment(full_path, vault):
+            await index_attachment_file(session, rel, full_path)
+            await session.execute(delete(Link).where(Link.source_path == rel))
+            await session.execute(delete(Document).where(Document.path == rel))
         else:
             # Deleted file
             await session.execute(delete(Link).where(Link.source_path == rel))
             await session.execute(delete(Document).where(Document.path == rel))
+            await session.execute(delete(Attachment).where(Attachment.path == rel))
 
     await _refresh_tag_counts(session)
     await session.commit()

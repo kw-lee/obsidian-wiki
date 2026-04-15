@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
 
 from app.routers.attachments import MAX_ATTACHMENT_SIZE
 
@@ -41,6 +42,9 @@ async def test_get_attachment_not_found(client, auth_headers, setup_vault):
 
 @pytest.mark.asyncio
 async def test_upload_and_get_attachment(client, auth_headers, setup_vault):
+    from app.db.models import Attachment
+    from app.db.session import async_session
+
     _git_init(setup_vault)
     # Upload
     resp = await client.post(
@@ -53,6 +57,13 @@ async def test_upload_and_get_attachment(client, auth_headers, setup_vault):
     data = resp.json()
     assert data["path"] == "attachments/test.txt"
     assert data["size"] == 11
+
+    async with async_session() as session:
+        result = await session.execute(select(Attachment).where(Attachment.path == data["path"]))
+        attachment = result.scalar_one()
+
+    assert attachment.mime_type == "text/plain"
+    assert attachment.size_bytes == 11
 
     # Get
     resp = await client.get(f"/api/attachments/{data['path']}", headers=auth_headers)

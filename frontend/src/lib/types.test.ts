@@ -319,10 +319,12 @@ describe("Type contracts", () => {
   it("PluginSettings has expected shape", () => {
     const plugin: PluginSettings = {
       dataview_enabled: true,
+      dataview_show_source: false,
       folder_note_enabled: true,
       templater_enabled: false,
     };
     expect(plugin.dataview_enabled).toBe(true);
+    expect(plugin.dataview_show_source).toBe(false);
     expect(plugin.folder_note_enabled).toBe(true);
   });
 

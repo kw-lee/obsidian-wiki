@@ -254,6 +254,10 @@ class SystemAuditResponse(BaseModel):
     entries: list[ProfileAuditEntry]
 
 
+class DocAuditResponse(BaseModel):
+    entries: list[ProfileAuditEntry]
+
+
 class AuthTokenPair(BaseModel):
     access_token: str
     refresh_token: str
@@ -343,12 +347,14 @@ class AppearanceSettingsUpdateRequest(BaseModel):
 
 class PluginSettingsResponse(BaseModel):
     dataview_enabled: bool = True
+    dataview_show_source: bool = False
     folder_note_enabled: bool = False
     templater_enabled: bool = False
 
 
 class PluginSettingsUpdateRequest(BaseModel):
     dataview_enabled: bool = True
+    dataview_show_source: bool = False
     folder_note_enabled: bool = False
     templater_enabled: bool = False
 

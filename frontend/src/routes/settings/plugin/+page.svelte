@@ -13,6 +13,7 @@
   let error = $state("");
   let success = $state("");
   let dataviewEnabled = $state(true);
+  let dataviewShowSource = $state(false);
   let folderNoteEnabled = $state(false);
   let templaterEnabled = $state(false);
 
@@ -36,6 +37,7 @@
       const data = await fetchPluginSettings();
       pluginSettings = data;
       dataviewEnabled = data.dataview_enabled;
+      dataviewShowSource = data.dataview_show_source;
       folderNoteEnabled = data.folder_note_enabled;
       templaterEnabled = data.templater_enabled;
     } catch (err) {
@@ -61,6 +63,7 @@
     try {
       pluginSettings = await updatePluginSettings({
         dataview_enabled: dataviewEnabled,
+        dataview_show_source: dataviewShowSource,
         folder_note_enabled: folderNoteEnabled,
         templater_enabled: templaterEnabled,
       });
@@ -116,6 +119,19 @@
         <p class="copy">{t("plugin.dataview.description")}</p>
         <p class="detail-note">{t("plugin.dataview.supportedSubset")}</p>
         <p class="detail-note">{t("plugin.dataview.limits")}</p>
+        <label class="plugin-option">
+          <div>
+            <strong>{t("plugin.dataview.showSourceLabel")}</strong>
+            <p class="detail-note">
+              {t("plugin.dataview.showSourceDescription")}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            bind:checked={dataviewShowSource}
+            aria-label={t("plugin.dataview.showSourceLabel")}
+          />
+        </label>
         <a
           class="plugin-link"
           href={DATAVIEW_REPO_URL}
@@ -284,6 +300,26 @@
     color: var(--accent);
     font-weight: 600;
     text-decoration: none;
+  }
+
+  .plugin-option {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    padding-top: 0.25rem;
+  }
+
+  .plugin-option strong {
+    display: block;
+    font-size: 0.95rem;
+  }
+
+  .plugin-option input {
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.2rem;
+    accent-color: var(--accent);
   }
 
   .save-button {

@@ -204,6 +204,7 @@ describe("Settings API functions", () => {
   it("fetchPluginSettings calls the plugin endpoint", async () => {
     mockApi.mockResolvedValueOnce({
       dataview_enabled: true,
+      dataview_show_source: false,
       folder_note_enabled: false,
       templater_enabled: false,
     });
@@ -214,11 +215,13 @@ describe("Settings API functions", () => {
   it("updatePluginSettings sends PUT payload", async () => {
     mockApi.mockResolvedValueOnce({
       dataview_enabled: false,
+      dataview_show_source: true,
       folder_note_enabled: true,
       templater_enabled: true,
     });
     await updatePluginSettings({
       dataview_enabled: false,
+      dataview_show_source: true,
       folder_note_enabled: true,
       templater_enabled: true,
     });
@@ -226,6 +229,7 @@ describe("Settings API functions", () => {
       method: "PUT",
       body: JSON.stringify({
         dataview_enabled: false,
+        dataview_show_source: true,
         folder_note_enabled: true,
         templater_enabled: true,
       }),

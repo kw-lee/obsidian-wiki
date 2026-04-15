@@ -541,6 +541,7 @@ async def get_plugin_settings(
     row = await ensure_app_settings(db)
     return PluginSettingsResponse(
         dataview_enabled=row.dataview_enabled,
+        dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
     )
@@ -554,12 +555,14 @@ async def update_plugin_settings(
 ) -> PluginSettingsResponse:
     row = await ensure_app_settings(db)
     row.dataview_enabled = body.dataview_enabled
+    row.dataview_show_source = body.dataview_show_source
     row.folder_note_enabled = body.folder_note_enabled
     row.templater_enabled = body.templater_enabled
     await db.commit()
     invalidate_settings_cache()
     return PluginSettingsResponse(
         dataview_enabled=row.dataview_enabled,
+        dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
     )

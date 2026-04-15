@@ -19,6 +19,7 @@ import {
   fetchGraph,
   fetchTasks,
   movePath,
+  fetchDataviewContext,
   queryDataview,
   syncPull,
   syncPush,
@@ -156,6 +157,12 @@ describe("Wiki API functions", () => {
       method: "POST",
       body: JSON.stringify({ query: 'LIST FROM "projects"' }),
     });
+  });
+
+  it("fetchDataviewContext calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ pages: [] });
+    await fetchDataviewContext();
+    expect(mockApi).toHaveBeenCalledWith("/dataview/context");
   });
 
   it("syncPull sends POST", async () => {

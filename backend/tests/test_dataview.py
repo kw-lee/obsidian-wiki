@@ -122,3 +122,42 @@ async def test_dataview_rejects_queries_when_plugin_disabled(client, auth_header
     )
     assert resp.status_code == 409
     assert resp.json()["detail"] == "Dataview compatibility is disabled"
+
+
+@pytest.mark.asyncio
+async def test_dataview_context_returns_pages_and_links(client, auth_headers, setup_vault):
+    _git_init(setup_vault)
+
+    try:
+        beta = await client.post(
+            "/api/wiki/doc",
+            json={"path": "notes/beta.md", "content": "---\nstatus: done\n---\n# Beta"},
+            headers=auth_headers,
+        )
+        alpha = await client.post(
+            "/api/wiki/doc",
+            json={
+                "path": "notes/alpha.md",
+                "content": "---\nstatus: active\n---\n# Alpha\n\nSee [[notes/beta]].",
+            },
+            headers=auth_headers,
+        )
+    except OperationalError:
+        pytest.skip("SQLite does not support PostgreSQL dialect (ARRAY/JSONB)")
+    assert beta.status_code in (201, 500)
+    assert alpha.status_code in (201, 500)
+    if beta.status_code != 201 or alpha.status_code != 201:
+        pytest.skip("SQLite document upsert is not available")
+
+    resp = await client.get("/api/dataview/context", headers=auth_headers)
+    assert resp.status_code == 200
+    pages = {page["path"]: page for page in resp.json()["pages"]}
+    alpha_page = pages["notes/alpha.md"]
+    beta_page = pages["notes/beta.md"]
+
+    assert alpha_page["frontmatter"]["status"] == "active"
+    assert alpha_page["file"]["name"] == "alpha"
+    assert alpha_page["file"]["folder"] == "notes"
+    assert alpha_page["file"]["link"] == {"path": "notes/alpha.md", "display": "alpha"}
+    assert alpha_page["file"]["outlinks"] == [{"path": "notes/beta.md", "display": "beta"}]
+    assert beta_page["file"]["inlinks"] == [{"path": "notes/alpha.md", "display": "alpha"}]

@@ -491,6 +491,7 @@ async def test_get_plugin_settings(client, auth_headers, setup_vault):
     assert resp.status_code == 200
     assert resp.json() == {
         "dataview_enabled": True,
+        "dataview_show_source": False,
         "folder_note_enabled": False,
         "templater_enabled": False,
     }
@@ -502,6 +503,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
         "/api/settings/plugin",
         json={
             "dataview_enabled": False,
+            "dataview_show_source": True,
             "folder_note_enabled": True,
             "templater_enabled": True,
         },
@@ -510,6 +512,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
     assert resp.status_code == 200
     assert resp.json() == {
         "dataview_enabled": False,
+        "dataview_show_source": True,
         "folder_note_enabled": True,
         "templater_enabled": True,
     }
@@ -518,6 +521,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
     assert read_resp.status_code == 200
     assert read_resp.json() == {
         "dataview_enabled": False,
+        "dataview_show_source": True,
         "folder_note_enabled": True,
         "templater_enabled": True,
     }
@@ -526,6 +530,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.dataview_enabled is False
+        assert row.dataview_show_source is True
         assert row.folder_note_enabled is True
         assert row.templater_enabled is True
 

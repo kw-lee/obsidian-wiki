@@ -266,6 +266,7 @@ export interface AppearanceSettings {
 
 export interface PluginSettings {
   dataview_enabled: boolean;
+  dataview_show_source: boolean;
   folder_note_enabled: boolean;
   templater_enabled: boolean;
 }

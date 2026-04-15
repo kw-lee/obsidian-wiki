@@ -32,6 +32,7 @@ class SyncRuntimeSettings:
     ui_font: str
     editor_font: str
     dataview_enabled: bool
+    dataview_show_source: bool
     folder_note_enabled: bool
     templater_enabled: bool
 
@@ -63,6 +64,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         ui_font=row.ui_font,
         editor_font=row.editor_font,
         dataview_enabled=row.dataview_enabled,
+        dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
     )
@@ -96,6 +98,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         ui_font="system",
         editor_font="system",
         dataview_enabled=True,
+        dataview_show_source=False,
         folder_note_enabled=False,
         templater_enabled=False,
     )

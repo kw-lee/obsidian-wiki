@@ -400,9 +400,12 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.dataview.description":
       "지원되는 Dataview 쿼리를 문서 미리보기 안에서 서버 렌더링으로 표시합니다.",
     "plugin.dataview.supportedSubset":
-      '현재는 `LIST/TABLE FROM "folder"` 와 `FROM #tag` 형태의 정적 쿼리를 지원합니다.',
+      '정적 `LIST/TABLE FROM "folder"` / `FROM #tag` 쿼리와 DataviewJS의 기본 `dv.pages()`, `dv.page()`, `dv.current()`, `list/table/header` 렌더링을 지원합니다.',
     "plugin.dataview.limits":
-      "DataviewJS, TASK 쿼리, 정렬, 그룹핑, 인라인 표현식은 아직 실행하지 않습니다.",
+      "복잡한 source 표현식, `dv.execute*`, DataviewJS의 전체 API, 그리고 일부 고급 렌더링 동작은 아직 제한됩니다.",
+    "plugin.dataview.showSourceLabel": "미리보기에서 Dataview 원문 표시",
+    "plugin.dataview.showSourceDescription":
+      "활성화하면 렌더링 결과 위에 query/script 원문도 함께 보여줍니다.",
     "plugin.dataview.toggle": "Dataview 호환 모드 사용",
     "plugin.templater.title": "Templater",
     "plugin.templater.description":
@@ -602,6 +605,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "dataview.error":
       "이 Dataview 쿼리는 아직 지원되지 않거나 실행에 실패했습니다.",
     "dataview.empty": "조건에 맞는 문서가 없습니다.",
+    "dataview.timeout": "DataviewJS 실행 시간이 초과되었습니다.",
     "viewer.loading": "파일 미리보기를 불러오는 중...",
     "viewer.failed": "파일을 불러오지 못했습니다.",
     "viewer.unsupported": "이 파일 형식은 다운로드로 여는 것이 더 안전합니다.",
@@ -1010,9 +1014,12 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.dataview.description":
       "Render the supported subset of Dataview queries directly inside note previews.",
     "plugin.dataview.supportedSubset":
-      'Currently supports static `LIST/TABLE FROM "folder"` and `FROM #tag` queries.',
+      'Supports static `LIST/TABLE FROM "folder"` / `FROM #tag` queries plus the core DataviewJS `dv.pages()`, `dv.page()`, `dv.current()`, and `list/table/header` rendering flow.',
     "plugin.dataview.limits":
-      "DataviewJS, TASK queries, sorting, grouping, and inline expressions are not executed yet.",
+      "Complex source expressions, `dv.execute*`, the full DataviewJS API surface, and some advanced rendering behaviors are still limited.",
+    "plugin.dataview.showSourceLabel": "Show Dataview source in previews",
+    "plugin.dataview.showSourceDescription":
+      "When enabled, the viewer shows the original query or script above each rendered result.",
     "plugin.dataview.toggle": "Enable Dataview compatibility",
     "plugin.templater.title": "Templater",
     "plugin.templater.description":
@@ -1214,6 +1221,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "dataview.error":
       "This Dataview query is not supported yet or failed to run.",
     "dataview.empty": "No documents matched this query.",
+    "dataview.timeout": "DataviewJS execution timed out.",
     "viewer.loading": "Loading file preview...",
     "viewer.failed": "Failed to load the file.",
     "viewer.unsupported": "This file type is safer to open as a download.",

@@ -74,6 +74,7 @@
   let workspaceReady = $state(false);
   let openedPath = $state<string | null>(null);
   let dataviewEnabled = $state(true);
+  let dataviewShowSource = $state(false);
   let revealNonce = $state(0);
   let folderNoteEnabled = $state(false);
   let documentSurface = $state<HTMLElement | null>(null);
@@ -234,9 +235,11 @@
     try {
       const plugin = await fetchPluginSettings();
       dataviewEnabled = plugin.dataview_enabled;
+      dataviewShowSource = plugin.dataview_show_source;
       folderNoteEnabled = plugin.folder_note_enabled;
     } catch {
       dataviewEnabled = true;
+      dataviewShowSource = false;
       folderNoteEnabled = false;
     }
   }
@@ -859,6 +862,7 @@
                   path={selectedPath}
                   {doc}
                   {dataviewEnabled}
+                  {dataviewShowSource}
                   onnavigate={navigateTo}
                 />
               {/if}

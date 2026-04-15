@@ -13,11 +13,13 @@
     path,
     doc,
     dataviewEnabled = true,
+    dataviewShowSource = false,
     onnavigate,
   }: {
     path: string;
     doc: DocDetail | null;
     dataviewEnabled?: boolean;
+    dataviewShowSource?: boolean;
     onnavigate: (path: string) => void;
   } = $props();
 
@@ -81,6 +83,7 @@
     content={doc.rendered_content ?? doc.content}
     links={doc.outgoing_links}
     {dataviewEnabled}
+    {dataviewShowSource}
     {onnavigate}
   />
 {:else}

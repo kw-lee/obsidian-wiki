@@ -11,6 +11,7 @@ import type {
   SyncStatus,
   SyncJob,
   TaskListResponse,
+  DataviewContextResponse,
   DataviewQueryResponse,
 } from "$lib/types";
 
@@ -77,6 +78,9 @@ export const queryDataview = (query: string) =>
     method: "POST",
     body: JSON.stringify({ query }),
   });
+
+export const fetchDataviewContext = () =>
+  api<DataviewContextResponse>("/dataview/context");
 
 export const syncPull = () =>
   api<{ head: string; changed_files: number }>("/sync/pull", {

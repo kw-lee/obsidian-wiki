@@ -13,6 +13,7 @@
   } from "$lib/utils/markdown";
   import { buildAttachmentApiPath, getViewerKind } from "$lib/utils/routes";
   import DataviewBlock from "./DataviewBlock.svelte";
+  import DataviewJsBlock from "./DataviewJsBlock.svelte";
   import ExcalidrawView from "./ExcalidrawView.svelte";
 
   let {
@@ -20,12 +21,14 @@
     content,
     links = [],
     dataviewEnabled = true,
+    dataviewShowSource = false,
     onnavigate,
   }: {
     path: string;
     content: string;
     links?: ResolvedWikiLink[];
     dataviewEnabled?: boolean;
+    dataviewShowSource?: boolean;
     onnavigate: (path: string) => void;
   } = $props();
 
@@ -61,7 +64,8 @@
 
   type Segment =
     | { type: "markdown"; content: string }
-    | { type: "dataview"; query: string };
+    | { type: "dataview"; query: string }
+    | { type: "dataviewjs"; code: string };
 
   function splitSegments(source: string, dataviewEnabled: boolean): Segment[] {
     if (!dataviewEnabled) {
@@ -69,7 +73,7 @@
     }
 
     const segments: Segment[] = [];
-    const regex = /```dataview\s*\n([\s\S]*?)```/g;
+    const regex = /```(dataviewjs|dataview)\s*\n([\s\S]*?)```/g;
     let lastIndex = 0;
     for (const match of source.matchAll(regex)) {
       const index = match.index ?? 0;
@@ -79,7 +83,11 @@
           content: source.slice(lastIndex, index),
         });
       }
-      segments.push({ type: "dataview", query: match[1].trim() });
+      if (match[1] === "dataviewjs") {
+        segments.push({ type: "dataviewjs", code: match[2].trim() });
+      } else {
+        segments.push({ type: "dataview", query: match[2].trim() });
+      }
       lastIndex = index + match[0].length;
     }
     if (lastIndex < source.length) {
@@ -555,8 +563,19 @@
     {#each segments as segment, index (`${segment.type}-${index}`)}
       {#if segment.type === "markdown"}
         {@html renderMarkdown(segment.content)}
+      {:else if segment.type === "dataviewjs"}
+        <DataviewJsBlock
+          code={segment.code}
+          {path}
+          showSource={dataviewShowSource}
+          {onnavigate}
+        />
       {:else}
-        <DataviewBlock query={segment.query} {onnavigate} />
+        <DataviewBlock
+          query={segment.query}
+          showSource={dataviewShowSource}
+          {onnavigate}
+        />
       {/if}
     {/each}
   </div>

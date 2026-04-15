@@ -172,10 +172,18 @@ describe("Settings API functions", () => {
 
   it("updateSystemSettings sends PUT payload", async () => {
     mockApi.mockResolvedValueOnce({ timezone: "Asia/Seoul" });
-    await updateSystemSettings({ timezone: "Asia/Seoul" });
+    await updateSystemSettings({
+      timezone: "Asia/Seoul",
+      folder_note_enabled: true,
+      templater_enabled: true,
+    });
     expect(mockApi).toHaveBeenCalledWith("/settings/system", {
       method: "PUT",
-      body: JSON.stringify({ timezone: "Asia/Seoul" }),
+      body: JSON.stringify({
+        timezone: "Asia/Seoul",
+        folder_note_enabled: true,
+        templater_enabled: true,
+      }),
     });
   });
 

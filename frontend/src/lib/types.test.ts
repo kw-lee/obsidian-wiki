@@ -129,10 +129,12 @@ describe("Type contracts", () => {
       created_at: "2025-01-01T00:00:00Z",
       updated_at: null,
       content: "# Test",
+      rendered_content: "# Rendered Test",
       base_commit: "abc123",
       outgoing_links: [link],
     };
     expect(doc.tags).toContain("tag1");
+    expect(doc.rendered_content).toBe("# Rendered Test");
     expect(doc.base_commit).toBe("abc123");
     expect(doc.outgoing_links[0].vault_path).toBe("target.md");
   });
@@ -262,6 +264,8 @@ describe("Type contracts", () => {
       version: "0.1.0",
       started_at: "2026-04-13T02:00:00Z",
       timezone: "Asia/Seoul",
+      folder_note_enabled: true,
+      templater_enabled: true,
       uptime_seconds: 42,
       sync_backend: "git",
       sync_auto_enabled: true,
@@ -287,6 +291,8 @@ describe("Type contracts", () => {
       },
     };
     expect(system.vault_git.has_origin).toBe(true);
+    expect(system.folder_note_enabled).toBe(true);
+    expect(system.templater_enabled).toBe(true);
   });
 
   it("SystemLogs has expected shape", () => {

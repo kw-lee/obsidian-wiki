@@ -15,6 +15,17 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
+function buildUrl(path: string, params?: Record<string, string>): URL {
+  const normalizedPath = path.startsWith("/api") ? path : `${API_BASE}${path}`;
+  const url = new URL(normalizedPath, window.location.origin);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return url;
+}
+
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem("access_token", access);
   localStorage.setItem("refresh_token", refresh);
@@ -41,6 +52,45 @@ async function refreshAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function performAuthorizedFetch(
+  url: URL,
+  options: FetchOptions = {},
+): Promise<Response> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (options.body && typeof options.body === "string") {
+    headers["Content-Type"] = "application/json";
+  }
+
+  let res = await fetch(url.toString(), { ...options, headers });
+
+  if (res.status === 401 && token) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      res = await fetch(url.toString(), { ...options, headers });
+    } else {
+      clearTokens();
+      window.location.href = "/login";
+      throw new Error("Session expired");
+    }
+  }
+
+  if (res.status === 403) {
+    const detail = await res.json().catch(() => ({ detail: "" }));
+    if (detail.detail === "Credential change required") {
+      window.location.href = "/auth/setup";
+      throw new Error("Credential change required");
+    }
+    throw new Error(detail.detail || res.statusText);
+  }
+
+  return res;
 }
 
 function formatErrorMessage(payload: unknown, fallback: string): string {
@@ -71,46 +121,8 @@ export async function api<T = unknown>(
   path: string,
   options: FetchOptions = {},
 ): Promise<T> {
-  const url = new URL(`${API_BASE}${path}`, window.location.origin);
-  if (options.params) {
-    for (const [k, v] of Object.entries(options.params)) {
-      url.searchParams.set(k, v);
-    }
-  }
-
-  const token = getToken();
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  if (options.body && typeof options.body === "string") {
-    headers["Content-Type"] = "application/json";
-  }
-
-  let res = await fetch(url.toString(), { ...options, headers });
-
-  // Auto-refresh on 401
-  if (res.status === 401 && token) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      headers["Authorization"] = `Bearer ${newToken}`;
-      res = await fetch(url.toString(), { ...options, headers });
-    } else {
-      clearTokens();
-      window.location.href = "/login";
-      throw new Error("Session expired");
-    }
-  }
-
-  // Redirect to credential change page if required
-  if (res.status === 403) {
-    const detail = await res.json().catch(() => ({ detail: "" }));
-    if (detail.detail === "Credential change required") {
-      window.location.href = "/auth/setup";
-      throw new Error("Credential change required");
-    }
-    throw new Error(detail.detail || res.statusText);
-  }
+  const url = buildUrl(path, options.params);
+  const res = await performAuthorizedFetch(url, options);
 
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
@@ -119,4 +131,17 @@ export async function api<T = unknown>(
 
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+export async function fetchApiResource(
+  path: string,
+  options: FetchOptions = {},
+): Promise<Response> {
+  const url = buildUrl(path, options.params);
+  const res = await performAuthorizedFetch(url, options);
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(formatErrorMessage(detail, res.statusText));
+  }
+  return res;
 }

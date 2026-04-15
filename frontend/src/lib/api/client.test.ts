@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { api, setTokens, clearTokens } from "./client";
+import { api, clearTokens, fetchApiResource, setTokens } from "./client";
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -68,6 +68,22 @@ describe("api()", () => {
     await api("/search", { params: { q: "test" } });
     const [url] = mockFetch.mock.calls[0];
     expect(url).toContain("q=test");
+  });
+
+  it("fetches raw resources with auth headers", async () => {
+    storage["access_token"] = "resource-token";
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["preview"]),
+    });
+
+    const response = await fetchApiResource("/api/attachments/files/paper.pdf");
+    expect(response.status).toBe(200);
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toContain("/api/attachments/files/paper.pdf");
+    expect(opts.headers["Authorization"]).toBe("Bearer resource-token");
   });
 
   it("returns undefined for 204 responses", async () => {

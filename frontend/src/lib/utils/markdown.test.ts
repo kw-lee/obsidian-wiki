@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-import { stripYamlFrontmatter } from './markdown';
+import {
+  buildResolvedLinkLookup,
+  consumeResolvedLink,
+  extractMarkdownPreviewText,
+  renderResolvedWikiMarkup,
+  stripYamlFrontmatter,
+} from "./markdown";
 
-describe('stripYamlFrontmatter', () => {
-	it('removes YAML frontmatter from markdown content', () => {
-		const content = `---
+describe("stripYamlFrontmatter", () => {
+  it("removes YAML frontmatter from markdown content", () => {
+    const content = `---
 name: Sieve MLE
 tags:
   - concept
@@ -14,26 +20,164 @@ date: 2024-09-25 21:09
 
 본문`;
 
-		expect(stripYamlFrontmatter(content)).toBe(`# Sieve MLE
+    expect(stripYamlFrontmatter(content)).toBe(`# Sieve MLE
 
 본문`);
-	});
+  });
 
-	it('keeps markdown without frontmatter unchanged', () => {
-		const content = `# Note
+  it("keeps markdown without frontmatter unchanged", () => {
+    const content = `# Note
 
 본문`;
 
-		expect(stripYamlFrontmatter(content)).toBe(content);
-	});
+    expect(stripYamlFrontmatter(content)).toBe(content);
+  });
 
-	it('keeps a leading thematic break unchanged', () => {
-		const content = `---
+  it("keeps a leading thematic break unchanged", () => {
+    const content = `---
 
 # Note
 
 본문`;
 
-		expect(stripYamlFrontmatter(content)).toBe(content);
-	});
+    expect(stripYamlFrontmatter(content)).toBe(content);
+  });
+
+  it("renders image embeds as inline previews", () => {
+    const html = renderResolvedWikiMarkup(
+      {
+        raw_target: "assets/photo.png",
+        display_text: "Inline Photo",
+        kind: "attachment",
+        vault_path: "assets/photo.png",
+        subpath: null,
+        embed: true,
+        exists: true,
+        ambiguous_paths: [],
+        mime_type: "image/png",
+      },
+      "assets/photo.png",
+      "Inline Photo",
+      true,
+    );
+
+    expect(html).toContain('class="wiki-embed attachment image"');
+    expect(html).toContain('<img class="wiki-embed-preview image"');
+    expect(html).toContain(
+      'data-attachment-url="/api/attachments/assets/photo.png"',
+    );
+  });
+
+  it("renders pdf embeds as inline previews", () => {
+    const html = renderResolvedWikiMarkup(
+      {
+        raw_target: "files/paper.pdf",
+        display_text: "Paper",
+        kind: "attachment",
+        vault_path: "files/paper.pdf",
+        subpath: null,
+        embed: true,
+        exists: true,
+        ambiguous_paths: [],
+        mime_type: "application/pdf",
+      },
+      "files/paper.pdf",
+      "Paper",
+      true,
+    );
+
+    expect(html).toContain('class="wiki-embed attachment pdf"');
+    expect(html).toContain('<iframe class="wiki-embed-preview pdf"');
+    expect(html).toContain(
+      'data-attachment-url="/api/attachments/files/paper.pdf"',
+    );
+  });
+
+  it("adds hover preview metadata to note links", () => {
+    const html = renderResolvedWikiMarkup(
+      {
+        raw_target: "notes/target",
+        display_text: "Target Note",
+        kind: "heading",
+        vault_path: "notes/target.md",
+        subpath: "Overview",
+        embed: false,
+        exists: true,
+        ambiguous_paths: [],
+        mime_type: null,
+      },
+      "notes/target",
+      "Target Note",
+      false,
+    );
+
+    expect(html).toContain('data-preview-path="notes/target.md"');
+    expect(html).toContain('data-preview-kind="note"');
+    expect(html).toContain('data-preview-subpath="Overview"');
+  });
+
+  it("consumes resolved links from the shared lookup by alias and embed flag", () => {
+    const lookup = buildResolvedLinkLookup([
+      {
+        raw_target: "assets/photo.png",
+        display_text: "Inline Photo",
+        kind: "attachment",
+        vault_path: "assets/photo.png",
+        subpath: null,
+        embed: true,
+        exists: true,
+        ambiguous_paths: [],
+        mime_type: "image/png",
+      },
+    ]);
+
+    const resolved = consumeResolvedLink(
+      lookup,
+      "assets/photo.png",
+      "Inline Photo",
+      true,
+    );
+    expect(resolved?.vault_path).toBe("assets/photo.png");
+    expect(
+      consumeResolvedLink(lookup, "assets/photo.png", "Inline Photo", true),
+    ).toBeUndefined();
+  });
+
+  it("extracts a readable preview from markdown", () => {
+    const preview = extractMarkdownPreviewText(
+      `---
+title: Demo
+---
+# Hello
+
+This is a [[wikilink|preview]] with **formatting** and \`code\`.`,
+    );
+
+    expect(preview).toContain("Hello");
+    expect(preview).toContain("preview");
+    expect(preview).not.toContain("[[");
+  });
+
+  it("focuses preview extraction around the requested heading", () => {
+    const preview = extractMarkdownPreviewText(
+      `# Intro
+
+Nothing to see here.
+
+## Overview
+
+This section should be shown first.
+
+## Later
+
+This should be omitted.`,
+      "Overview",
+    );
+
+    expect(
+      preview.startsWith("Overview This section should be shown first."),
+    ).toBe(true);
+    expect(preview).not.toContain("Nothing to see here.");
+    expect(preview).not.toContain("This should be omitted.");
+  });
 });

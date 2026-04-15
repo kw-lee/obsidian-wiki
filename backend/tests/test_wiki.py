@@ -7,10 +7,12 @@ vault and may use PostgreSQL-specific features. They are marked to accept 500 on
 import subprocess
 
 import pytest
-from sqlalchemy import text
+from git import Repo
+from sqlalchemy import select, text
 from sqlalchemy.exc import OperationalError
 
 import app.db.session as session_mod
+from app.db.models import AuditLog, User
 from app.main import app
 from app.services.indexer import index_file
 from app.services.settings import ensure_app_settings, invalidate_settings_cache
@@ -88,6 +90,45 @@ async def test_create_doc(client, auth_headers, setup_vault):
         data = resp.json()
         assert data["path"] == "new-note.md"
         assert data["content"] == "# New Note\nHello world"
+
+
+@pytest.mark.asyncio
+async def test_create_doc_uses_current_user_git_actor_and_records_audit_log(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    _git_init(setup_vault)
+
+    async def fake_index_file(db, path, content):  # noqa: ANN001
+        del db, path, content
+
+    monkeypatch.setattr("app.routers.wiki.index_file", fake_index_file)
+
+    async with session_mod.async_session() as session:
+        user = await session.scalar(select(User).where(User.username == "admin"))
+        assert user is not None
+        user.git_display_name = "Audit Writer"
+        user.git_email = "audit@example.com"
+        user.must_change_credentials = False
+        await session.commit()
+
+    resp = await client.post(
+        "/api/wiki/doc",
+        json={"path": "audit-note.md", "content": "# Audit"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 201
+
+    repo = Repo(setup_vault)
+    commit = repo.head.commit
+    assert commit.author.name == "Audit Writer"
+    assert commit.author.email == "audit@example.com"
+
+    async with session_mod.async_session() as session:
+        logs = (await session.execute(select(AuditLog))).scalars().all()
+        assert len(logs) == 1
+        assert logs[0].action == "wiki.create"
+        assert logs[0].path == "audit-note.md"
+        assert logs[0].commit_sha == commit.hexsha
 
 
 @pytest.mark.asyncio

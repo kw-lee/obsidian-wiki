@@ -50,8 +50,26 @@ def _has_remote_branch(repo: Repo, remote_branch: str) -> bool:
     return any(ref.name == remote_branch for ref in repo.references)
 
 
-def _commit_index(repo: Repo, message: str) -> str:
-    commit = repo.index.commit(message, author=_DEFAULT_ACTOR, committer=_DEFAULT_ACTOR)
+def build_git_actor(
+    *,
+    display_name: str | None,
+    email: str | None,
+    username: str | None = None,
+) -> Actor:
+    name = (display_name or "").strip() or (username or "").strip() or _DEFAULT_ACTOR.name
+    if email and email.strip():
+        address = email.strip()
+    elif username and username.strip():
+        local = "".join(ch.lower() if ch.isalnum() else "-" for ch in username.strip())
+        address = f"{local.strip('-') or 'user'}@obsidian-wiki.local"
+    else:
+        address = _DEFAULT_ACTOR.email
+    return Actor(name, address)
+
+
+def _commit_index(repo: Repo, message: str, *, actor: Actor | None = None) -> str:
+    commit_actor = actor or _DEFAULT_ACTOR
+    commit = repo.index.commit(message, author=commit_actor, committer=commit_actor)
     return commit.hexsha
 
 
@@ -80,7 +98,13 @@ def file_changed_between(
     return path in changed_files_since(old_sha, new_sha, git_remote_url=git_remote_url)
 
 
-def git_add_and_commit(paths: list[str], message: str, *, git_remote_url: str = "") -> str | None:
+def git_add_and_commit(
+    paths: list[str],
+    message: str,
+    *,
+    git_remote_url: str = "",
+    actor: Actor | None = None,
+) -> str | None:
     """Stage files and commit. Returns new commit sha or None if nothing to commit."""
     repo = get_repo(git_remote_url=git_remote_url)
     repo.index.add(paths)
@@ -89,7 +113,7 @@ def git_add_and_commit(paths: list[str], message: str, *, git_remote_url: str = 
             return None
     elif not repo.index.entries and not repo.untracked_files:
         return None
-    return _commit_index(repo, message)
+    return _commit_index(repo, message, actor=actor)
 
 
 def git_stage_move_and_commit(
@@ -98,6 +122,7 @@ def git_stage_move_and_commit(
     message: str,
     *,
     git_remote_url: str = "",
+    actor: Actor | None = None,
 ) -> str | None:
     repo = get_repo(git_remote_url=git_remote_url)
     repo.git.add(destination_path)
@@ -107,10 +132,15 @@ def git_stage_move_and_commit(
             return None
     elif not repo.index.entries and not repo.untracked_files:
         return None
-    return _commit_index(repo, message)
+    return _commit_index(repo, message, actor=actor)
 
 
-def git_add_all_and_commit(message: str, *, git_remote_url: str = "") -> str | None:
+def git_add_all_and_commit(
+    message: str,
+    *,
+    git_remote_url: str = "",
+    actor: Actor | None = None,
+) -> str | None:
     repo = get_repo(git_remote_url=git_remote_url)
     repo.git.add(A=True)
     if repo.head.is_valid():
@@ -118,7 +148,7 @@ def git_add_all_and_commit(message: str, *, git_remote_url: str = "") -> str | N
             return None
     elif not repo.index.entries and not repo.untracked_files:
         return None
-    return _commit_index(repo, message)
+    return _commit_index(repo, message, actor=actor)
 
 
 def git_pull(*, git_remote_url: str = "", git_branch: str = "main") -> tuple[str | None, list[str]]:

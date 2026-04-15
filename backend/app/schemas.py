@@ -150,6 +150,37 @@ class DataviewQueryResponse(BaseModel):
     rows: list[DataviewRow]
 
 
+class DataviewLinkSnapshot(BaseModel):
+    path: str
+    display: str
+
+
+class DataviewPageFileSnapshot(BaseModel):
+    name: str
+    path: str
+    folder: str
+    ext: str
+    link: DataviewLinkSnapshot
+    ctime: datetime | None = None
+    mtime: datetime | None = None
+    tags: list[str] = []
+    inlinks: list[DataviewLinkSnapshot] = []
+    outlinks: list[DataviewLinkSnapshot] = []
+    tasks: list[TaskItem] = []
+
+
+class DataviewPageSnapshot(BaseModel):
+    path: str
+    title: str
+    tags: list[str] = []
+    frontmatter: dict = {}
+    file: DataviewPageFileSnapshot
+
+
+class DataviewContextResponse(BaseModel):
+    pages: list[DataviewPageSnapshot]
+
+
 # ── Sync ──────────────────────────────────────────────
 class SyncStatus(BaseModel):
     last_sync: datetime | None = None
@@ -190,6 +221,8 @@ class SyncJobStartRequest(BaseModel):
 # ── Settings ──────────────────────────────────────────
 class ProfileSettingsResponse(BaseModel):
     username: str
+    git_display_name: str
+    git_email: str
     must_change_credentials: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -198,7 +231,27 @@ class ProfileSettingsResponse(BaseModel):
 class ProfileSettingsUpdateRequest(BaseModel):
     current_password: str
     new_username: str | None = None
+    git_display_name: str
+    git_email: str
     new_password: str | None = None
+
+
+class ProfileAuditEntry(BaseModel):
+    created_at: datetime
+    action: str
+    path: str
+    commit_sha: str | None = None
+    username: str
+    git_display_name: str
+    git_email: str
+
+
+class ProfileAuditResponse(BaseModel):
+    entries: list[ProfileAuditEntry]
+
+
+class SystemAuditResponse(BaseModel):
+    entries: list[ProfileAuditEntry]
 
 
 class AuthTokenPair(BaseModel):
@@ -318,6 +371,7 @@ class SystemSettingsResponse(BaseModel):
     version: str
     started_at: datetime
     timezone: str
+    editor_split_preview_enabled: bool = False
     uptime_seconds: int = Field(ge=0)
     sync_backend: Literal["git", "webdav", "none"]
     sync_auto_enabled: bool
@@ -336,6 +390,7 @@ class SystemLogEntry(BaseModel):
 
 class SystemSettingsUpdateRequest(BaseModel):
     timezone: str
+    editor_split_preview_enabled: bool = False
 
 
 class SystemLogsResponse(BaseModel):

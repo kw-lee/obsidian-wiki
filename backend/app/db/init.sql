@@ -8,6 +8,8 @@ CREATE TABLE users (
     id                       SERIAL PRIMARY KEY,
     username                 TEXT UNIQUE NOT NULL,
     password_hash            TEXT NOT NULL,
+    git_display_name         TEXT NOT NULL DEFAULT '',
+    git_email                TEXT NOT NULL DEFAULT '',
     must_change_credentials  BOOLEAN NOT NULL DEFAULT TRUE,
     created_at               TIMESTAMPTZ DEFAULT NOW(),
     updated_at               TIMESTAMPTZ DEFAULT NOW()
@@ -44,6 +46,7 @@ CREATE TABLE app_settings (
                           CHECK (ui_font IN ('system', 'nanum-square', 'nanum-square-ac')),
     editor_font           TEXT NOT NULL DEFAULT 'system'
                           CHECK (editor_font IN ('system', 'd2coding')),
+    editor_split_preview_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     dataview_enabled      BOOLEAN NOT NULL DEFAULT TRUE,
     folder_note_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
     templater_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
@@ -102,12 +105,26 @@ CREATE TABLE webdav_manifest (
     base_content TEXT
 );
 
+CREATE TABLE audit_logs (
+    id               SERIAL PRIMARY KEY,
+    user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    username         TEXT NOT NULL,
+    git_display_name TEXT NOT NULL,
+    git_email        TEXT NOT NULL,
+    action           TEXT NOT NULL,
+    path             TEXT NOT NULL,
+    commit_sha       TEXT,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX idx_documents_search ON documents USING GIN(search_vector);
 CREATE INDEX idx_documents_tags ON documents USING GIN(tags);
 CREATE INDEX idx_documents_path_trgm ON documents USING GIN(path gin_trgm_ops);
 CREATE INDEX idx_links_source ON links(source_path);
 CREATE INDEX idx_links_target ON links(target_path);
 CREATE INDEX idx_webdav_manifest_path ON webdav_manifest(path);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
 INSERT INTO app_settings (
     id,

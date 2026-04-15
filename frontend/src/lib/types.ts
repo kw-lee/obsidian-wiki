@@ -119,6 +119,37 @@ export interface DataviewQueryResponse {
   rows: DataviewRow[];
 }
 
+export interface DataviewLinkSnapshot {
+  path: string;
+  display: string;
+}
+
+export interface DataviewPageFileSnapshot {
+  name: string;
+  path: string;
+  folder: string;
+  ext: string;
+  link: DataviewLinkSnapshot;
+  ctime: string | null;
+  mtime: string | null;
+  tags: string[];
+  inlinks: DataviewLinkSnapshot[];
+  outlinks: DataviewLinkSnapshot[];
+  tasks: TaskItem[];
+}
+
+export interface DataviewPageSnapshot {
+  path: string;
+  title: string;
+  tags: string[];
+  frontmatter: Record<string, unknown>;
+  file: DataviewPageFileSnapshot;
+}
+
+export interface DataviewContextResponse {
+  pages: DataviewPageSnapshot[];
+}
+
 export interface SyncStatus {
   last_sync: string | null;
   timezone?: string | null;
@@ -158,9 +189,25 @@ export interface AuthTokenPair {
 
 export interface ProfileSettings {
   username: string;
+  git_display_name: string;
+  git_email: string;
   must_change_credentials: boolean;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface AuditEntry {
+  created_at: string;
+  action: string;
+  path: string;
+  commit_sha: string | null;
+  username: string;
+  git_display_name: string;
+  git_email: string;
+}
+
+export interface AuditEntriesResponse {
+  entries: AuditEntry[];
 }
 
 export type SyncBackend = "git" | "webdav" | "none";
@@ -241,6 +288,7 @@ export interface SystemSettings {
   version: string;
   started_at: string;
   timezone: string;
+  editor_split_preview_enabled: boolean;
   uptime_seconds: number;
   sync_backend: SyncBackend;
   sync_auto_enabled: boolean;

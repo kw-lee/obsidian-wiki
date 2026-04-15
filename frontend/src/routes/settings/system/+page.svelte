@@ -1,22 +1,27 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
+    fetchSystemAudit,
     fetchSystemLogs,
     fetchSystemSettings,
     updateSystemSettings,
   } from "$lib/api/settings";
   import { t } from "$lib/i18n/index.svelte";
-  import type { SystemLogEntry, SystemSettings } from "$lib/types";
+  import type { AuditEntry, SystemLogEntry, SystemSettings } from "$lib/types";
   import { formatDateTime } from "$lib/utils/datetime";
+  import { buildWikiRoute } from "$lib/utils/routes";
+  import { getAuditTargetPath, shortCommitSha } from "$lib/utils/audit";
 
   let system = $state<SystemSettings | null>(null);
   let logs = $state<SystemLogEntry[]>([]);
+  let auditEntries = $state<AuditEntry[]>([]);
   let loading = $state(true);
   let refreshing = $state(false);
   let saving = $state(false);
   let error = $state("");
   let success = $state("");
   let timezone = $state("");
+  let editorSplitPreviewEnabled = $state(false);
 
   onMount(async () => {
     await loadSystem();
@@ -39,17 +44,39 @@
     return ok ? "ok" : "error";
   }
 
+  function auditActionLabel(action: string) {
+    switch (action) {
+      case "wiki.create":
+        return t("system.auditAction.create");
+      case "wiki.update":
+        return t("system.auditAction.update");
+      case "wiki.delete":
+        return t("system.auditAction.delete");
+      case "wiki.move":
+        return t("system.auditAction.move");
+      case "wiki.create_folder":
+        return t("system.auditAction.createFolder");
+      case "attachment.upload":
+        return t("system.auditAction.upload");
+      default:
+        return action;
+    }
+  }
+
   async function loadSystem() {
     loading = true;
     error = "";
     try {
-      const [systemData, logData] = await Promise.all([
+      const [systemData, logData, auditData] = await Promise.all([
         fetchSystemSettings(),
         fetchSystemLogs(40),
+        fetchSystemAudit(40),
       ]);
       system = systemData;
       logs = logData.entries;
+      auditEntries = auditData.entries;
       timezone = systemData.timezone;
+      editorSplitPreviewEnabled = systemData.editor_split_preview_enabled;
     } catch (err) {
       error = err instanceof Error ? err.message : t("system.loadFailed");
     } finally {
@@ -71,7 +98,12 @@
     error = "";
     success = "";
     try {
-      system = await updateSystemSettings({ timezone });
+      system = await updateSystemSettings({
+        timezone,
+        editor_split_preview_enabled: editorSplitPreviewEnabled,
+      });
+      timezone = system.timezone;
+      editorSplitPreviewEnabled = system.editor_split_preview_enabled;
       success = t("system.saveSuccess");
     } catch (err) {
       error = err instanceof Error ? err.message : t("system.saveFailed");
@@ -130,8 +162,8 @@
 
     <article class="detail-card">
       <div class="detail-head">
-        <span>{t("system.timezoneSettings")}</span>
-        <strong>{t("system.timezoneDescription")}</strong>
+        <span>{t("system.preferencesSettings")}</span>
+        <strong>{t("system.preferencesDescription")}</strong>
       </div>
       <label class="field">
         <span>{t("system.timezoneLabel")}</span>
@@ -142,6 +174,22 @@
         />
       </label>
       <p class="detail-note">{t("system.timezoneHelp")}</p>
+      <label class="toggle-field">
+        <div>
+          <span>{t("system.editorSplitPreviewLabel")}</span>
+          <small
+            >{editorSplitPreviewEnabled
+              ? t("system.enabled")
+              : t("system.disabled")}</small
+          >
+        </div>
+        <input
+          type="checkbox"
+          bind:checked={editorSplitPreviewEnabled}
+          aria-label={t("system.editorSplitPreviewLabel")}
+        />
+      </label>
+      <p class="detail-note">{t("system.editorSplitPreviewHelp")}</p>
       <button
         type="button"
         class="save-button"
@@ -252,6 +300,43 @@
         </ul>
       {/if}
     </article>
+
+    <article class="log-card">
+      <div class="detail-head">
+        <span>{t("system.audit")}</span>
+        <strong>{t("system.auditCount", { count: auditEntries.length })}</strong
+        >
+      </div>
+
+      {#if auditEntries.length === 0}
+        <p class="detail-note">{t("system.auditEmpty")}</p>
+      {:else}
+        <ul class="audit-list">
+          {#each auditEntries as entry}
+            {@const targetPath = getAuditTargetPath(entry)}
+            <li>
+              <div class="audit-top">
+                <strong>{auditActionLabel(entry.action)}</strong>
+                <span>{formatDateTime(entry.created_at, system.timezone)}</span>
+              </div>
+              <p class="audit-path">{entry.path}</p>
+              <div class="audit-meta">
+                <span>{entry.username}</span>
+                <span>{entry.git_display_name} &lt;{entry.git_email}&gt;</span>
+                {#if shortCommitSha(entry.commit_sha)}
+                  <code>{shortCommitSha(entry.commit_sha)}</code>
+                {/if}
+              </div>
+              {#if targetPath}
+                <a class="audit-link" href={buildWikiRoute(targetPath)}>
+                  {t("system.auditOpen")}
+                </a>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </article>
   {/if}
 
   {#if error}
@@ -357,12 +442,13 @@
     gap: 0.45rem;
   }
 
-  .field span {
+  .field span,
+  .toggle-field span {
     font-size: 0.85rem;
     color: var(--text-muted);
   }
 
-  input {
+  input[type="text"] {
     width: 100%;
     padding: 0.85rem 1rem;
     border-radius: 14px;
@@ -370,6 +456,32 @@
     background: color-mix(in srgb, var(--bg) 88%, transparent);
     color: var(--text-primary);
     font: inherit;
+  }
+
+  .toggle-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-tertiary) 76%, transparent);
+  }
+
+  .toggle-field div {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .toggle-field small {
+    color: var(--text-muted);
+  }
+
+  .toggle-field input[type="checkbox"] {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--accent);
+    flex-shrink: 0;
   }
 
   .stats-grid span,
@@ -434,12 +546,56 @@
     gap: 0.45rem;
   }
 
-  .log-meta {
+  .log-meta,
+  .audit-top,
+  .audit-meta {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
     color: var(--text-muted);
     font-size: 0.85rem;
+  }
+
+  .audit-top {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .audit-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.75rem;
+    max-height: 520px;
+    overflow: auto;
+  }
+
+  .audit-list li {
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--bg-tertiary) 78%, transparent);
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .audit-path {
+    margin: 0;
+    color: var(--text-primary);
+    word-break: break-word;
+  }
+
+  .audit-link {
+    display: inline-flex;
+    width: fit-content;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .audit-link:hover {
+    text-decoration: underline;
   }
 
   .feedback {

@@ -9,7 +9,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import CurrentUser, get_current_user, get_current_user_context
 from app.db.models import Document, Link
 from app.db.session import get_db
 from app.schemas import (
@@ -24,8 +24,10 @@ from app.schemas import (
     TreeNode,
 )
 from app.services import vault
+from app.services.audit import record_audit_log
 from app.services.conflict import three_way_merge
 from app.services.git_ops import (
+    build_git_actor,
     file_changed_between,
     git_add_all_and_commit,
     git_add_and_commit,
@@ -46,6 +48,14 @@ from app.services.wiki_links import (
 )
 
 router = APIRouter()
+
+
+def _git_actor_for_user(user: CurrentUser):
+    return build_git_actor(
+        display_name=user.git_display_name,
+        email=user.git_email,
+        username=user.username,
+    )
 
 
 def _invalid_path(detail: str) -> HTTPException:
@@ -348,7 +358,7 @@ async def save_doc(
     body: DocSaveRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user_context),
 ) -> DocDetail:
     _resolve_or_400(path, for_write=True)
     current_head = head_commit_sha()
@@ -378,9 +388,14 @@ async def save_doc(
         body.content = merged
 
     await vault.write_doc(path, body.content)
-    git_add_and_commit([path], f"web: update {path}")
+    commit_sha = git_add_and_commit(
+        [path],
+        f"web: update {path}",
+        actor=_git_actor_for_user(user),
+    )
 
     await index_file(db, path, body.content)
+    await record_audit_log(db, user=user, action="wiki.update", path=path, commit_sha=commit_sha)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 
@@ -392,7 +407,7 @@ async def create_doc(
     body: DocCreateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user_context),
 ) -> DocDetail:
     path = body.path
     if not path.endswith(".md"):
@@ -402,9 +417,14 @@ async def create_doc(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Document already exists")
 
     await vault.write_doc(path, body.content)
-    git_add_and_commit([path], f"web: create {path}")
+    commit_sha = git_add_and_commit(
+        [path],
+        f"web: create {path}",
+        actor=_git_actor_for_user(user),
+    )
 
     await index_file(db, path, body.content)
+    await record_audit_log(db, user=user, action="wiki.create", path=path, commit_sha=commit_sha)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 
@@ -416,7 +436,7 @@ async def create_folder(
     body: FolderCreateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user_context),
 ) -> FolderCreateResponse:
     path = body.path.strip().strip("/")
     if not path:
@@ -429,7 +449,15 @@ async def create_folder(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Folder already exists")
 
     placeholder_path = await vault.create_folder(path)
-    git_add_and_commit([placeholder_path], f"web: create folder {path}")
+    commit_sha = git_add_and_commit(
+        [placeholder_path],
+        f"web: create folder {path}",
+        actor=_git_actor_for_user(user),
+    )
+    await record_audit_log(
+        db, user=user, action="wiki.create_folder", path=path, commit_sha=commit_sha
+    )
+    await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
     return FolderCreateResponse(path=path)
 
@@ -439,7 +467,7 @@ async def move_path(
     body: MovePathRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user_context),
 ) -> MovePathResponse:
     source_path = body.source_path.strip().strip("/")
     destination_path = body.destination_path.strip().strip("/")
@@ -482,12 +510,26 @@ async def move_path(
         rewritten_paths, rewritten_links = await _rewrite_links_after_move(
             source_path, moved_path, catalog
         )
-        git_add_all_and_commit(f"web: move {source_path} -> {moved_path}")
+        commit_sha = git_add_all_and_commit(
+            f"web: move {source_path} -> {moved_path}",
+            actor=_git_actor_for_user(user),
+        )
     else:
-        git_stage_move_and_commit(
-            source_path, moved_path, f"web: move {source_path} -> {moved_path}"
+        commit_sha = git_stage_move_and_commit(
+            source_path,
+            moved_path,
+            f"web: move {source_path} -> {moved_path}",
+            actor=_git_actor_for_user(user),
         )
     await full_reindex(db)
+    await record_audit_log(
+        db,
+        user=user,
+        action="wiki.move",
+        path=f"{source_path} -> {moved_path}",
+        commit_sha=commit_sha,
+    )
+    await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
     return MovePathResponse(
         path=moved_path,
@@ -502,14 +544,19 @@ async def delete_doc(
     path: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: str = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user_context),
 ) -> None:
     _resolve_or_400(path, for_write=True)
     await vault.delete_doc(path)
-    git_add_and_commit([path], f"web: delete {path}")
+    commit_sha = git_add_and_commit(
+        [path],
+        f"web: delete {path}",
+        actor=_git_actor_for_user(user),
+    )
 
     await db.execute(sql_delete(Link).where(Link.source_path == path))
     await db.execute(sql_delete(Document).where(Document.path == path))
+    await record_audit_log(db, user=user, action="wiki.delete", path=path, commit_sha=commit_sha)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 

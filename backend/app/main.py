@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.auth import default_git_display_name, default_git_email
 from app.config import settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
@@ -47,6 +48,8 @@ async def _ensure_initial_admin() -> None:
             User(
                 username=settings.init_admin_username,
                 password_hash=hashed,
+                git_display_name=default_git_display_name(settings.init_admin_username),
+                git_email=default_git_email(settings.init_admin_username),
                 must_change_credentials=True,
             )
         )

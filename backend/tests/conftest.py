@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import os
 
 # Set default env vars only if not already provided (Docker sets them)
@@ -23,7 +25,7 @@ from sqlalchemy import pool, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.auth import create_token
+from app.auth import create_token, default_git_display_name, default_git_email
 from app.config import settings
 
 _is_sqlite = "sqlite" in settings.database_url
@@ -34,6 +36,7 @@ def _sqlite_db_path(database_url: str) -> Path | None:
     if not database_url.startswith(prefix):
         return None
     return Path(database_url.removeprefix(prefix))
+
 
 # ── SQLite compatibility: map PostgreSQL-only types ──────────
 if _is_sqlite:
@@ -116,6 +119,8 @@ async def client(tmp_path: Path):
                     User(
                         username=settings.init_admin_username,
                         password_hash=hashed,
+                        git_display_name=default_git_display_name(settings.init_admin_username),
+                        git_email=default_git_email(settings.init_admin_username),
                         must_change_credentials=True,
                     )
                 )

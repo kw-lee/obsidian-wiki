@@ -6,12 +6,21 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_token, get_current_user, hash_password, verify_password
+from app.auth import (
+    CurrentUser,
+    create_token,
+    get_current_user,
+    get_current_user_context,
+    hash_password,
+    normalize_git_display_name,
+    normalize_git_email,
+    verify_password,
+)
 from app.config import settings as app_settings
-from app.db.models import Document, Tag, User
+from app.db.models import AuditLog, Document, Tag, User
 from app.db.session import get_db
 from app.schemas import (
     AppearanceSettingsResponse,
@@ -19,6 +28,8 @@ from app.schemas import (
     AuthTokenPair,
     PluginSettingsResponse,
     PluginSettingsUpdateRequest,
+    ProfileAuditEntry,
+    ProfileAuditResponse,
     ProfileSettingsResponse,
     ProfileSettingsUpdateRequest,
     RebuildIndexResponse,
@@ -27,6 +38,7 @@ from app.schemas import (
     SyncSettingsUpdateRequest,
     SyncStatus,
     SyncTestResult,
+    SystemAuditResponse,
     SystemDependencyStatus,
     SystemLogEntry,
     SystemLogsResponse,
@@ -199,16 +211,19 @@ def _vault_attachment_count(root: Path) -> int:
 
 @router.get("/profile", response_model=ProfileSettingsResponse)
 async def get_profile(
-    username: str = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user_context),
     db: AsyncSession = Depends(get_db),
 ) -> ProfileSettingsResponse:
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
+    user = await db.get(User, current_user.id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return ProfileSettingsResponse(
         username=user.username,
+        git_display_name=normalize_git_display_name(
+            user.git_display_name, fallback_username=user.username
+        ),
+        git_email=normalize_git_email(user.git_email, fallback_username=user.username),
         must_change_credentials=user.must_change_credentials,
         created_at=user.created_at,
         updated_at=user.updated_at,
@@ -218,11 +233,10 @@ async def get_profile(
 @router.put("/profile", response_model=AuthTokenPair)
 async def update_profile(
     body: ProfileSettingsUpdateRequest,
-    username: str = Depends(get_current_user),
+    current_user: CurrentUser = Depends(get_current_user_context),
     db: AsyncSession = Depends(get_db),
 ) -> AuthTokenPair:
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
+    user = await db.get(User, current_user.id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -234,13 +248,23 @@ async def update_profile(
 
     new_username = _normalize_username(body.new_username) or user.username
     new_password = body.new_password or None
+    git_display_name = normalize_git_display_name(
+        body.git_display_name, fallback_username=new_username
+    )
+    git_email = normalize_git_email(body.git_email)
 
     if new_password is not None and len(new_password) < 4:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be at least 4 characters long",
         )
-    if new_username == user.username and new_password is None:
+    if (
+        new_username == user.username
+        and new_password is None
+        and git_display_name
+        == normalize_git_display_name(user.git_display_name, fallback_username=user.username)
+        and git_email == normalize_git_email(user.git_email, fallback_username=user.username)
+    ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes requested")
 
     if new_username != user.username:
@@ -254,14 +278,69 @@ async def update_profile(
     user.username = new_username
     if new_password is not None:
         user.password_hash = hash_password(new_password)
+    user.git_display_name = git_display_name
+    user.git_email = git_email
     user.must_change_credentials = False
     await db.commit()
 
     return AuthTokenPair(
-        access_token=create_token(new_username, "access", must_change=False),
-        refresh_token=create_token(new_username, "refresh", must_change=False),
+        access_token=create_token(user.id, "access", username=user.username, must_change=False),
+        refresh_token=create_token(user.id, "refresh", username=user.username, must_change=False),
         must_change_credentials=False,
     )
+
+
+@router.get("/profile/audit", response_model=ProfileAuditResponse)
+async def get_profile_audit(
+    limit: int = 20,
+    current_user: CurrentUser = Depends(get_current_user_context),
+    db: AsyncSession = Depends(get_db),
+) -> ProfileAuditResponse:
+    bounded_limit = max(1, min(limit, 100))
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.user_id == current_user.id)
+        .order_by(desc(AuditLog.created_at), desc(AuditLog.id))
+        .limit(bounded_limit)
+    )
+    entries = [
+        ProfileAuditEntry(
+            created_at=row.created_at,
+            action=row.action,
+            path=row.path,
+            commit_sha=row.commit_sha,
+            username=row.username,
+            git_display_name=row.git_display_name,
+            git_email=row.git_email,
+        )
+        for row in result.scalars().all()
+    ]
+    return ProfileAuditResponse(entries=entries)
+
+
+@router.get("/system/audit", response_model=SystemAuditResponse)
+async def get_system_audit(
+    limit: int = 50,
+    _username: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SystemAuditResponse:
+    bounded_limit = max(1, min(limit, 200))
+    result = await db.execute(
+        select(AuditLog).order_by(desc(AuditLog.created_at), desc(AuditLog.id)).limit(bounded_limit)
+    )
+    entries = [
+        ProfileAuditEntry(
+            created_at=row.created_at,
+            action=row.action,
+            path=row.path,
+            commit_sha=row.commit_sha,
+            username=row.username,
+            git_display_name=row.git_display_name,
+            git_email=row.git_email,
+        )
+        for row in result.scalars().all()
+    ]
+    return SystemAuditResponse(entries=entries)
 
 
 @router.get("/sync", response_model=SyncSettingsResponse)
@@ -504,6 +583,7 @@ async def get_system_settings(
         version=get_app_version(),
         started_at=started_at,
         timezone=row.timezone,
+        editor_split_preview_enabled=row.editor_split_preview_enabled,
         uptime_seconds=uptime_seconds,
         sync_backend=runtime.sync_backend,
         sync_auto_enabled=runtime.sync_auto_enabled,
@@ -522,6 +602,7 @@ async def update_system_settings(
 ) -> SystemSettingsResponse:
     row = await ensure_app_settings(db)
     row.timezone = _normalize_timezone(body.timezone)
+    row.editor_split_preview_enabled = body.editor_split_preview_enabled
     await db.commit()
     invalidate_settings_cache()
     return await get_system_settings(db=db, _username=_username)

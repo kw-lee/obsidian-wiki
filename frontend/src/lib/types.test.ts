@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type {
+  AuditEntriesResponse,
   AuthTokenPair,
   TreeNode,
   MovePathResult,
   TaskItem,
   TaskListResponse,
+  DataviewContextResponse,
+  DataviewPageSnapshot,
   DataviewQueryResponse,
   DocDetail,
   SearchResponse,
@@ -110,6 +113,30 @@ describe("Type contracts", () => {
     expect(response.rows[0].cells[1].link_path).toBe("projects/alpha.md");
   });
 
+  it("DataviewContextResponse has expected shape", () => {
+    const page: DataviewPageSnapshot = {
+      path: "projects/alpha.md",
+      title: "Alpha",
+      tags: ["project/active"],
+      frontmatter: { status: "active" },
+      file: {
+        name: "alpha",
+        path: "projects/alpha.md",
+        folder: "projects",
+        ext: ".md",
+        link: { path: "projects/alpha.md", display: "alpha" },
+        ctime: "2026-04-15T01:00:00Z",
+        mtime: "2026-04-15T02:00:00Z",
+        tags: ["project/active"],
+        inlinks: [],
+        outlinks: [{ path: "projects/beta.md", display: "beta" }],
+        tasks: [],
+      },
+    };
+    const response: DataviewContextResponse = { pages: [page] };
+    expect(response.pages[0].file.outlinks[0].path).toBe("projects/beta.md");
+  });
+
   it("DocDetail has expected shape", () => {
     const link: ResolvedWikiLink = {
       raw_target: "target",
@@ -196,11 +223,31 @@ describe("Type contracts", () => {
   it("ProfileSettings has expected shape", () => {
     const profile: ProfileSettings = {
       username: "admin",
+      git_display_name: "Admin",
+      git_email: "admin@example.com",
       must_change_credentials: false,
       created_at: null,
       updated_at: null,
     };
     expect(profile.username).toBe("admin");
+  });
+
+  it("AuditEntriesResponse has expected shape", () => {
+    const audit: AuditEntriesResponse = {
+      entries: [
+        {
+          created_at: "2026-04-15T12:00:00Z",
+          action: "wiki.update",
+          path: "notes/today.md",
+          commit_sha: "abc12345",
+          username: "admin",
+          git_display_name: "Admin Writer",
+          git_email: "admin@example.com",
+        },
+      ],
+    };
+    expect(audit.entries[0].action).toBe("wiki.update");
+    expect(audit.entries[0].git_email).toBe("admin@example.com");
   });
 
   it("SyncSettings has expected shape", () => {
@@ -284,6 +331,7 @@ describe("Type contracts", () => {
       version: "0.1.0",
       started_at: "2026-04-13T02:00:00Z",
       timezone: "Asia/Seoul",
+      editor_split_preview_enabled: true,
       uptime_seconds: 42,
       sync_backend: "git",
       sync_auto_enabled: true,
@@ -310,6 +358,7 @@ describe("Type contracts", () => {
     };
     expect(system.vault_git.has_origin).toBe(true);
     expect(system.timezone).toBe("Asia/Seoul");
+    expect(system.editor_split_preview_enabled).toBe(true);
   });
 
   it("SystemLogs has expected shape", () => {

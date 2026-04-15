@@ -7,8 +7,10 @@ vi.mock("./client", () => ({
 import { api } from "./client";
 import {
   fetchAppearanceSettings,
+  fetchProfileAudit,
   fetchPluginSettings,
   fetchProfileSettings,
+  fetchSystemAudit,
   fetchPublicAppearanceSettings,
   fetchSystemLogs,
   fetchSyncSettings,
@@ -36,11 +38,19 @@ describe("Settings API functions", () => {
     expect(mockApi).toHaveBeenCalledWith("/settings/profile");
   });
 
+  it("fetchProfileAudit calls the profile audit endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ entries: [] });
+    await fetchProfileAudit(15);
+    expect(mockApi).toHaveBeenCalledWith("/settings/profile/audit?limit=15");
+  });
+
   it("updateProfileSettings sends PUT payload", async () => {
     mockApi.mockResolvedValueOnce({ access_token: "a", refresh_token: "b" });
     await updateProfileSettings({
       current_password: "testpass",
       new_username: "writer",
+      git_display_name: "Writer One",
+      git_email: "writer@example.com",
       new_password: "newpass123",
     });
     expect(mockApi).toHaveBeenCalledWith("/settings/profile", {
@@ -48,6 +58,8 @@ describe("Settings API functions", () => {
       body: JSON.stringify({
         current_password: "testpass",
         new_username: "writer",
+        git_display_name: "Writer One",
+        git_email: "writer@example.com",
         new_password: "newpass123",
       }),
     });
@@ -230,11 +242,13 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({ timezone: "Asia/Seoul" });
     await updateSystemSettings({
       timezone: "Asia/Seoul",
+      editor_split_preview_enabled: true,
     });
     expect(mockApi).toHaveBeenCalledWith("/settings/system", {
       method: "PUT",
       body: JSON.stringify({
         timezone: "Asia/Seoul",
+        editor_split_preview_enabled: true,
       }),
     });
   });
@@ -243,5 +257,11 @@ describe("Settings API functions", () => {
     mockApi.mockResolvedValueOnce({ entries: [] });
     await fetchSystemLogs(25);
     expect(mockApi).toHaveBeenCalledWith("/settings/system/logs?limit=25");
+  });
+
+  it("fetchSystemAudit calls the system audit endpoint", async () => {
+    mockApi.mockResolvedValueOnce({ entries: [] });
+    await fetchSystemAudit(30);
+    expect(mockApi).toHaveBeenCalledWith("/settings/system/audit?limit=30");
   });
 });

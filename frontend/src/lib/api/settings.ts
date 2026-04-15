@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type {
+  AuditEntriesResponse,
   AuthTokenPair,
   AppearanceSettings,
   PluginSettings,
@@ -18,9 +19,17 @@ import type {
 export const fetchProfileSettings = () =>
   api<ProfileSettings>("/settings/profile");
 
+export const fetchProfileAudit = (limit = 20) =>
+  api<AuditEntriesResponse>(`/settings/profile/audit?limit=${limit}`);
+
+export const fetchSystemAudit = (limit = 50) =>
+  api<AuditEntriesResponse>(`/settings/system/audit?limit=${limit}`);
+
 export const updateProfileSettings = (payload: {
   current_password: string;
   new_username?: string;
+  git_display_name: string;
+  git_email: string;
   new_password?: string;
 }) =>
   api<AuthTokenPair>("/settings/profile", {
@@ -98,7 +107,10 @@ export const updatePluginSettings = (payload: PluginSettings) =>
 export const fetchSystemSettings = () =>
   api<SystemSettings>("/settings/system");
 
-export const updateSystemSettings = (payload: { timezone: string }) =>
+export const updateSystemSettings = (payload: {
+  timezone: string;
+  editor_split_preview_enabled: boolean;
+}) =>
   api<SystemSettings>("/settings/system", {
     method: "PUT",
     body: JSON.stringify(payload),

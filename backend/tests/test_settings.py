@@ -4,9 +4,10 @@ from datetime import UTC, datetime
 
 import bcrypt
 import pytest
+from sqlalchemy import select
 
 import app.db.session as session_mod
-from app.db.models import AppSettings, Document, Tag, User
+from app.db.models import AppSettings, AuditLog, Document, Tag, User
 from app.main import app
 from app.schemas import SyncStatus, SyncTestResult
 from app.services.settings import ensure_app_settings
@@ -22,6 +23,8 @@ async def test_get_profile(client, auth_headers, setup_vault):
     assert resp.status_code == 200
     data = resp.json()
     assert data["username"] == "admin"
+    assert data["git_display_name"] == "admin"
+    assert data["git_email"] == "admin@obsidian-wiki.local"
     assert data["must_change_credentials"] is True
 
 
@@ -32,6 +35,8 @@ async def test_update_profile_changes_username_and_password(client, auth_headers
         json={
             "current_password": "testpass",
             "new_username": "writer",
+            "git_display_name": "Writer One",
+            "git_email": "writer@example.com",
             "new_password": "newpass123",
         },
         headers=auth_headers,
@@ -49,6 +54,12 @@ async def test_update_profile_changes_username_and_password(client, auth_headers
     assert login_resp.status_code == 200
     assert login_resp.json()["must_change_credentials"] is False
 
+    async with session_mod.async_session() as session:
+        user = await session.scalar(select(User).where(User.username == "writer"))
+        assert user is not None
+        assert user.git_display_name == "Writer One"
+        assert user.git_email == "writer@example.com"
+
 
 @pytest.mark.asyncio
 async def test_update_profile_rejects_wrong_current_password(client, auth_headers, setup_vault):
@@ -57,6 +68,8 @@ async def test_update_profile_rejects_wrong_current_password(client, auth_header
         json={
             "current_password": "wrongpass",
             "new_username": "writer",
+            "git_display_name": "Writer",
+            "git_email": "writer@example.com",
         },
         headers=auth_headers,
     )
@@ -81,11 +94,76 @@ async def test_update_profile_rejects_username_conflict(client, auth_headers, se
         json={
             "current_password": "testpass",
             "new_username": "taken",
+            "git_display_name": "Taken",
+            "git_email": "taken@example.com",
         },
         headers=auth_headers,
     )
     assert resp.status_code == 409
     assert resp.json()["detail"] == "Username already taken"
+
+
+@pytest.mark.asyncio
+async def test_get_profile_audit_returns_current_user_entries_newest_first(
+    client, auth_headers, setup_vault
+):
+    async with session_mod.async_session() as session:
+        current_user = await session.scalar(select(User).where(User.username == "admin"))
+        assert current_user is not None
+        other_user = User(
+            username="other",
+            password_hash=bcrypt.hashpw(b"secret123", bcrypt.gensalt()).decode(),
+            git_display_name="Other User",
+            git_email="other@example.com",
+            must_change_credentials=False,
+        )
+        session.add(other_user)
+        await session.flush()
+        session.add_all(
+            [
+                AuditLog(
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.update",
+                    path="notes/second.md",
+                    commit_sha="bbb222",
+                    created_at=datetime(2026, 4, 15, 12, 5, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.create",
+                    path="notes/first.md",
+                    commit_sha="aaa111",
+                    created_at=datetime(2026, 4, 15, 12, 0, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=other_user.id,
+                    username=other_user.username,
+                    git_display_name=other_user.git_display_name,
+                    git_email=other_user.git_email,
+                    action="wiki.delete",
+                    path="notes/other.md",
+                    commit_sha="ccc333",
+                    created_at=datetime(2026, 4, 15, 12, 10, tzinfo=UTC),
+                ),
+            ]
+        )
+        await session.commit()
+
+    resp = await client.get("/api/settings/profile/audit?limit=5", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [entry["path"] for entry in data["entries"]] == [
+        "notes/second.md",
+        "notes/first.md",
+    ]
+    assert all(entry["username"] == "admin" for entry in data["entries"])
+    assert data["entries"][0]["commit_sha"] == "bbb222"
 
 
 @pytest.mark.asyncio
@@ -485,6 +563,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     assert data["version"] == "0.1.0"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
     assert data["timezone"] == "Asia/Seoul"
+    assert data["editor_split_preview_enabled"] is False
     assert data["sync_backend"] == "git"
     assert data["sync_auto_enabled"] is True
     assert data["database"] == {"ok": True, "detail": "Database connection successful"}
@@ -495,23 +574,31 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
 
 
 @pytest.mark.asyncio
-async def test_update_system_settings_persists_timezone(client, auth_headers, setup_vault):
+async def test_update_system_settings_persists_timezone_and_split_preview(
+    client, auth_headers, setup_vault
+):
     resp = await client.put(
         "/api/settings/system",
-        json={"timezone": "America/New_York"},
+        json={
+            "timezone": "America/New_York",
+            "editor_split_preview_enabled": True,
+        },
         headers=auth_headers,
     )
     assert resp.status_code == 200
     assert resp.json()["timezone"] == "America/New_York"
+    assert resp.json()["editor_split_preview_enabled"] is True
 
     read_resp = await client.get("/api/settings/system", headers=auth_headers)
     assert read_resp.status_code == 200
     assert read_resp.json()["timezone"] == "America/New_York"
+    assert read_resp.json()["editor_split_preview_enabled"] is True
 
     async with session_mod.async_session() as session:
         row = await session.get(AppSettings, 1)
         assert row is not None
         assert row.timezone == "America/New_York"
+        assert row.editor_split_preview_enabled is True
 
 
 @pytest.mark.asyncio
@@ -538,6 +625,67 @@ async def test_get_system_logs_redacts_sync_url_secrets(client, auth_headers, se
         for entry in data["entries"]
     )
     assert all("secret@" not in entry["message"] for entry in data["entries"])
+
+
+@pytest.mark.asyncio
+async def test_get_system_audit_returns_all_entries_newest_first(client, auth_headers, setup_vault):
+    async with session_mod.async_session() as session:
+        admin = await session.scalar(select(User).where(User.username == "admin"))
+        assert admin is not None
+        other = User(
+            username="reviewer",
+            password_hash=bcrypt.hashpw(b"secret123", bcrypt.gensalt()).decode(),
+            git_display_name="Reviewer",
+            git_email="reviewer@example.com",
+            must_change_credentials=False,
+        )
+        session.add(other)
+        await session.flush()
+        session.add_all(
+            [
+                AuditLog(
+                    user_id=admin.id,
+                    username=admin.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.update",
+                    path="notes/admin.md",
+                    commit_sha="bbb222",
+                    created_at=datetime(2026, 4, 15, 14, 5, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=other.id,
+                    username=other.username,
+                    git_display_name=other.git_display_name,
+                    git_email=other.git_email,
+                    action="attachment.upload",
+                    path="attachments/image.png",
+                    commit_sha="ccc333",
+                    created_at=datetime(2026, 4, 15, 14, 10, tzinfo=UTC),
+                ),
+                AuditLog(
+                    user_id=admin.id,
+                    username=admin.username,
+                    git_display_name="Admin Writer",
+                    git_email="admin@example.com",
+                    action="wiki.create",
+                    path="notes/first.md",
+                    commit_sha="aaa111",
+                    created_at=datetime(2026, 4, 15, 14, 0, tzinfo=UTC),
+                ),
+            ]
+        )
+        await session.commit()
+
+    resp = await client.get("/api/settings/system/audit?limit=2", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [entry["path"] for entry in data["entries"]] == [
+        "attachments/image.png",
+        "notes/admin.md",
+    ]
+    assert data["entries"][0]["username"] == "reviewer"
+    assert data["entries"][1]["username"] == "admin"
 
 
 def test_encrypt_secret_roundtrip():
@@ -581,15 +729,6 @@ async def test_sync_scheduler_reload_restarts_task():
 
 
 @pytest.mark.asyncio
-async def test_get_vault_settings(client, auth_headers, setup_vault):
-    await write_doc("notes/test.md", "# Test\n#tag")
-    (setup_vault / "assets").mkdir(parents=True, exist_ok=True)
-    (setup_vault / "assets" / "image.png").write_bytes(b"pngdata")
-    (setup_vault / ".obsidian").mkdir(parents=True, exist_ok=True)
-    (setup_vault / ".obsidian" / "workspace.json").write_text("{}", encoding="utf-8")
-
-    async with session_mod.async_session() as session:
-@pytest.mark.asyncio
 async def test_enqueue_startup_sync_if_enabled_queues_automatic_sync(client):
     del client
     async with session_mod.async_session() as session:
@@ -622,6 +761,15 @@ async def test_enqueue_startup_sync_if_enabled_queues_automatic_sync(client):
     assert job_calls == [("sync", "automatic")]
 
 
+@pytest.mark.asyncio
+async def test_get_vault_settings(client, auth_headers, setup_vault):
+    await write_doc("notes/test.md", "# Test\n#tag")
+    (setup_vault / "assets").mkdir(parents=True, exist_ok=True)
+    (setup_vault / "assets" / "image.png").write_bytes(b"pngdata")
+    (setup_vault / ".obsidian").mkdir(parents=True, exist_ok=True)
+    (setup_vault / ".obsidian" / "workspace.json").write_text("{}", encoding="utf-8")
+
+    async with session_mod.async_session() as session:
         session.add(
             Document(
                 path="notes/test.md",

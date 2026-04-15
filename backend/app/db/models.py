@@ -25,6 +25,10 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    git_display_name: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    git_email: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     must_change_credentials: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
     )
@@ -94,6 +98,9 @@ class AppSettings(Base):
     editor_font: Mapped[str] = mapped_column(
         Text, nullable=False, default="system", server_default="system"
     )
+    editor_split_preview_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     dataview_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
@@ -116,9 +123,6 @@ class AppSettings(Base):
             "sync_interval_seconds >= 60", name="ck_app_settings_sync_interval_seconds"
         ),
         CheckConstraint(
-            "default_theme IN ('light', 'dark', 'system')", name="ck_app_settings_default_theme"
-        ),
-        CheckConstraint(
             "sync_mode IN ('bidirectional', 'pull-only', 'push-only')",
             name="ck_app_settings_sync_mode",
         ),
@@ -129,6 +133,9 @@ class AppSettings(Base):
         CheckConstraint(
             "webdav_obsidian_policy IN ('remote-only', 'ignore', 'include')",
             name="ck_app_settings_webdav_obsidian_policy",
+        ),
+        CheckConstraint(
+            "default_theme IN ('light', 'dark', 'system')", name="ck_app_settings_default_theme"
         ),
         CheckConstraint(
             "theme_preset IN ('obsidian', 'graphite', 'dawn', 'forest')",
@@ -222,3 +229,24 @@ class WebDAVManifest(Base):
     base_content: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("idx_webdav_manifest_path", "path"),)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    username: Mapped[str] = mapped_column(Text, nullable=False)
+    git_display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    git_email: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    path: Mapped[str] = mapped_column(Text, nullable=False)
+    commit_sha: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_audit_logs_user_id", "user_id"),
+        Index("idx_audit_logs_created_at", "created_at"),
+    )

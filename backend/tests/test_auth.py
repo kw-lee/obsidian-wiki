@@ -10,9 +10,10 @@ def test_verify_password():
 
 
 def test_create_and_decode_token():
-    token = create_token("admin", "access")
+    token = create_token(1, "access", username="admin")
     payload = decode_token(token)
-    assert payload["sub"] == "admin"
+    assert payload["sub"] == "1"
+    assert payload["username"] == "admin"
     assert payload["type"] == "access"
 
 
@@ -90,7 +91,12 @@ async def test_change_credentials_flow(client, setup_vault):
     # 2. Change credentials
     resp = await client.post(
         "/api/auth/change-credentials",
-        json={"new_username": "myuser", "new_password": "newpass123"},
+        json={
+            "new_username": "myuser",
+            "new_password": "newpass123",
+            "git_display_name": "My User",
+            "git_email": "myuser@example.com",
+        },
         headers=headers,
     )
     assert resp.status_code == 200
@@ -104,7 +110,9 @@ async def test_change_credentials_flow(client, setup_vault):
     assert resp.status_code == 200
 
     # 4. Login with new credentials works
-    resp = await client.post("/api/auth/login", json={"username": "myuser", "password": "newpass123"})
+    resp = await client.post(
+        "/api/auth/login", json={"username": "myuser", "password": "newpass123"}
+    )
     assert resp.status_code == 200
     assert resp.json()["must_change_credentials"] is False
 

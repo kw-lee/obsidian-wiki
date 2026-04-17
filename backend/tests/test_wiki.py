@@ -15,9 +15,9 @@ from sqlalchemy.exc import OperationalError
 import app.db.session as session_mod
 from app.db.models import AuditLog, User
 from app.main import app
-from app.services.indexer import index_file
+from app.services.indexer import index_attachment_file, index_file
 from app.services.settings import ensure_app_settings, invalidate_settings_cache
-from app.services.vault import write_doc
+from app.services.vault import content_hash, write_doc
 
 
 def _git_init(vault_path):
@@ -76,6 +76,134 @@ async def test_get_tree_with_files(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_get_attachment_catalog_returns_indexed_attachments(
+    client, auth_headers, setup_vault
+):
+    from app.db.session import async_session
+
+    assets = setup_vault / "assets"
+    assets.mkdir()
+    image = assets / "diagram.png"
+    image.write_bytes(b"png")
+    pdf = assets / "paper.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    async with async_session() as session:
+        await index_attachment_file(session, "assets/diagram.png", image)
+        await index_attachment_file(session, "assets/paper.pdf", pdf)
+        await session.commit()
+
+    resp = await client.get("/api/wiki/attachment-catalog", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {
+            "path": "assets/diagram.png",
+            "mime_type": "image/png",
+            "size_bytes": 3,
+        },
+        {
+            "path": "assets/paper.pdf",
+            "mime_type": "application/pdf",
+            "size_bytes": 4,
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_note_catalog_returns_titles_and_aliases(
+    client, auth_headers, setup_vault
+):
+    (setup_vault / "notes").mkdir()
+
+    await _write_and_index_doc(
+        "notes/alpha.md",
+        """---
+title: Project Alpha
+aliases:
+  - Alpha Roadmap
+  - Launch Plan
+---
+# Alpha
+""",
+    )
+    await _write_and_index_doc(
+        "notes/beta.md",
+        """---
+alias: Beta Card
+---
+# Beta
+""",
+    )
+
+    resp = await client.get("/api/wiki/note-catalog", headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {
+            "path": "notes/alpha.md",
+            "title": "Project Alpha",
+            "aliases": ["Alpha Roadmap", "Launch Plan"],
+        },
+        {
+            "path": "notes/beta.md",
+            "title": "beta",
+            "aliases": ["Beta Card"],
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_link_target_catalog_returns_headings_and_blocks(
+    client, auth_headers, setup_vault
+):
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "reference").mkdir()
+
+    await _write_and_index_doc("notes/current.md", "# Current\nSee [[../reference/guide]].")
+    await _write_and_index_doc(
+        "reference/guide.md",
+        """---
+title: Guide
+---
+# Overview
+
+Paragraph with block ^intro
+
+```md
+## Hidden
+Code block ^skip
+```
+
+## Deep Dive ##
+""",
+    )
+
+    resp = await client.get(
+        "/api/wiki/link-target-catalog",
+        params={
+            "source_path": "notes/current.md",
+            "target": "../reference/guide",
+        },
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "resolved_path": "reference/guide.md",
+        "headings": [
+            {"text": "Overview", "level": 1},
+            {"text": "Deep Dive", "level": 2},
+        ],
+        "blocks": [
+            {
+                "id": "intro",
+                "text": "Paragraph with block",
+            }
+        ],
+    }
+
+
+@pytest.mark.asyncio
 async def test_create_doc(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     try:
@@ -94,7 +222,7 @@ async def test_create_doc(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
-async def test_create_doc_uses_current_user_git_actor_and_records_audit_log(
+async def test_create_doc_records_user_identity_without_creating_a_git_commit(
     client, auth_headers, setup_vault, monkeypatch
 ):
     _git_init(setup_vault)
@@ -120,16 +248,16 @@ async def test_create_doc_uses_current_user_git_actor_and_records_audit_log(
     assert resp.status_code == 201
 
     repo = Repo(setup_vault)
-    commit = repo.head.commit
-    assert commit.author.name == "Audit Writer"
-    assert commit.author.email == "audit@example.com"
+    assert repo.head.commit.message.strip() == "init"
 
     async with session_mod.async_session() as session:
         logs = (await session.execute(select(AuditLog))).scalars().all()
         assert len(logs) == 1
         assert logs[0].action == "wiki.create"
         assert logs[0].path == "audit-note.md"
-        assert logs[0].commit_sha == commit.hexsha
+        assert logs[0].git_display_name == "Audit Writer"
+        assert logs[0].git_email == "audit@example.com"
+        assert logs[0].commit_sha is None
 
 
 @pytest.mark.asyncio
@@ -443,10 +571,16 @@ async def test_get_doc_rejects_git_path(client, auth_headers, setup_vault):
 async def test_save_doc(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     await write_doc("edit-me.md", "original")
+    repo = Repo(setup_vault)
+    initial_head = repo.head.commit.hexsha
     try:
         resp = await client.put(
             "/api/wiki/doc/edit-me.md",
-            json={"content": "updated content", "base_commit": None},
+            json={
+                "content": "updated content",
+                "base_revision": content_hash("original"),
+                "base_content": "original",
+            },
             headers=auth_headers,
         )
     except OperationalError:
@@ -454,6 +588,17 @@ async def test_save_doc(client, auth_headers, setup_vault):
     assert resp.status_code in (200, 500)
     if resp.status_code == 200:
         assert resp.json()["content"] == "updated content"
+        assert resp.json()["base_revision"] == content_hash("updated content")
+        assert Repo(setup_vault).head.commit.hexsha == initial_head
+        assert Repo(setup_vault).is_dirty(untracked_files=True)
+
+        async with session_mod.async_session() as session:
+            logs = (await session.execute(select(AuditLog))).scalars().all()
+
+        assert logs
+        latest = max(logs, key=lambda row: row.id)
+        assert latest.action == "wiki.update"
+        assert latest.commit_sha is None
 
 
 @pytest.mark.asyncio
@@ -482,7 +627,11 @@ async def test_save_doc_enqueues_sync_when_sync_on_save_enabled(
     try:
         resp = await client.put(
             "/api/wiki/doc/edit-me.md",
-            json={"content": "updated content", "base_commit": None},
+            json={
+                "content": "updated content",
+                "base_revision": content_hash("original"),
+                "base_content": "original",
+            },
             headers=auth_headers,
         )
     except OperationalError:

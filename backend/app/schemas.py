@@ -75,6 +75,34 @@ class SearchResponse(BaseModel):
     total: int
 
 
+class AttachmentCatalogItem(BaseModel):
+    path: str
+    mime_type: str
+    size_bytes: int
+
+
+class NoteCatalogItem(BaseModel):
+    path: str
+    title: str
+    aliases: list[str] = []
+
+
+class LinkTargetHeadingItem(BaseModel):
+    text: str
+    level: int
+
+
+class LinkTargetBlockItem(BaseModel):
+    id: str
+    text: str
+
+
+class LinkTargetCatalog(BaseModel):
+    resolved_path: str | None = None
+    headings: list[LinkTargetHeadingItem] = []
+    blocks: list[LinkTargetBlockItem] = []
+
+
 # ── Links / Tags / Graph ─────────────────────────────
 class BacklinkItem(BaseModel):
     source_path: str
@@ -351,6 +379,7 @@ class PluginSettingsResponse(BaseModel):
     dataview_show_source: bool = False
     folder_note_enabled: bool = False
     templater_enabled: bool = False
+    katex_enabled: bool = True
 
 
 class PluginSettingsUpdateRequest(BaseModel):
@@ -358,6 +387,7 @@ class PluginSettingsUpdateRequest(BaseModel):
     dataview_show_source: bool = False
     folder_note_enabled: bool = False
     templater_enabled: bool = False
+    katex_enabled: bool = True
 
 
 class SystemDependencyStatus(BaseModel):

@@ -4,15 +4,16 @@ import re
 from collections import defaultdict
 from pathlib import PurePosixPath
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, get_current_user, get_current_user_context
-from app.db.models import AuditLog, Document, Link
+from app.db.models import Attachment, AuditLog, Document, Link
 from app.db.session import get_db
 from app.schemas import (
+    AttachmentCatalogItem,
     BacklinkItem,
     DocAuditResponse,
     DocCreateRequest,
@@ -20,8 +21,12 @@ from app.schemas import (
     DocSaveRequest,
     FolderCreateRequest,
     FolderCreateResponse,
+    LinkTargetBlockItem,
+    LinkTargetCatalog,
+    LinkTargetHeadingItem,
     MovePathRequest,
     MovePathResponse,
+    NoteCatalogItem,
     ProfileAuditEntry,
     TreeNode,
 )
@@ -41,6 +46,11 @@ from app.services.wiki_links import (
 )
 
 router = APIRouter()
+NOTE_EXTENSIONS = (".md", ".mdx")
+FRONTMATTER_OPENING = re.compile(r"^(?:\ufeff)?---[ \t]*\r?\n")
+FRONTMATTER_CLOSING = re.compile(r"^(?:---|\.\.\.)[ \t]*$")
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+BLOCK_ID_RE = re.compile(r"^(?P<content>.*?)(?:\s+\^(?P<id>[A-Za-z0-9][A-Za-z0-9_-]*))\s*$")
 
 
 def _invalid_path(detail: str) -> HTTPException:
@@ -84,6 +94,39 @@ def _normalize_frontmatter(value: object) -> dict:
     return {}
 
 
+def _normalize_aliases(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, list):
+        aliases: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            if text:
+                aliases.append(text)
+        return aliases
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _frontmatter_aliases(frontmatter: dict) -> list[str]:
+    raw_aliases = frontmatter.get("aliases")
+    if raw_aliases is None:
+        raw_aliases = frontmatter.get("alias")
+
+    seen: set[str] = set()
+    aliases: list[str] = []
+    for alias in _normalize_aliases(raw_aliases):
+        key = alias.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        aliases.append(alias)
+    return aliases
+
+
 def _doc_revision(content: str) -> str:
     return vault.content_hash(content)
 
@@ -93,6 +136,81 @@ def _normalize_snippet(text: str, max_length: int = 160) -> str:
     if len(compact) <= max_length:
         return compact
     return f"{compact[: max_length - 1].rstrip()}…"
+
+
+def _strip_yaml_frontmatter(source: str) -> str:
+    if not FRONTMATTER_OPENING.match(source):
+        return source
+
+    bom = "\ufeff" if source.startswith("\ufeff") else ""
+    normalized = source[1:] if bom else source
+    lines = normalized.splitlines()
+
+    for index, line in enumerate(lines[1:], start=1):
+        if FRONTMATTER_CLOSING.match(line):
+            return bom + "\n".join(lines[index + 1 :])
+    return source
+
+
+def _iter_markdown_body_lines(source: str):
+    in_fence = False
+    for raw_line in _strip_yaml_frontmatter(source).splitlines():
+        trimmed = raw_line.strip()
+        if re.match(r"^```", trimmed):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        yield raw_line, trimmed
+
+
+def _extract_heading_targets(source: str) -> list[LinkTargetHeadingItem]:
+    headings: list[LinkTargetHeadingItem] = []
+    for _, trimmed in _iter_markdown_body_lines(source):
+        match = HEADING_RE.match(trimmed)
+        if not match:
+            continue
+
+        text = re.sub(r"\s+#+\s*$", "", match.group(2)).strip()
+        if not text:
+            continue
+
+        headings.append(LinkTargetHeadingItem(text=text, level=len(match.group(1))))
+    return headings
+
+
+def _extract_block_targets(source: str) -> list[LinkTargetBlockItem]:
+    blocks: list[LinkTargetBlockItem] = []
+    for _, trimmed in _iter_markdown_body_lines(source):
+        if not trimmed or HEADING_RE.match(trimmed):
+            continue
+
+        match = BLOCK_ID_RE.match(trimmed)
+        if not match:
+            continue
+
+        block_id = match.group("id")
+        content = match.group("content").strip() or trimmed
+        blocks.append(
+            LinkTargetBlockItem(id=block_id, text=_normalize_snippet(content, max_length=100))
+        )
+    return blocks
+
+
+def _resolve_link_target_note_path(source_path: str, target: str, catalog) -> str | None:
+    if not target:
+        return source_path
+
+    resolved = resolve_wikilink(
+        ParsedWikiLink(raw_target=target, display_text=target, embed=False),
+        source_path,
+        catalog,
+    )
+    if not resolved.vault_path or resolved.kind not in {"note", "heading", "block"}:
+        return None
+    if PurePosixPath(resolved.vault_path).suffix.lower() not in NOTE_EXTENSIONS:
+        return None
+    return resolved.vault_path
 
 
 def _extract_backlink_snippet(
@@ -335,6 +453,75 @@ async def _rewrite_links_after_move(
 async def get_tree(_user: str = Depends(get_current_user)) -> list[TreeNode]:
     nodes = vault.build_tree()
     return [TreeNode(**n) for n in nodes]
+
+
+@router.get("/note-catalog", response_model=list[NoteCatalogItem])
+async def get_note_catalog(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> list[NoteCatalogItem]:
+    result = await db.execute(
+        select(Document.path, Document.title, Document.frontmatter).order_by(Document.path)
+    )
+    return [
+        NoteCatalogItem(
+            path=path,
+            title=title,
+            aliases=_frontmatter_aliases(_normalize_frontmatter(frontmatter)),
+        )
+        for path, title, frontmatter in result.all()
+    ]
+
+
+@router.get("/attachment-catalog", response_model=list[AttachmentCatalogItem])
+async def get_attachment_catalog(
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> list[AttachmentCatalogItem]:
+    result = await db.execute(
+        select(Attachment.path, Attachment.mime_type, Attachment.size_bytes).order_by(
+            Attachment.path
+        )
+    )
+    return [
+        AttachmentCatalogItem(path=path, mime_type=mime_type, size_bytes=size_bytes)
+        for path, mime_type, size_bytes in result.all()
+    ]
+
+
+@router.get("/link-target-catalog", response_model=LinkTargetCatalog)
+async def get_link_target_catalog(
+    source_path: str = Query(..., min_length=1),
+    target: str = Query(""),
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+) -> LinkTargetCatalog:
+    normalized_source = source_path.strip().strip("/")
+    normalized_target = target.strip()
+    if not normalized_source:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Source path is required"
+        )
+
+    source_full = _resolve_or_400(normalized_source)
+    if not source_full.exists() or source_full.is_dir():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source note not found")
+
+    catalog = await load_resolver_catalog(db)
+    note_path = _resolve_link_target_note_path(normalized_source, normalized_target, catalog)
+    if not note_path:
+        return LinkTargetCatalog()
+
+    target_full = _resolve_or_400(note_path)
+    if not target_full.exists() or target_full.is_dir():
+        return LinkTargetCatalog()
+
+    content = await vault.read_doc(note_path)
+    return LinkTargetCatalog(
+        resolved_path=note_path,
+        headings=_extract_heading_targets(content),
+        blocks=_extract_block_targets(content),
+    )
 
 
 @router.get("/doc/{path:path}", response_model=DocDetail)

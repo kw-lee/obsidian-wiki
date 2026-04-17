@@ -5,6 +5,9 @@ import type {
   FolderCreateResult,
   MovePathResult,
   SearchResponse,
+  AttachmentCatalogItem,
+  NoteCatalogItem,
+  LinkTargetCatalog,
   BacklinkItem,
   TagInfo,
   GraphData,
@@ -17,6 +20,16 @@ import type {
 } from "$lib/types";
 
 export const fetchTree = () => api<TreeNode[]>("/wiki/tree");
+
+export const fetchAttachmentCatalog = () =>
+  api<AttachmentCatalogItem[]>("/wiki/attachment-catalog");
+
+export const fetchNoteCatalog = () => api<NoteCatalogItem[]>("/wiki/note-catalog");
+
+export const fetchLinkTargetCatalog = (sourcePath: string, target: string) =>
+  api<LinkTargetCatalog>("/wiki/link-target-catalog", {
+    params: { source_path: sourcePath, target },
+  });
 
 export const fetchDoc = (path: string) => api<DocDetail>(`/wiki/doc/${path}`);
 

@@ -8,6 +8,9 @@ vi.mock("./client", () => ({
 import { api } from "./client";
 import {
   fetchTree,
+  fetchAttachmentCatalog,
+  fetchNoteCatalog,
+  fetchLinkTargetCatalog,
   fetchDoc,
   fetchDocHistory,
   saveDoc,
@@ -42,6 +45,33 @@ describe("Wiki API functions", () => {
     expect(mockApi).toHaveBeenCalledWith("/wiki/tree");
   });
 
+  it("fetchAttachmentCatalog calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce([]);
+    await fetchAttachmentCatalog();
+    expect(mockApi).toHaveBeenCalledWith("/wiki/attachment-catalog");
+  });
+
+  it("fetchNoteCatalog calls correct endpoint", async () => {
+    mockApi.mockResolvedValueOnce([]);
+    await fetchNoteCatalog();
+    expect(mockApi).toHaveBeenCalledWith("/wiki/note-catalog");
+  });
+
+  it("fetchLinkTargetCatalog passes source_path and target params", async () => {
+    mockApi.mockResolvedValueOnce({
+      resolved_path: "notes/reference.md",
+      headings: [],
+      blocks: [],
+    });
+    await fetchLinkTargetCatalog("notes/current.md", "../notes/reference");
+    expect(mockApi).toHaveBeenCalledWith("/wiki/link-target-catalog", {
+      params: {
+        source_path: "notes/current.md",
+        target: "../notes/reference",
+      },
+    });
+  });
+
   it("fetchDoc calls correct endpoint", async () => {
     mockApi.mockResolvedValueOnce({ path: "test.md" });
     await fetchDoc("folder/test.md");
@@ -56,12 +86,16 @@ describe("Wiki API functions", () => {
     );
   });
 
-  it("saveDoc sends PUT with content and base_commit", async () => {
+  it("saveDoc sends PUT with content and base_revision", async () => {
     mockApi.mockResolvedValueOnce({ path: "test.md" });
-    await saveDoc("test.md", "new content", "abc123");
+    await saveDoc("test.md", "new content", "abc123", "old content");
     expect(mockApi).toHaveBeenCalledWith("/wiki/doc/test.md", {
       method: "PUT",
-      body: JSON.stringify({ content: "new content", base_commit: "abc123" }),
+      body: JSON.stringify({
+        content: "new content",
+        base_revision: "abc123",
+        base_content: "old content",
+      }),
     });
   });
 

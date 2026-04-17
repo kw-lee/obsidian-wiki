@@ -42,6 +42,34 @@ export interface SearchResponse {
   total: number;
 }
 
+export interface AttachmentCatalogItem {
+  path: string;
+  mime_type: string;
+  size_bytes: number;
+}
+
+export interface NoteCatalogItem {
+  path: string;
+  title: string;
+  aliases: string[];
+}
+
+export interface LinkTargetHeadingItem {
+  text: string;
+  level: number;
+}
+
+export interface LinkTargetBlockItem {
+  id: string;
+  text: string;
+}
+
+export interface LinkTargetCatalog {
+  resolved_path: string | null;
+  headings: LinkTargetHeadingItem[];
+  blocks: LinkTargetBlockItem[];
+}
+
 export interface BacklinkItem {
   source_path: string;
   title: string;
@@ -273,6 +301,7 @@ export interface PluginSettings {
   dataview_show_source: boolean;
   folder_note_enabled: boolean;
   templater_enabled: boolean;
+  katex_enabled: boolean;
 }
 
 export interface SystemDependencyStatus {

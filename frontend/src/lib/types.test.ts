@@ -12,6 +12,9 @@ import type {
   DocAuditHistoryResponse,
   DocDetail,
   SearchResponse,
+  AttachmentCatalogItem,
+  NoteCatalogItem,
+  LinkTargetCatalog,
   BacklinkItem,
   TagInfo,
   GraphData,
@@ -159,12 +162,12 @@ describe("Type contracts", () => {
       updated_at: null,
       content: "# Test",
       rendered_content: "# Rendered Test",
-      base_commit: "abc123",
+      base_revision: "abc123",
       outgoing_links: [link],
     };
     expect(doc.tags).toContain("tag1");
     expect(doc.rendered_content).toBe("# Rendered Test");
-    expect(doc.base_commit).toBe("abc123");
+    expect(doc.base_revision).toBe("abc123");
     expect(doc.outgoing_links[0].vault_path).toBe("target.md");
   });
 
@@ -178,6 +181,39 @@ describe("Type contracts", () => {
     };
     expect(resp.results).toHaveLength(1);
     expect(resp.results[0].score).toBeGreaterThan(0);
+  });
+
+  it("AttachmentCatalogItem has expected shape", () => {
+    const attachment: AttachmentCatalogItem = {
+      path: "assets/diagram.png",
+      mime_type: "image/png",
+      size_bytes: 1280,
+    };
+    expect(attachment.path).toBe("assets/diagram.png");
+    expect(attachment.size_bytes).toBeGreaterThan(0);
+  });
+
+  it("NoteCatalogItem includes title aliases", () => {
+    const note: NoteCatalogItem = {
+      path: "projects/alpha.md",
+      title: "Project Alpha",
+      aliases: ["Alpha Roadmap", "Launch Plan"],
+    };
+    expect(note.title).toBe("Project Alpha");
+    expect(note.aliases[0]).toBe("Alpha Roadmap");
+  });
+
+  it("LinkTargetCatalog captures headings and block references", () => {
+    const catalog: LinkTargetCatalog = {
+      resolved_path: "notes/reference.md",
+      headings: [
+        { text: "Overview", level: 1 },
+        { text: "Details", level: 2 },
+      ],
+      blocks: [{ id: "quote-1", text: "Quoted line" }],
+    };
+    expect(catalog.headings[1].text).toBe("Details");
+    expect(catalog.blocks[0].id).toBe("quote-1");
   });
 
   it("GraphData has nodes and edges", () => {
@@ -341,10 +377,12 @@ describe("Type contracts", () => {
       dataview_show_source: false,
       folder_note_enabled: true,
       templater_enabled: false,
+      katex_enabled: true,
     };
     expect(plugin.dataview_enabled).toBe(true);
     expect(plugin.dataview_show_source).toBe(false);
     expect(plugin.folder_note_enabled).toBe(true);
+    expect(plugin.katex_enabled).toBe(true);
   });
 
   it("SystemSettings has expected shape", () => {

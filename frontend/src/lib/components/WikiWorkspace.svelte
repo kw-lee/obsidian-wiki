@@ -6,19 +6,29 @@
     fetchSystemSettings,
     rebuildVaultIndex,
   } from "$lib/api/settings";
+  import { ApiError } from "$lib/api/client";
   import {
     createDoc,
     createFolder,
+    fetchAttachmentCatalog,
     fetchDoc,
     fetchDocHistory,
+    fetchNoteCatalog,
     fetchTree,
     movePath,
     saveDoc,
   } from "$lib/api/wiki";
   import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
   import { getAuth } from "$lib/stores/auth.svelte";
+  import { getSyncMonitor, isSyncJobActive } from "$lib/stores/sync.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
-  import type { AuditEntry, DocDetail, TreeNode } from "$lib/types";
+  import type {
+    AttachmentCatalogItem,
+    AuditEntry,
+    DocDetail,
+    NoteCatalogItem,
+    TreeNode,
+  } from "$lib/types";
   import { findTreeNode, resolveFolderNotePath } from "$lib/utils/folder-notes";
   import { stripYamlFrontmatter } from "$lib/utils/markdown";
   import { describeMoveToast } from "$lib/utils/move";
@@ -27,6 +37,10 @@
     suggestNewNotePath,
   } from "$lib/utils/note-path";
   import { buildWikiRoute, isNotePath } from "$lib/utils/routes";
+  import {
+    buildAttachmentAutocompleteItems,
+    buildWikiLinkAutocompleteItems,
+  } from "$lib/utils/wikilink-autocomplete";
   import {
     getWorkspaceState,
     setLastWikiPath,
@@ -57,11 +71,20 @@
     occurrence: number;
   };
 
+  type SaveConflictState = {
+    path: string;
+    message: string;
+    diff: string | null;
+  };
+
   const MAX_OPEN_TABS = 12;
+  const SYNC_REFRESH_ACTIONS = new Set(["pull", "sync", "bootstrap"]);
 
   let { initialPath = null }: { initialPath?: string | null } = $props();
 
   let tree = $state<TreeNode[]>([]);
+  let attachmentCatalog = $state<AttachmentCatalogItem[]>([]);
+  let noteCatalog = $state<NoteCatalogItem[]>([]);
   let doc = $state<DocDetail | null>(null);
   let selectedPath = $state("");
   let missingPath = $state("");
@@ -87,12 +110,18 @@
   let dataviewShowSource = $state(false);
   let revealNonce = $state(0);
   let folderNoteEnabled = $state(false);
+  let katexEnabled = $state(true);
   let editorSplitPreviewEnabled = $state(false);
   let previewContent = $state("");
   let documentSurface = $state<HTMLElement | null>(null);
   let docAuditEntries = $state<AuditEntry[]>([]);
   let docAuditLoading = $state(false);
   let docAuditError = $state("");
+  let saveConflict = $state<SaveConflictState | null>(null);
+  let saveConflictOpen = $state(false);
+  let saveConflictReloading = $state(false);
+  let lastCatalogRefreshJobId = $state<string | null>(null);
+  const syncMonitor = getSyncMonitor();
 
   const activePath = $derived(initialPath?.trim() ?? "");
   const isEditable = $derived(Boolean(doc && isNotePath(doc.path)));
@@ -123,6 +152,19 @@
     doc && isNotePath(doc.path)
       ? `${doc.path}:${doc.base_revision ?? ""}:${doc.updated_at ?? ""}`
       : "",
+  );
+  const wikilinkItems = $derived(
+    buildWikiLinkAutocompleteItems(
+      tree,
+      doc?.path ?? selectedPath,
+      noteCatalog,
+    ),
+  );
+  const attachmentWikilinkItems = $derived(
+    buildAttachmentAutocompleteItems(
+      attachmentCatalog,
+      doc?.path ?? selectedPath,
+    ),
   );
 
   onMount(() => {
@@ -303,9 +345,34 @@
     setWorkspaceOpenTabs(openTabs);
   });
 
+  $effect(() => {
+    const job = syncMonitor.currentJob;
+    if (
+      !ready ||
+      !job ||
+      !SYNC_REFRESH_ACTIONS.has(job.action) ||
+      isSyncJobActive(job) ||
+      !job.finished_at ||
+      lastCatalogRefreshJobId === job.id
+    ) {
+      return;
+    }
+
+    lastCatalogRefreshJobId = job.id;
+    void refreshVaultCatalog();
+  });
+
   async function initializeWorkspace() {
-    await Promise.all([loadTree(), loadPluginSettings(), loadSystemSettings()]);
+    await Promise.all([
+      refreshVaultCatalog(),
+      loadPluginSettings(),
+      loadSystemSettings(),
+    ]);
     ready = true;
+  }
+
+  async function refreshVaultCatalog() {
+    await Promise.all([loadTree(), loadAttachmentCatalog(), loadNoteCatalog()]);
   }
 
   async function loadTree() {
@@ -316,16 +383,34 @@
     }
   }
 
+  async function loadAttachmentCatalog() {
+    try {
+      attachmentCatalog = await fetchAttachmentCatalog();
+    } catch {
+      attachmentCatalog = [];
+    }
+  }
+
+  async function loadNoteCatalog() {
+    try {
+      noteCatalog = await fetchNoteCatalog();
+    } catch {
+      noteCatalog = [];
+    }
+  }
+
   async function loadPluginSettings() {
     try {
       const plugin = await fetchPluginSettings();
       dataviewEnabled = plugin.dataview_enabled;
       dataviewShowSource = plugin.dataview_show_source;
       folderNoteEnabled = plugin.folder_note_enabled;
+      katexEnabled = plugin.katex_enabled;
     } catch {
       dataviewEnabled = true;
       dataviewShowSource = false;
       folderNoteEnabled = false;
+      katexEnabled = true;
     }
   }
 
@@ -353,6 +438,7 @@
     selectedPath = effectivePath;
     missingPath = "";
     editing = false;
+    clearSaveConflict();
 
     if (!path) {
       doc = null;
@@ -382,6 +468,7 @@
 
   function startEdit() {
     if (!doc || !isEditable) return;
+    clearSaveConflict();
     editContent = doc.content;
     previewContent = doc.content;
     editing = true;
@@ -413,20 +500,63 @@
         currentDoc.base_revision,
         currentDoc.content,
       );
+      await loadNoteCatalog();
+      clearSaveConflict();
       editing = false;
       showToast(t("home.saveSuccess"));
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        saveConflict = {
+          path: currentDoc.path,
+          message: error.message,
+          diff: error.diff,
+        };
+        saveConflictOpen = true;
+        return;
+      }
       showToast(error instanceof Error ? error.message : t("home.saveFailed"));
     } finally {
       saving = false;
     }
   }
 
+  async function handleCreateWikilinkNote(path: string) {
+    try {
+      await createDoc(path);
+      await refreshVaultCatalog();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        await loadNoteCatalog();
+        return;
+      }
+
+      showToast(
+        error instanceof Error ? error.message : t("home.newDocFailed"),
+      );
+    }
+  }
+
+  async function handleCancelEdit() {
+    if (!editing) {
+      return;
+    }
+
+    if (saveConflict) {
+      await reloadLatestDocAfterConflict("view");
+      return;
+    }
+
+    editContent = doc?.content ?? "";
+    previewContent = doc?.content ?? "";
+    editing = false;
+    clearSaveConflict();
+  }
+
   async function createMissingNote() {
     if (!missingPath) return;
     try {
       const created = await createDoc(missingPath, "");
-      await loadTree();
+      await refreshVaultCatalog();
       await navigateTo(created.path);
     } catch (error) {
       showToast(
@@ -438,7 +568,7 @@
   async function createNoteAtPath(path: string) {
     try {
       const newDoc = await createDoc(path);
-      await loadTree();
+      await refreshVaultCatalog();
       await navigateTo(newDoc.path);
     } catch (error) {
       showToast(
@@ -531,7 +661,7 @@
   async function handleCreateFolder(path: string) {
     try {
       await createFolder(path);
-      await loadTree();
+      await refreshVaultCatalog();
       showToast(t("fileExplorer.folderCreated"));
     } catch (error) {
       showToast(
@@ -549,7 +679,7 @@
   ) {
     try {
       const moved = await movePath(sourcePath, destinationPath, rewriteLinks);
-      await loadTree();
+      await refreshVaultCatalog();
 
       if (
         selectedPath === sourcePath ||
@@ -602,6 +732,38 @@
     }, 3000);
   }
 
+  function clearSaveConflict() {
+    saveConflict = null;
+    saveConflictOpen = false;
+    saveConflictReloading = false;
+  }
+
+  async function reloadLatestDocAfterConflict(mode: "view" | "editing") {
+    if (!doc) {
+      clearSaveConflict();
+      return;
+    }
+
+    saveConflictReloading = true;
+    try {
+      const latest = await fetchDoc(doc.path);
+      doc = latest;
+      editContent = latest.content;
+      previewContent = latest.content;
+      editing = mode === "editing";
+      clearSaveConflict();
+      showToast(t("workspace.saveConflictReloaded"));
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : t("workspace.saveConflictReloadFailed"),
+      );
+    } finally {
+      saveConflictReloading = false;
+    }
+  }
+
   function ignorePreviewNavigation(_path: string) {}
 
   async function handleAction(action: string, payload?: string) {
@@ -626,6 +788,7 @@
     if (action === "rebuild-index") {
       try {
         const result = await rebuildVaultIndex();
+        await refreshVaultCatalog();
         showToast(
           t("commandPalette.rebuildIndexSuccess", {
             count: result.indexed_documents,
@@ -1038,7 +1201,7 @@
                   <button
                     class="btn secondary"
                     type="button"
-                    onclick={() => (editing = false)}
+                    onclick={() => void handleCancelEdit()}
                   >
                     {t("home.buttonCancel")}
                   </button>
@@ -1070,7 +1233,11 @@
                         <CodeMirrorEditor
                           content={editContent}
                           fillHeight={true}
+                          currentPath={doc.path}
+                          {wikilinkItems}
+                          attachmentItems={attachmentWikilinkItems}
                           onchange={(value) => (editContent = value)}
+                          oncreatenote={handleCreateWikilinkNote}
                           onsave={handleSave}
                         />
                       </div>
@@ -1087,6 +1254,7 @@
                             doc={previewDoc}
                             {dataviewEnabled}
                             {dataviewShowSource}
+                            {katexEnabled}
                             onnavigate={ignorePreviewNavigation}
                           />
                         {/if}
@@ -1096,7 +1264,11 @@
                 {:else}
                   <CodeMirrorEditor
                     content={editContent}
+                    currentPath={doc.path}
+                    {wikilinkItems}
+                    attachmentItems={attachmentWikilinkItems}
                     onchange={(value) => (editContent = value)}
+                    oncreatenote={handleCreateWikilinkNote}
                     onsave={handleSave}
                   />
                 {/if}
@@ -1106,6 +1278,7 @@
                   {doc}
                   {dataviewEnabled}
                   {dataviewShowSource}
+                  {katexEnabled}
                   onnavigate={navigateTo}
                 />
               {/if}
@@ -1223,6 +1396,79 @@
   onselect={navigateTo}
 />
 
+{#if saveConflict && saveConflictOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="save-conflict-overlay"
+    onclick={() => {
+      if (!saveConflictReloading) {
+        saveConflictOpen = false;
+      }
+    }}
+    onkeydown={(event) => {
+      if (event.key === "Escape" && !saveConflictReloading) {
+        saveConflictOpen = false;
+      }
+    }}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="save-conflict-modal"
+      onclick={(event) => event.stopPropagation()}
+    >
+      <div class="save-conflict-header">
+        <div>
+          <p class="save-conflict-eyebrow">
+            {t("workspace.saveConflictTitle")}
+          </p>
+          <h2>{saveConflict.message}</h2>
+        </div>
+        <span class="save-conflict-path">{saveConflict.path}</span>
+      </div>
+
+      <p class="save-conflict-copy">{t("workspace.saveConflictDescription")}</p>
+
+      <div class="save-conflict-diff-block">
+        <div class="save-conflict-diff-head">
+          <strong>{t("workspace.saveConflictDiff")}</strong>
+        </div>
+        {#if saveConflict.diff}
+          <pre>{saveConflict.diff}</pre>
+        {:else}
+          <p class="save-conflict-empty">{t("workspace.saveConflictNoDiff")}</p>
+        {/if}
+      </div>
+
+      <p class="save-conflict-help">{t("workspace.saveConflictHelp")}</p>
+
+      <div class="save-conflict-actions">
+        <button
+          type="button"
+          class="btn secondary"
+          onclick={() => {
+            saveConflictOpen = false;
+            showToast(t("workspace.saveConflictDraftKept"));
+          }}
+          disabled={saveConflictReloading}
+        >
+          {t("workspace.saveConflictContinue")}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          onclick={() => void reloadLatestDocAfterConflict("editing")}
+          disabled={saveConflictReloading}
+        >
+          {saveConflictReloading
+            ? t("workspace.saveConflictReloading")
+            : t("workspace.saveConflictReload")}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if toast}
   <div class="toast">{toast}</div>
 {/if}
@@ -1310,6 +1556,9 @@
   }
 
   .sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
     width: var(--sidebar-width);
     min-width: var(--sidebar-width);
     border-right: 1px solid var(--border);
@@ -1331,6 +1580,7 @@
   }
 
   .sidebar-header {
+    flex-shrink: 0;
     position: sticky;
     top: 0;
     z-index: 2;
@@ -1642,6 +1892,108 @@
     backdrop-filter: blur(18px);
   }
 
+  .save-conflict-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(15, 23, 42, 0.5);
+    z-index: 220;
+  }
+
+  .save-conflict-modal {
+    width: min(100%, 52rem);
+    max-height: min(88vh, 48rem);
+    display: grid;
+    gap: 1rem;
+    overflow: hidden;
+    padding: 1.15rem;
+    border-radius: 22px;
+    border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+    background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-primary));
+    box-shadow: var(--shadow-strong);
+  }
+
+  .save-conflict-header {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .save-conflict-header h2,
+  .save-conflict-copy,
+  .save-conflict-help,
+  .save-conflict-empty {
+    margin: 0;
+  }
+
+  .save-conflict-eyebrow {
+    margin: 0 0 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .save-conflict-path {
+    flex-shrink: 0;
+    max-width: 16rem;
+    overflow-wrap: anywhere;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-tertiary) 75%, transparent);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+  }
+
+  .save-conflict-copy,
+  .save-conflict-help {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+
+  .save-conflict-diff-block {
+    min-height: 0;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-panel-hover) 86%, transparent);
+    overflow: hidden;
+  }
+
+  .save-conflict-diff-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+  }
+
+  .save-conflict-diff-block pre,
+  .save-conflict-empty {
+    margin: 0;
+    padding: 0.9rem;
+    max-height: min(44vh, 24rem);
+    overflow: auto;
+    font-family: var(--font-editor);
+    font-size: 0.84rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .save-conflict-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
   @media (max-width: 768px) {
     .body {
       position: relative;
@@ -1711,6 +2063,28 @@
     .editing-split-layout {
       grid-template-columns: 1fr;
       min-height: auto;
+    }
+
+    .save-conflict-modal {
+      width: 100%;
+      padding: 1rem;
+      border-radius: 18px;
+    }
+
+    .save-conflict-header {
+      flex-direction: column;
+    }
+
+    .save-conflict-path {
+      max-width: 100%;
+    }
+
+    .save-conflict-actions {
+      flex-direction: column-reverse;
+    }
+
+    .save-conflict-actions button {
+      width: 100%;
     }
   }
 </style>

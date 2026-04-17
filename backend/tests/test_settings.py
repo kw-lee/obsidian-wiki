@@ -37,7 +37,7 @@ async def test_update_profile_changes_username_and_password(client, auth_headers
             "new_username": "writer",
             "git_display_name": "Writer One",
             "git_email": "writer@example.com",
-            "new_password": "newpass123",
+            "new_password": "Newpass123!A",
         },
         headers=auth_headers,
     )
@@ -45,11 +45,12 @@ async def test_update_profile_changes_username_and_password(client, auth_headers
     data = resp.json()
     assert data["must_change_credentials"] is False
     assert "access_token" in data
-    assert "refresh_token" in data
+    assert data["username"] == "writer"
+    assert "refresh_token" not in data
 
     login_resp = await client.post(
         "/api/auth/login",
-        json={"username": "writer", "password": "newpass123"},
+        json={"username": "writer", "password": "Newpass123!A"},
     )
     assert login_resp.status_code == 200
     assert login_resp.json()["must_change_credentials"] is False
@@ -59,6 +60,23 @@ async def test_update_profile_changes_username_and_password(client, auth_headers
         assert user is not None
         assert user.git_display_name == "Writer One"
         assert user.git_email == "writer@example.com"
+
+
+@pytest.mark.asyncio
+async def test_update_profile_rejects_weak_new_password(client, auth_headers, setup_vault):
+    resp = await client.put(
+        "/api/settings/profile",
+        json={
+            "current_password": "testpass",
+            "new_username": "writer",
+            "git_display_name": "Writer One",
+            "git_email": "writer@example.com",
+            "new_password": "short",
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+    assert "password" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -75,6 +93,45 @@ async def test_update_profile_rejects_wrong_current_password(client, auth_header
     )
     assert resp.status_code == 401
     assert resp.json()["detail"] == "Invalid current password"
+
+
+@pytest.mark.asyncio
+async def test_update_profile_rate_limit(client, auth_headers, monkeypatch, setup_vault):
+    from app.services import rate_limit
+
+    async def fail_redis_count(key: str):
+        raise RuntimeError(key)
+
+    async def fail_redis_hit(key: str, *, window_seconds: int):
+        raise RuntimeError(f"{key}:{window_seconds}")
+
+    monkeypatch.setattr(rate_limit, "_redis_count", fail_redis_count)
+    monkeypatch.setattr(rate_limit, "_redis_hit", fail_redis_hit)
+
+    for _ in range(10):
+        resp = await client.put(
+            "/api/settings/profile",
+            json={
+                "current_password": "wrongpass",
+                "new_username": "writer",
+                "git_display_name": "Writer",
+                "git_email": "writer@example.com",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 401
+
+    blocked = await client.put(
+        "/api/settings/profile",
+        json={
+            "current_password": "wrongpass",
+            "new_username": "writer",
+            "git_display_name": "Writer",
+            "git_email": "writer@example.com",
+        },
+        headers=auth_headers,
+    )
+    assert blocked.status_code == 429
 
 
 @pytest.mark.asyncio
@@ -551,7 +608,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     async def fake_redis_ping():
         return False, "Connection refused"
 
-    monkeypatch.setattr("app.routers.settings.get_app_version", lambda: "0.1.0")
+    monkeypatch.setattr("app.routers.settings.get_app_version", lambda: "0.0.1")
     monkeypatch.setattr("app.routers.settings.get_process_started_at", lambda: started_at)
     monkeypatch.setattr("app.routers.settings.ping_database", fake_database_ping)
     monkeypatch.setattr("app.routers.settings.ping_redis", fake_redis_ping)
@@ -570,7 +627,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     resp = await client.get("/api/settings/system", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["version"] == "0.1.0"
+    assert data["version"] == "0.0.1"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
     assert data["timezone"] == "Asia/Seoul"
     assert data["editor_split_preview_enabled"] is False

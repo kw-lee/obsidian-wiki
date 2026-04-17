@@ -37,8 +37,7 @@ describe("sync store", () => {
   });
 
   it("records finalized sync jobs in a bounded recent history", async () => {
-    localStorage.setItem("access_token", "token");
-    localStorage.setItem("refresh_token", "refresh");
+    sessionStorage.setItem("access_token", "token");
 
     const api = await import("$lib/api/wiki");
     const { refreshSyncJob, getSyncMonitor } = await import("./sync.svelte.ts");
@@ -93,6 +92,8 @@ describe("sync store", () => {
       "job-2",
       "job-1",
     ]);
-    expect(JSON.parse(localStorage.getItem("sync_job_history_v1") ?? "[]")).toHaveLength(2);
+    expect(
+      JSON.parse(localStorage.getItem("sync_job_history_v1") ?? "[]"),
+    ).toHaveLength(2);
   });
 });

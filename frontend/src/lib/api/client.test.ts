@@ -4,16 +4,17 @@ import {
   ApiError,
   clearTokens,
   fetchApiResource,
-  setTokens,
+  refreshAccessToken,
+  setAccessToken,
 } from "./client";
 
 // Mock fetch
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-// Mock localStorage
+// Mock sessionStorage
 const storage: Record<string, string> = {};
-vi.stubGlobal("localStorage", {
+vi.stubGlobal("sessionStorage", {
   getItem: (key: string) => storage[key] ?? null,
   setItem: (key: string, value: string) => {
     storage[key] = value;
@@ -26,19 +27,17 @@ vi.stubGlobal("localStorage", {
 // Mock window.location
 vi.stubGlobal("location", { origin: "http://localhost:3000", href: "" });
 
-describe("setTokens / clearTokens", () => {
+describe("setAccessToken / clearTokens", () => {
   beforeEach(() => {
     Object.keys(storage).forEach((k) => delete storage[k]);
   });
 
-  it("stores and clears tokens", () => {
-    setTokens("access123", "refresh456");
+  it("stores and clears the access token", () => {
+    setAccessToken("access123");
     expect(storage["access_token"]).toBe("access123");
-    expect(storage["refresh_token"]).toBe("refresh456");
 
     clearTokens();
     expect(storage["access_token"]).toBeUndefined();
-    expect(storage["refresh_token"]).toBeUndefined();
   });
 });
 
@@ -157,7 +156,6 @@ describe("api()", () => {
 
   it("attempts token refresh on 401", async () => {
     storage["access_token"] = "expired";
-    storage["refresh_token"] = "valid-refresh";
 
     // First call returns 401
     mockFetch.mockResolvedValueOnce({
@@ -170,7 +168,11 @@ describe("api()", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: async () => ({ access_token: "new-token" }),
+      json: async () => ({
+        access_token: "new-token",
+        username: "admin",
+        must_change_credentials: false,
+      }),
     });
 
     // Retry succeeds
@@ -183,5 +185,25 @@ describe("api()", () => {
     const result = await api("/protected");
     expect(result).toEqual({ data: "refreshed" });
     expect(storage["access_token"]).toBe("new-token");
+  });
+
+  it("refreshAccessToken uses cookie-based refresh without a request body", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "cookie-token",
+        username: "admin",
+        must_change_credentials: false,
+      }),
+    });
+
+    const result = await refreshAccessToken();
+
+    expect(result?.access_token).toBe("cookie-token");
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toContain("/api/auth/refresh");
+    expect(opts.body).toBeUndefined();
+    expect(opts.credentials).toBe("same-origin");
   });
 });

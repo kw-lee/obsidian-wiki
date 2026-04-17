@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { getAuth, changeCredentials } from "$lib/stores/auth.svelte";
+  import {
+    changeCredentials,
+    getAuth,
+    initAuth,
+  } from "$lib/stores/auth.svelte";
   import { t } from "$lib/i18n/index.svelte";
 
   let newUsername = $state("");
@@ -12,7 +16,8 @@
   let error = $state("");
   let loading = $state(false);
 
-  onMount(() => {
+  onMount(async () => {
+    await initAuth();
     const auth = getAuth();
     if (!auth.isAuthenticated) {
       goto("/login");
@@ -32,8 +37,8 @@
       error = t("auth.setup.passwordMismatch");
       return;
     }
-    if (newPassword.length < 4) {
-      error = t("auth.setup.passwordTooShort");
+    if (newPassword.length < 12) {
+      error = t("auth.setup.passwordTooWeak");
       return;
     }
 

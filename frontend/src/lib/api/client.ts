@@ -1,4 +1,5 @@
 const API_BASE = "/api";
+const ACCESS_TOKEN_KEY = "access_token";
 
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
@@ -35,7 +36,7 @@ export class ApiError extends Error {
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 function buildUrl(path: string, params?: Record<string, string>): URL {
@@ -49,29 +50,31 @@ function buildUrl(path: string, params?: Record<string, string>): URL {
   return url;
 }
 
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem("access_token", access);
-  localStorage.setItem("refresh_token", refresh);
+export function setAccessToken(access: string) {
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, access);
 }
 
 export function clearTokens() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return null;
+export interface RefreshedSession {
+  access_token: string;
+  username: string;
+  must_change_credentials: boolean;
+}
+
+export async function refreshAccessToken(): Promise<RefreshedSession | null> {
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: "same-origin",
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    localStorage.setItem("access_token", data.access_token);
-    return data.access_token;
+    const data = (await res.json()) as RefreshedSession;
+    setAccessToken(data.access_token);
+    return data;
   } catch {
     return null;
   }
@@ -93,9 +96,9 @@ async function performAuthorizedFetch(
   let res = await fetch(url.toString(), { ...options, headers });
 
   if (res.status === 401 && token) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      headers["Authorization"] = `Bearer ${newToken}`;
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      headers["Authorization"] = `Bearer ${refreshed.access_token}`;
       res = await fetch(url.toString(), { ...options, headers });
     } else {
       clearTokens();

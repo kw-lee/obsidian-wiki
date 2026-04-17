@@ -6,7 +6,7 @@
 
   import { createDoc, fetchGraph } from "$lib/api/wiki";
   import { t } from "$lib/i18n/index.svelte";
-  import { getAuth } from "$lib/stores/auth.svelte";
+  import { getAuth, initAuth } from "$lib/stores/auth.svelte";
   import type { GraphData, GraphNode } from "$lib/types";
   import {
     buildGraphRouteSearch,
@@ -172,37 +172,40 @@
   const hasActiveControls = $derived(activeControlCount > 0);
 
   onMount(() => {
-    const auth = getAuth();
-    if (!auth.isAuthenticated) {
-      goto("/login");
-      return;
-    }
-    if (auth.mustChangeCredentials) {
-      goto("/auth/setup");
-      return;
-    }
+    void (async () => {
+      await initAuth();
+      const auth = getAuth();
+      if (!auth.isAuthenticated) {
+        goto("/login");
+        return;
+      }
+      if (auth.mustChangeCredentials) {
+        goto("/auth/setup");
+        return;
+      }
 
-    const routeState = parseGraphRouteState(
-      page.url.searchParams,
-      getLastWikiPath(),
-    );
-    currentPath = routeState.focusPath;
-    selectedNodeId = routeState.selectedNodeId;
-    depth = routeState.depth;
-    folder = routeState.folder;
-    tag = routeState.tag;
-    searchQuery = routeState.query;
-    showLabels = routeState.showLabels;
-    physicsEnabled = routeState.physicsEnabled;
-    showControls = routeState.showControls;
-    showDetails = routeState.showDetails;
-    centerForce = routeState.centerForce;
-    repelStrength = routeState.repelStrength;
-    linkStrength = routeState.linkStrength;
-    linkDistance = routeState.linkDistance;
-    routeStateReady = true;
+      const routeState = parseGraphRouteState(
+        page.url.searchParams,
+        getLastWikiPath(),
+      );
+      currentPath = routeState.focusPath;
+      selectedNodeId = routeState.selectedNodeId;
+      depth = routeState.depth;
+      folder = routeState.folder;
+      tag = routeState.tag;
+      searchQuery = routeState.query;
+      showLabels = routeState.showLabels;
+      physicsEnabled = routeState.physicsEnabled;
+      showControls = routeState.showControls;
+      showDetails = routeState.showDetails;
+      centerForce = routeState.centerForce;
+      repelStrength = routeState.repelStrength;
+      linkStrength = routeState.linkStrength;
+      linkDistance = routeState.linkDistance;
+      routeStateReady = true;
 
-    void loadGraph();
+      void loadGraph();
+    })();
 
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === "Escape") {

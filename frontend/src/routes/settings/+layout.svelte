@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { t } from "$lib/i18n/index.svelte";
-  import { getAuth } from "$lib/stores/auth.svelte";
+  import { getAuth, initAuth } from "$lib/stores/auth.svelte";
   import { getSyncMonitor, isSyncJobActive } from "$lib/stores/sync.svelte";
   import { buildWikiRoute } from "$lib/utils/routes";
   import { getLastWikiPath } from "$lib/utils/workspace";
@@ -21,7 +21,8 @@
   ]);
   const backToWikiHref = $derived(buildWikiRoute(getLastWikiPath() ?? ""));
 
-  onMount(() => {
+  onMount(async () => {
+    await initAuth();
     const auth = getAuth();
     if (!auth.isAuthenticated) {
       goto("/login");

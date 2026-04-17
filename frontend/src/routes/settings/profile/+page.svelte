@@ -59,6 +59,10 @@
       error = t("profile.passwordMismatch");
       return;
     }
+    if (newPassword && newPassword.length < 12) {
+      error = t("profile.passwordTooWeak");
+      return;
+    }
 
     saving = true;
     try {
@@ -69,7 +73,7 @@
         git_email: gitEmail,
         new_password: newPassword || undefined,
       });
-      updateSession(newUsername, payload);
+      updateSession(payload.username, payload);
       await loadProfile();
       currentPassword = "";
       newPassword = "";

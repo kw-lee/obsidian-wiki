@@ -19,7 +19,7 @@
     saveDoc,
   } from "$lib/api/wiki";
   import { getLocale, setLocale, t } from "$lib/i18n/index.svelte";
-  import { getAuth } from "$lib/stores/auth.svelte";
+  import { getAuth, initAuth } from "$lib/stores/auth.svelte";
   import { getSyncMonitor, isSyncJobActive } from "$lib/stores/sync.svelte";
   import { toggleTheme } from "$lib/stores/theme.svelte";
   import type {
@@ -168,25 +168,28 @@
   );
 
   onMount(() => {
-    const auth = getAuth();
-    if (!auth.isAuthenticated) {
-      goto("/login");
-      return;
-    }
-    if (auth.mustChangeCredentials) {
-      goto("/auth/setup");
-      return;
-    }
+    void (async () => {
+      await initAuth();
+      const auth = getAuth();
+      if (!auth.isAuthenticated) {
+        goto("/login");
+        return;
+      }
+      if (auth.mustChangeCredentials) {
+        goto("/auth/setup");
+        return;
+      }
 
-    const workspaceState = getWorkspaceState();
-    sidebarOpen = workspaceState.sidebarOpen;
-    rightSidebarOpen = workspaceState.rightSidebarOpen;
-    explorerExpandedPaths = workspaceState.expandedPaths;
-    rightPanelTab = workspaceState.rightPanelTab;
-    treeSortMode = workspaceState.treeSortMode;
-    openTabs = workspaceState.openTabs;
-    workspaceReady = true;
-    void initializeWorkspace();
+      const workspaceState = getWorkspaceState();
+      sidebarOpen = workspaceState.sidebarOpen;
+      rightSidebarOpen = workspaceState.rightSidebarOpen;
+      explorerExpandedPaths = workspaceState.expandedPaths;
+      rightPanelTab = workspaceState.rightPanelTab;
+      treeSortMode = workspaceState.treeSortMode;
+      openTabs = workspaceState.openTabs;
+      workspaceReady = true;
+      void initializeWorkspace();
+    })();
 
     const mediaQuery = window.matchMedia("(max-width: 768px)");
 

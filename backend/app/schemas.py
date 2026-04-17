@@ -289,7 +289,7 @@ class DocAuditResponse(BaseModel):
 
 class AuthTokenPair(BaseModel):
     access_token: str
-    refresh_token: str
+    username: str
     token_type: str = "bearer"
     must_change_credentials: bool = False
 

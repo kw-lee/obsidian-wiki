@@ -44,9 +44,11 @@ async def test_login_success(client, setup_vault):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert "refresh_token" in data
+    assert data["username"] == "admin"
+    assert "refresh_token" not in data
     # Initial user must change credentials
     assert data["must_change_credentials"] is True
+    assert "httponly" in resp.headers["set-cookie"].lower()
 
 
 @pytest.mark.asyncio
@@ -58,11 +60,10 @@ async def test_login_wrong_password(client, setup_vault):
 @pytest.mark.asyncio
 async def test_refresh(client, setup_vault):
     resp = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
-    refresh_token = resp.json()["refresh_token"]
-
-    resp = await client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    resp = await client.post("/api/auth/refresh")
     assert resp.status_code == 200
     assert "access_token" in resp.json()
+    assert resp.json()["username"] == "admin"
 
 
 @pytest.mark.asyncio
@@ -93,7 +94,7 @@ async def test_change_credentials_flow(client, setup_vault):
         "/api/auth/change-credentials",
         json={
             "new_username": "myuser",
-            "new_password": "newpass123",
+            "new_password": "Newpass123!A",
             "git_display_name": "My User",
             "git_email": "myuser@example.com",
         },
@@ -102,6 +103,7 @@ async def test_change_credentials_flow(client, setup_vault):
     assert resp.status_code == 200
     new_data = resp.json()
     assert new_data["must_change_credentials"] is False
+    assert new_data["username"] == "myuser"
     new_token = new_data["access_token"]
     new_headers = {"Authorization": f"Bearer {new_token}"}
 
@@ -111,7 +113,7 @@ async def test_change_credentials_flow(client, setup_vault):
 
     # 4. Login with new credentials works
     resp = await client.post(
-        "/api/auth/login", json={"username": "myuser", "password": "newpass123"}
+        "/api/auth/login", json={"username": "myuser", "password": "Newpass123!A"}
     )
     assert resp.status_code == 200
     assert resp.json()["must_change_credentials"] is False
@@ -119,3 +121,60 @@ async def test_change_credentials_flow(client, setup_vault):
     # 5. Old credentials no longer work
     resp = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_change_credentials_rejects_weak_password(client, setup_vault):
+    resp = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
+    token = resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post(
+        "/api/auth/change-credentials",
+        json={
+            "new_username": "myuser",
+            "new_password": "short",
+            "git_display_name": "My User",
+            "git_email": "myuser@example.com",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "password" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit(client, monkeypatch, setup_vault):
+    from app.services import rate_limit
+
+    async def fail_redis_count(key: str):
+        raise RuntimeError(key)
+
+    async def fail_redis_hit(key: str, *, window_seconds: int):
+        raise RuntimeError(f"{key}:{window_seconds}")
+
+    monkeypatch.setattr(rate_limit, "_redis_count", fail_redis_count)
+    monkeypatch.setattr(rate_limit, "_redis_hit", fail_redis_hit)
+
+    for _ in range(10):
+        resp = await client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "wrongpass"},
+        )
+        assert resp.status_code == 401
+
+    blocked = await client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "wrongpass"},
+    )
+    assert blocked.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_logout_clears_refresh_cookie(client, setup_vault):
+    login = await client.post("/api/auth/login", json={"username": "admin", "password": "testpass"})
+    assert login.status_code == 200
+
+    resp = await client.post("/api/auth/logout")
+    assert resp.status_code == 204
+    assert "max-age=0" in resp.headers["set-cookie"].lower()

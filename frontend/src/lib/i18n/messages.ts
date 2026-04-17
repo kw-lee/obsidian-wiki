@@ -27,7 +27,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     "auth.setup.password": "새 비밀번호",
     "auth.setup.confirmPassword": "비밀번호 확인",
     "auth.setup.passwordMismatch": "비밀번호가 일치하지 않습니다.",
-    "auth.setup.passwordTooShort": "비밀번호는 4자 이상이어야 합니다.",
+    "auth.setup.passwordTooWeak":
+      "비밀번호는 12자 이상이어야 하며 대문자, 소문자, 숫자, 기호 중 3가지를 포함해야 합니다.",
     "auth.setup.failed": "계정 설정 실패. 다시 시도해주세요.",
     "auth.setup.submit": "계정 설정 완료",
     "auth.setup.submitting": "설정 중...",
@@ -191,8 +192,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "workspace.saveConflictReloading": "최신 버전 불러오는 중...",
     "workspace.saveConflictReloaded":
       "최신 버전을 불러왔습니다. 필요한 변경은 다시 반영해주세요.",
-    "workspace.saveConflictReloadFailed":
-      "최신 버전을 불러오지 못했습니다.",
+    "workspace.saveConflictReloadFailed": "최신 버전을 불러오지 못했습니다.",
     "workspace.saveConflictDraftKept":
       "현재 초안을 유지했습니다. 다시 저장하려면 최신 버전을 먼저 확인해주세요.",
     "settings.title": "관리자 설정",
@@ -276,6 +276,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     "profile.currentUsername": "현재 사용자명: {username}",
     "profile.loadFailed": "프로필을 불러오지 못했습니다.",
     "profile.passwordMismatch": "새 비밀번호가 일치하지 않습니다.",
+    "profile.passwordTooWeak":
+      "비밀번호는 12자 이상이어야 하며 대문자, 소문자, 숫자, 기호 중 3가지를 포함해야 합니다.",
     "profile.saveSuccess": "프로필이 업데이트되었습니다.",
     "profile.saveFailed": "프로필 저장에 실패했습니다.",
     "profile.newUsername": "새 사용자명",
@@ -679,7 +681,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     "auth.setup.password": "New password",
     "auth.setup.confirmPassword": "Confirm password",
     "auth.setup.passwordMismatch": "Passwords do not match.",
-    "auth.setup.passwordTooShort": "Password must be at least 4 characters.",
+    "auth.setup.passwordTooWeak":
+      "Password must be at least 12 characters and include three of: uppercase, lowercase, number, symbol.",
     "auth.setup.failed": "Failed to update credentials. Please try again.",
     "auth.setup.submit": "Finish account setup",
     "auth.setup.submitting": "Saving...",
@@ -931,6 +934,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     "profile.currentUsername": "Current username: {username}",
     "profile.loadFailed": "Failed to load profile.",
     "profile.passwordMismatch": "New passwords do not match.",
+    "profile.passwordTooWeak":
+      "Password must be at least 12 characters and include three of: uppercase, lowercase, number, symbol.",
     "profile.saveSuccess": "Profile updated.",
     "profile.saveFailed": "Failed to save profile.",
     "profile.newUsername": "New username",

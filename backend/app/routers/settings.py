@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,8 @@ from app.auth import (
     hash_password,
     normalize_git_display_name,
     normalize_git_email,
+    set_refresh_cookie,
+    validate_password_strength,
     verify_password,
 )
 from app.config import settings as app_settings
@@ -49,6 +51,13 @@ from app.schemas import (
 )
 from app.services.indexer import full_reindex
 from app.services.log_buffer import get_recent_logs
+from app.services.rate_limit import (
+    RateLimitRule,
+    build_identifier,
+    clear_failures,
+    ensure_not_limited,
+    record_failure,
+)
 from app.services.settings import (
     ensure_app_settings,
     get_runtime_sync_settings,
@@ -73,6 +82,7 @@ from app.services.system_status import (
 )
 
 router = APIRouter()
+PROFILE_RATE_LIMIT = RateLimitRule(bucket="settings-profile")
 
 
 def _normalize_username(value: str | None) -> str | None:
@@ -233,18 +243,24 @@ async def get_profile(
 @router.put("/profile", response_model=AuthTokenPair)
 async def update_profile(
     body: ProfileSettingsUpdateRequest,
+    request: Request,
+    response: Response,
     current_user: CurrentUser = Depends(get_current_user_context),
     db: AsyncSession = Depends(get_db),
 ) -> AuthTokenPair:
+    identifier = build_identifier(request, current_user.id, current_user.username)
+    await ensure_not_limited(PROFILE_RATE_LIMIT, identifier)
     user = await db.get(User, current_user.id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if not verify_password(body.current_password, user.password_hash):
+        await record_failure(PROFILE_RATE_LIMIT, identifier)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid current password",
         )
+    await clear_failures(PROFILE_RATE_LIMIT, identifier)
 
     new_username = _normalize_username(body.new_username) or user.username
     new_password = body.new_password or None
@@ -253,11 +269,8 @@ async def update_profile(
     )
     git_email = normalize_git_email(body.git_email)
 
-    if new_password is not None and len(new_password) < 4:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 4 characters long",
-        )
+    if new_password is not None:
+        validate_password_strength(new_password)
     if (
         new_username == user.username
         and new_password is None
@@ -282,10 +295,12 @@ async def update_profile(
     user.git_email = git_email
     user.must_change_credentials = False
     await db.commit()
+    refresh_token = create_token(user.id, "refresh", username=user.username, must_change=False)
+    set_refresh_cookie(response, refresh_token)
 
     return AuthTokenPair(
         access_token=create_token(user.id, "access", username=user.username, must_change=False),
-        refresh_token=create_token(user.id, "refresh", username=user.username, must_change=False),
+        username=user.username,
         must_change_credentials=False,
     )
 

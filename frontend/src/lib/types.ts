@@ -211,7 +211,8 @@ export interface SyncJob {
 
 export interface AuthTokenPair {
   access_token: string;
-  refresh_token: string;
+  username: string;
+  token_type?: string;
   must_change_credentials: boolean;
 }
 

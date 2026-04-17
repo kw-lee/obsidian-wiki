@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -15,6 +15,10 @@ from app.db.session import get_db
 
 security = HTTPBearer()
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+$")
+_PASSWORD_UPPER_RE = re.compile(r"[A-Z]")
+_PASSWORD_LOWER_RE = re.compile(r"[a-z]")
+_PASSWORD_DIGIT_RE = re.compile(r"\d")
+_PASSWORD_SYMBOL_RE = re.compile(r"[^A-Za-z0-9]")
 
 
 @dataclass(frozen=True)
@@ -65,6 +69,28 @@ def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
+def validate_password_strength(password: str) -> None:
+    if len(password) < settings.auth_password_min_length:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Password must be at least {settings.auth_password_min_length} characters long"
+            ),
+        )
+
+    checks = (
+        bool(_PASSWORD_UPPER_RE.search(password)),
+        bool(_PASSWORD_LOWER_RE.search(password)),
+        bool(_PASSWORD_DIGIT_RE.search(password)),
+        bool(_PASSWORD_SYMBOL_RE.search(password)),
+    )
+    if sum(checks) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must include at least three of: uppercase, lowercase, number, symbol",
+        )
+
+
 def create_token(
     subject: int | str,
     token_type: str = "access",
@@ -95,6 +121,40 @@ def decode_token(token: str) -> dict:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from e
+
+
+def set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    max_age = settings.refresh_token_expire_days * 24 * 60 * 60
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_token,
+        httponly=True,
+        secure=settings.is_production,
+        samesite="lax",
+        max_age=max_age,
+        expires=max_age,
+        path="/api/auth",
+    )
+
+
+def clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.refresh_cookie_name,
+        httponly=True,
+        secure=settings.is_production,
+        samesite="lax",
+        path="/api/auth",
+    )
+
+
+def get_refresh_token_from_request(request: Request) -> str:
+    token = request.cookies.get(settings.refresh_cookie_name)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
+    return token
 
 
 async def get_current_user(

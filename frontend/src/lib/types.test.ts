@@ -251,10 +251,11 @@ describe("Type contracts", () => {
   it("AuthTokenPair has expected shape", () => {
     const tokens: AuthTokenPair = {
       access_token: "access",
-      refresh_token: "refresh",
+      username: "admin",
       must_change_credentials: false,
     };
     expect(tokens.access_token).toBe("access");
+    expect(tokens.username).toBe("admin");
   });
 
   it("ProfileSettings has expected shape", () => {
@@ -387,7 +388,7 @@ describe("Type contracts", () => {
 
   it("SystemSettings has expected shape", () => {
     const system: SystemSettings = {
-      version: "0.1.0",
+      version: "0.0.1",
       started_at: "2026-04-13T02:00:00Z",
       timezone: "Asia/Seoul",
       editor_split_preview_enabled: true,

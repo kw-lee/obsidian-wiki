@@ -1,5 +1,6 @@
 # ruff: noqa: E402
 
+import asyncio
 import os
 
 # Set default env vars only if not already provided (Docker sets them)
@@ -59,6 +60,25 @@ def setup_vault(tmp_path: Path):
     settings.vault_local_path = str(vault)
     yield vault
     shutil.rmtree(vault, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limit_state():
+    from app.services import rate_limit
+
+    rate_limit._memory_limiter._events.clear()  # noqa: SLF001
+
+    async def _clear_redis() -> None:
+        try:
+            client = rate_limit._get_redis_client()  # noqa: SLF001
+            keys = await client.keys("rate-limit:*")
+            if keys:
+                await client.delete(*keys)
+        except Exception:
+            return
+
+    asyncio.run(_clear_redis())
+    yield
 
 
 @pytest.fixture

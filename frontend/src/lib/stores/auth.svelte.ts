@@ -1,4 +1,9 @@
-import { api, setTokens, clearTokens } from "$lib/api/client";
+import {
+  api,
+  clearTokens,
+  refreshAccessToken,
+  setAccessToken,
+} from "$lib/api/client";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -9,7 +14,8 @@ interface AuthState {
 
 interface LoginResponse {
   access_token: string;
-  refresh_token: string;
+  username: string;
+  token_type?: string;
   must_change_credentials: boolean;
 }
 
@@ -21,26 +27,41 @@ let state = $state<AuthState>({
 });
 
 function applySession(username: string, data: LoginResponse) {
-  setTokens(data.access_token, data.refresh_token);
-  localStorage.setItem("username", username);
+  setAccessToken(data.access_token);
+  sessionStorage.setItem("username", username);
   state.isAuthenticated = true;
   state.username = username;
   state.mustChangeCredentials = data.must_change_credentials;
   state.initialized = true;
   if (data.must_change_credentials) {
-    localStorage.setItem("must_change_credentials", "true");
+    sessionStorage.setItem("must_change_credentials", "true");
   } else {
-    localStorage.removeItem("must_change_credentials");
+    sessionStorage.removeItem("must_change_credentials");
   }
 }
 
-export function initAuth() {
+export async function initAuth() {
   if (typeof window === "undefined") return;
-  const token = localStorage.getItem("access_token");
-  const mustChange = localStorage.getItem("must_change_credentials") === "true";
+  const token = sessionStorage.getItem("access_token");
+  const mustChange =
+    sessionStorage.getItem("must_change_credentials") === "true";
   state.isAuthenticated = !!token;
-  state.username = token ? (localStorage.getItem("username") ?? null) : null;
+  state.username = token ? (sessionStorage.getItem("username") ?? null) : null;
   state.mustChangeCredentials = mustChange;
+  if (token) {
+    state.initialized = true;
+    return;
+  }
+
+  const refreshed = await refreshAccessToken();
+  if (refreshed) {
+    applySession(refreshed.username, refreshed);
+    return;
+  }
+
+  state.isAuthenticated = false;
+  state.username = null;
+  state.mustChangeCredentials = false;
   state.initialized = true;
 }
 
@@ -53,7 +74,7 @@ export async function login(
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
-    applySession(username, data);
+    applySession(data.username, data);
     return { success: true, mustChange: data.must_change_credentials };
   } catch {
     return { success: false, mustChange: false };
@@ -76,7 +97,7 @@ export async function changeCredentials(
         git_email: gitEmail,
       }),
     });
-    applySession(newUsername, data);
+    applySession(data.username, data);
     return true;
   } catch {
     return false;
@@ -88,9 +109,13 @@ export function updateSession(username: string, data: LoginResponse) {
 }
 
 export function logout() {
+  void fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "same-origin",
+  }).catch(() => undefined);
   clearTokens();
-  localStorage.removeItem("username");
-  localStorage.removeItem("must_change_credentials");
+  sessionStorage.removeItem("username");
+  sessionStorage.removeItem("must_change_credentials");
   state.isAuthenticated = false;
   state.username = null;
   state.mustChangeCredentials = false;
@@ -99,7 +124,7 @@ export function logout() {
 
 export function getAuth(): AuthState {
   if (typeof window !== "undefined" && !state.initialized) {
-    initAuth();
+    void initAuth();
   }
   return state;
 }

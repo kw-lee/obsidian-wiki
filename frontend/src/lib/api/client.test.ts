@@ -25,7 +25,11 @@ vi.stubGlobal("sessionStorage", {
 });
 
 // Mock window.location
-vi.stubGlobal("location", { origin: "http://localhost:3000", href: "" });
+vi.stubGlobal("location", {
+  origin: "http://localhost:3000",
+  href: "",
+  pathname: "/",
+});
 
 describe("setAccessToken / clearTokens", () => {
   beforeEach(() => {
@@ -45,6 +49,8 @@ describe("api()", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     Object.keys(storage).forEach((k) => delete storage[k]);
+    window.location.href = "";
+    window.location.pathname = "/";
   });
 
   it("makes GET request with auth header", async () => {
@@ -205,5 +211,34 @@ describe("api()", () => {
     expect(url).toContain("/api/auth/refresh");
     expect(opts.body).toBeUndefined();
     expect(opts.credentials).toBe("same-origin");
+  });
+
+  it("redirects to setup on credential-change-required responses", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: "Forbidden",
+      json: async () => ({ detail: "Credential change required" }),
+    });
+
+    await expect(api("/sync/status")).rejects.toThrow(
+      "Credential change required",
+    );
+    expect(window.location.href).toBe("/auth/setup");
+  });
+
+  it("does not force a reload when already on the setup page", async () => {
+    window.location.pathname = "/auth/setup";
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: "Forbidden",
+      json: async () => ({ detail: "Credential change required" }),
+    });
+
+    await expect(api("/sync/status")).rejects.toThrow(
+      "Credential change required",
+    );
+    expect(window.location.href).toBe("");
   });
 });

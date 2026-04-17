@@ -93,6 +93,7 @@ When multiple people work in parallel, always mark WIP items with an owner to av
 - [x] Forced credential change page (`/auth/setup`)
 - [x] Redirect to setup when login response shows `must_change` (block all other routes)
 - [x] After change, navigate to main page with new tokens
+- [x] Pause background sync polling during forced credential setup to avoid 403 redirect loops
 
 ## Phase 7: Settings Page (Admin Dashboard)
 

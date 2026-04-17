@@ -99,7 +99,7 @@ docker compose exec backend alembic upgrade head
 
 Open **`http://localhost:${WEB_PORT}`** in your browser (default: `80`) and log in with `INIT_ADMIN_*`.
 
-> `BACKEND_PORT` and `FRONTEND_PORT` are for direct debug access without nginx. The real entrypoint is `WEB_PORT`. After login, complete the forced credential-change flow at **`/auth/setup`**, then use **`/settings/profile`**, **`/settings/sync`**, **`/settings/appearance`**, and **`/settings/system`** to review and adjust account, sync, theme, and server state.
+> `BACKEND_PORT` and `FRONTEND_PORT` are for direct debug access without nginx. The real entrypoint is `WEB_PORT`. After login, complete the forced credential-change flow at **`/auth/setup`**; background sync/status polling stays paused until that step finishes. Then use **`/settings/profile`**, **`/settings/sync`**, **`/settings/appearance`**, and **`/settings/system`** to review and adjust account, sync, theme, and server state.
 
 ### 4. If You Prefer Source Builds
 

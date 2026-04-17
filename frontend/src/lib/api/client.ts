@@ -34,6 +34,13 @@ export class ApiError extends Error {
   }
 }
 
+function redirectToCredentialSetup() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname !== "/auth/setup") {
+    window.location.href = "/auth/setup";
+  }
+}
+
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return sessionStorage.getItem(ACCESS_TOKEN_KEY);
@@ -110,7 +117,7 @@ async function performAuthorizedFetch(
   if (res.status === 403) {
     const detail = await res.json().catch(() => ({ detail: "" }));
     if (detail.detail === "Credential change required") {
-      window.location.href = "/auth/setup";
+      redirectToCredentialSetup();
       throw new Error("Credential change required");
     }
     throw new Error(detail.detail || res.statusText);

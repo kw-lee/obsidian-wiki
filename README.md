@@ -99,7 +99,7 @@ docker compose exec backend alembic upgrade head
 
 브라우저에서 **`http://localhost:${WEB_PORT}`** (기본 80) 접속 → `INIT_ADMIN_*` 로 로그인
 
-> `BACKEND_PORT` / `FRONTEND_PORT` 는 nginx 를 거치지 않는 직접 접근용(디버그)입니다. 실제 사용 진입점은 `WEB_PORT` 입니다. 로그인 후에는 **강제 credential 변경 페이지** (`/auth/setup`) 에서 새 username/password 를 지정하고, 필요하면 **설정 페이지** (`/settings/profile`, `/settings/sync`, `/settings/appearance`, `/settings/system`) 에서 계정/동기화/기본 테마/서버 상태를 확인하고 조정합니다.
+> `BACKEND_PORT` / `FRONTEND_PORT` 는 nginx 를 거치지 않는 직접 접근용(디버그)입니다. 실제 사용 진입점은 `WEB_PORT` 입니다. 로그인 후에는 **강제 credential 변경 페이지** (`/auth/setup`) 에서 새 username/password 를 지정하고, 이 단계가 끝날 때까지 백그라운드 sync/status polling 은 일시 중지됩니다. 이후 필요하면 **설정 페이지** (`/settings/profile`, `/settings/sync`, `/settings/appearance`, `/settings/system`) 에서 계정/동기화/기본 테마/서버 상태를 확인하고 조정합니다.
 
 ### 4. 소스 빌드 방식이 필요할 때
 

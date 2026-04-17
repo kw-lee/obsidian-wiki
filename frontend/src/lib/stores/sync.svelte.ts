@@ -118,7 +118,8 @@ export function initSyncMonitor() {
 
   void refreshSyncJob();
   pollHandle = window.setInterval(() => {
-    if (!getAuth().isAuthenticated) {
+    const auth = getAuth();
+    if (!auth.isAuthenticated || auth.mustChangeCredentials) {
       state.currentJob = null;
       state.status = null;
       state.initialized = true;
@@ -129,7 +130,8 @@ export function initSyncMonitor() {
 }
 
 export async function refreshSyncJob() {
-  if (!getAuth().isAuthenticated) {
+  const auth = getAuth();
+  if (!auth.isAuthenticated || auth.mustChangeCredentials) {
     state.currentJob = null;
     state.status = null;
     state.initialized = true;

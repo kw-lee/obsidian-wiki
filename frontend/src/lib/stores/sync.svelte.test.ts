@@ -9,6 +9,8 @@ vi.mock("$lib/api/wiki", () => ({
 describe("sync store", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -95,5 +97,21 @@ describe("sync store", () => {
     expect(
       JSON.parse(localStorage.getItem("sync_job_history_v1") ?? "[]"),
     ).toHaveLength(2);
+  });
+
+  it("skips protected sync polling while credential setup is still required", async () => {
+    sessionStorage.setItem("access_token", "token");
+    sessionStorage.setItem("must_change_credentials", "true");
+
+    const api = await import("$lib/api/wiki");
+    const { refreshSyncJob, getSyncMonitor } = await import("./sync.svelte.ts");
+
+    await refreshSyncJob();
+
+    expect(api.fetchCurrentSyncJob).not.toHaveBeenCalled();
+    expect(api.fetchSyncStatus).not.toHaveBeenCalled();
+    expect(getSyncMonitor().initialized).toBe(true);
+    expect(getSyncMonitor().status).toBeNull();
+    expect(getSyncMonitor().currentJob).toBeNull();
   });
 });

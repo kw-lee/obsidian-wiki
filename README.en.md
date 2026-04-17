@@ -45,11 +45,18 @@ Architecture and data flow are documented in [`llm-docs/ARCHITECTURE.md`](llm-do
 - Keep your real vault contents, `.env`, SSH keys, and runtime volumes private and out of Git.
 - Bundled font assets under [`frontend/static/fonts/`](frontend/static/fonts/) are third-party files and keep their upstream license terms.
 
-### 1. Configure Environment Variables
+### 1. Download Deployment Files
 
 ```bash
-cp .env.example .env
+mkdir -p obsidian-wiki && cd obsidian-wiki
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/.env.example -O .env
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/docker-compose.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/nginx.conf -O nginx.conf
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/init.sql -O init.sql
+mkdir -p config/ssh
 ```
+
+### 2. Configure Environment Variables
 
 Edit `.env`:
 
@@ -64,20 +71,47 @@ CORS_ALLOWED_ORIGINS=https://wiki.example.com # comma-separated if multiple orig
 
 Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
 
-### 2. Run
+### 2. Point to GHCR Images
+
+Add app image tags to `.env`:
+
+```ini
+BACKEND_IMAGE=ghcr.io/kw-lee/obsidian-wiki-backend:latest
+FRONTEND_IMAGE=ghcr.io/kw-lee/obsidian-wiki-frontend:latest
+```
+
+The GHCR images are public, so you can pull them without logging in.
+
+If you plan to use Git sync, also copy your SSH key material:
 
 ```bash
-make up        # production: start in background
-make dev       # development: hot reload + foreground logs
-make logs      # view logs
-make down      # stop
+cp ~/.ssh/id_ed25519 config/ssh/
+cp ~/.ssh/known_hosts config/ssh/
+```
+
+### 3. Run
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose exec backend alembic upgrade head
 ```
 
 Open **`http://localhost:${WEB_PORT}`** in your browser (default: `80`) and log in with `INIT_ADMIN_*`.
 
 > `BACKEND_PORT` and `FRONTEND_PORT` are for direct debug access without nginx. The real entrypoint is `WEB_PORT`. After login, complete the forced credential-change flow at **`/auth/setup`**, then use **`/settings/profile`**, **`/settings/sync`**, **`/settings/appearance`**, and **`/settings/system`** to review and adjust account, sync, theme, and server state.
 
-### 3. DB Migrations (When Schema Changes)
+### 4. If You Prefer Source Builds
+
+You can still build on the server with the base compose flow.
+
+```bash
+make build
+make up
+make migrate
+```
+
+### 5. DB Migrations (When Schema Changes)
 
 ```bash
 make migrate                          # upgrade to latest
@@ -112,15 +146,14 @@ See [`llm-docs/TESTING.md`](llm-docs/TESTING.md) for more details.
 
 Includes an nginx reverse proxy + HTTPS template. See [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) for build and deployment details.
 
-For source-based deployment, keep using `docker-compose.yml` and build on the server.
-
-For registry-based deployment without Docker Hub, publish app images to GitHub Container Registry (`ghcr.io`) via [`.github/workflows/publish-ghcr.yml`](.github/workflows/publish-ghcr.yml), then deploy with:
+The default deployment path is GitHub Container Registry (`ghcr.io`). This repository includes the [`.github/workflows/publish-ghcr.yml`](.github/workflows/publish-ghcr.yml) workflow plus a self-contained [`deploy/`](deploy/) bundle, so a server can download only the deployment files and run directly:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/docker-compose.yml -O docker-compose.yml
+docker compose up -d
 ```
 
-Set `BACKEND_IMAGE` and `FRONTEND_IMAGE` in `.env` to your GHCR image tags first. This keeps PostgreSQL, Redis, and nginx from the base compose file while swapping the app services from local `build:` to prebuilt `image:` references.
+Set `BACKEND_IMAGE` and `FRONTEND_IMAGE` in `.env` to the GHCR tags you want first. This deploy path pulls prebuilt app images directly without checking out the repository source. If needed, you can still fall back to a full source checkout and build on the server.
 
 Three persistent volumes:
 

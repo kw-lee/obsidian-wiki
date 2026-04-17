@@ -8,25 +8,70 @@
 ## Quick Start
 
 ```bash
-# 1. Configure environment variables
-cp .env.example .env
-# Edit .env: passwords, JWT_SECRET, GIT_REMOTE_URL, etc.
+# 1. Create a deployment directory
+mkdir -p obsidian-wiki && cd obsidian-wiki
 
-# 2. Set up SSH key (for Git sync)
-mkdir -p config/ssh
-cp ~/.ssh/id_ed25519 config/ssh/
-cp ~/.ssh/known_hosts config/ssh/
+# 2. Download the self-contained deploy bundle
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/.env.example -O .env
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/docker-compose.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/nginx.conf -O nginx.conf
+wget https://raw.githubusercontent.com/kw-lee/obsidian-wiki/main/deploy/init.sql -O init.sql
 
-# 3. Build & run
-make build
-make up
+# 3. Edit .env: passwords, JWT_SECRET, CORS_ALLOWED_ORIGINS, etc.
+
+# 4. Run
+docker compose pull
+docker compose up -d
+docker compose exec backend alembic upgrade head
 ```
 
 Open `http://localhost` in a browser.
 
 ## Deployment Modes
 
-### 1. Source build on the server
+### 1. Prebuilt app images from GHCR
+
+Use GHCR when you do not want to build `backend` and `frontend` on the server. This is the recommended production path.
+
+This repository ships:
+
+- `.github/workflows/publish-ghcr.yml` — builds and pushes `backend` / `frontend` to `ghcr.io`
+- `deploy/docker-compose.yml` — self-contained deploy compose file
+- `deploy/nginx.conf` — nginx config for the deploy bundle
+- `deploy/init.sql` — Postgres bootstrap SQL for the deploy bundle
+- `deploy/.env.example` — production-oriented environment template
+
+Recommended image names:
+
+```text
+ghcr.io/kw-lee/obsidian-wiki-backend:latest
+ghcr.io/kw-lee/obsidian-wiki-frontend:latest
+```
+
+Add these to `.env` on the server:
+
+```ini
+BACKEND_IMAGE=ghcr.io/kw-lee/obsidian-wiki-backend:latest
+FRONTEND_IMAGE=ghcr.io/kw-lee/obsidian-wiki-frontend:latest
+```
+
+Then deploy with:
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose exec backend alembic upgrade head
+```
+
+If you use Git sync, also copy the SSH key material mounted by the compose file:
+
+```bash
+mkdir -p config/ssh
+cp ~/.ssh/id_ed25519 config/ssh/
+cp ~/.ssh/known_hosts config/ssh/
+```
+
+### 2. Source build on the server
 
 Use the default compose file when the server can clone the repository and build images locally.
 
@@ -36,45 +81,8 @@ cd obsidian-wiki
 cp .env.example .env
 docker compose build
 docker compose up -d
+docker compose exec backend alembic upgrade head
 ```
-
-### 2. Prebuilt app images from GHCR
-
-Use GHCR when you do not want to build `backend` and `frontend` on the server.
-
-This repository ships:
-
-- `.github/workflows/publish-ghcr.yml` — builds and pushes `backend` / `frontend` to `ghcr.io`
-- `docker-compose.ghcr.yml` — overrides app services from local `build:` to prebuilt `image:`
-
-Recommended image names:
-
-```text
-ghcr.io/<owner>/obsidian-wiki-backend:latest
-ghcr.io/<owner>/obsidian-wiki-frontend:latest
-```
-
-Add these to `.env` on the server:
-
-```ini
-BACKEND_IMAGE=ghcr.io/<owner>/obsidian-wiki-backend:latest
-FRONTEND_IMAGE=ghcr.io/<owner>/obsidian-wiki-frontend:latest
-```
-
-Then deploy with:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
-```
-
-If the GHCR package is private, log in first:
-
-```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
-```
-
-`GHCR_TOKEN` should be a GitHub token with package read permission.
 
 ## Architecture
 
@@ -95,11 +103,11 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
 
 ## Compose Profiles
 
-| File | Purpose |
-|------|---------|
-| `docker-compose.yml` | Production (default) |
-| `docker-compose.dev.yml` | Dev override (hot reload, source mount) |
-| `docker-compose.test.yml` | Test (ephemeral DB, auto-exit) |
+| File                      | Purpose                                 |
+| ------------------------- | --------------------------------------- |
+| `docker-compose.yml`      | Production (default)                    |
+| `docker-compose.dev.yml`  | Dev override (hot reload, source mount) |
+| `docker-compose.test.yml` | Test (ephemeral DB, auto-exit)          |
 
 ## Makefile Commands
 
@@ -158,25 +166,25 @@ make prune   # Docker system prune
 
 ## Environment Variables (.env)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_USER` | DB user | `obsidian` |
-| `POSTGRES_PASSWORD` | DB password | `changeme` |
-| `POSTGRES_DB` | DB name | `obsidian_wiki` |
-| `DATABASE_URL` | SQLAlchemy connection string | (auto-generated) |
-| `REDIS_URL` | Redis connection | `redis://redis:6379/0` |
-| `JWT_SECRET` | JWT signing key | (must change) |
-| `INIT_ADMIN_USERNAME` | Initial admin username | `admin` |
-| `INIT_ADMIN_PASSWORD` | Initial admin password | (must change) |
-| `APP_ENV` | Runtime environment | `development` |
-| `CORS_ALLOWED_ORIGINS` | Allowed browser origins | (empty) |
-| `APP_TIMEZONE` | App / container timezone | `Asia/Seoul` |
-| `VAULT_LOCAL_PATH` | Vault path inside container | `/data/vault` |
-| `WEB_PORT` | Host port (nginx entrypoint) | `80` |
-| `BACKEND_PORT` | Host port (backend) | `8000` |
-| `FRONTEND_PORT` | Host port (frontend) | `3000` |
-| `BACKEND_IMAGE` | Optional GHCR backend image | (unset) |
-| `FRONTEND_IMAGE` | Optional GHCR frontend image | (unset) |
+| Variable               | Description                  | Default                |
+| ---------------------- | ---------------------------- | ---------------------- |
+| `POSTGRES_USER`        | DB user                      | `obsidian`             |
+| `POSTGRES_PASSWORD`    | DB password                  | `changeme`             |
+| `POSTGRES_DB`          | DB name                      | `obsidian_wiki`        |
+| `DATABASE_URL`         | SQLAlchemy connection string | (auto-generated)       |
+| `REDIS_URL`            | Redis connection             | `redis://redis:6379/0` |
+| `JWT_SECRET`           | JWT signing key              | (must change)          |
+| `INIT_ADMIN_USERNAME`  | Initial admin username       | `admin`                |
+| `INIT_ADMIN_PASSWORD`  | Initial admin password       | (must change)          |
+| `APP_ENV`              | Runtime environment          | `development`          |
+| `CORS_ALLOWED_ORIGINS` | Allowed browser origins      | (empty)                |
+| `APP_TIMEZONE`         | App / container timezone     | `Asia/Seoul`           |
+| `VAULT_LOCAL_PATH`     | Vault path inside container  | `/data/vault`          |
+| `WEB_PORT`             | Host port (nginx entrypoint) | `80`                   |
+| `BACKEND_PORT`         | Host port (backend)          | `8000`                 |
+| `FRONTEND_PORT`        | Host port (frontend)         | `3000`                 |
+| `BACKEND_IMAGE`        | Optional GHCR backend image  | (unset)                |
+| `FRONTEND_IMAGE`       | Optional GHCR frontend image | (unset)                |
 
 ### Generate Password Hash
 
@@ -234,9 +242,9 @@ make migrate  # DB migrations
 For GHCR-based deployment, replace the build step with:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.ghcr.yml exec backend alembic upgrade head
+docker compose pull
+docker compose up -d
+docker compose exec backend alembic upgrade head
 ```
 
 ### 4. Verify
@@ -252,8 +260,8 @@ curl http://localhost/health  # {"status": "ok"}
 
 The GitHub Actions workflow publishes two application images:
 
-- `ghcr.io/<owner>/obsidian-wiki-backend`
-- `ghcr.io/<owner>/obsidian-wiki-frontend`
+- `ghcr.io/kw-lee/obsidian-wiki-backend`
+- `ghcr.io/kw-lee/obsidian-wiki-frontend`
 
 Publishing triggers:
 
@@ -289,11 +297,11 @@ Generated tags include:
 
 ## Volumes
 
-| Volume | Purpose | Needs Backup |
-|--------|---------|--------------|
-| `db_data` | PostgreSQL data | Yes |
-| `vault_data` | Obsidian vault (git repo) | Yes (git remote) |
-| `config_data` | App configuration | Yes |
+| Volume        | Purpose                   | Needs Backup     |
+| ------------- | ------------------------- | ---------------- |
+| `db_data`     | PostgreSQL data           | Yes              |
+| `vault_data`  | Obsidian vault (git repo) | Yes (git remote) |
+| `config_data` | App configuration         | Yes              |
 
 ### Volume Backup
 

@@ -37,6 +37,12 @@
 - Git backend 사용 시 원격 Git 리포지토리 (예: private GitHub repo)와 SSH 키
 - WebDAV backend 사용 시 WebDAV URL / 계정 정보
 
+### 저장소 범위
+
+- 이 저장소는 public 으로 공개 가능한 범위를 유지하는 것을 전제로 합니다. 애플리케이션 소스, 배포 파일, 프로젝트 문서는 여기에 둡니다.
+- 실제 vault 내용, `.env`, SSH 키, 런타임 볼륨 데이터는 Git 에 올리지 말고 비공개로 유지하세요.
+- [`frontend/static/fonts/`](frontend/static/fonts/) 아래의 번들 폰트는 제3자 자산이며, 루트 라이선스와 별도로 upstream 라이선스 조건을 따릅니다.
+
 ### 1. 환경 변수 설정
 
 ```bash
@@ -123,10 +129,13 @@ nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 
 - `README.md` 는 기본 사용자 안내 문서이며 영어로 유지합니다.
 - `README.ko.md` 는 한국어 사용자 안내 문서입니다.
 - `llm-docs/` 는 구현/설계 참조 문서이므로 영어만 사용합니다.
+- Agent 대상 문서는 사람과 LLM 도구가 같은 규칙을 따르도록 의도적으로 버전 관리합니다.
+- 서드파티 의존성과 자산의 고지 사항은 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 에 정리합니다.
 
 - [`AGENTS.md`](AGENTS.md) — 프로젝트 전반 규칙 (Claude/Codex 공통)
 - [`CLAUDE.md`](CLAUDE.md) — Claude용 포인터 문서
 - [`CODEX.md`](CODEX.md) — Codex용 포인터 문서
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) — 직접 의존성 버전과 서드파티 라이선스 메모
 - [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — 시스템 아키텍처 / 기술 결정
 - [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — 코드 스타일 / Git / CI
 - [`llm-docs/SETTINGS.md`](llm-docs/SETTINGS.md) — 관리자 설정 화면 / 런타임 설정
@@ -135,6 +144,15 @@ nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 
 - [`llm-docs/TESTING.md`](llm-docs/TESTING.md) — 테스트 가이드
 - [`llm-docs/PROGRESS.md`](llm-docs/PROGRESS.md) — 구현 진행 상황
 
+## Upstream 의존성과 라이선스
+
+- 직접 사용하는 주요 upstream 프로젝트로는 SvelteKit, Svelte, CodeMirror, d3, KaTeX, Marked, FastAPI, Pydantic, SQLAlchemy, Alembic, Uvicorn, HTTPX, GitPython 등이 있습니다.
+- 락파일 기준으로 확인한 직접 의존성은 모두 `MIT`, `Apache-2.0`, `BSD-3-Clause`, `ISC` 같은 permissive 라이선스에 속합니다. 이번 직접 의존성 점검 범위에서는 `GPL`, `LGPL`, `AGPL` 계열은 발견되지 않았습니다.
+- [`frontend/static/fonts/`](frontend/static/fonts/) 아래의 번들 폰트 자산은 저장소 루트 라이선스와 별도의 조건을 따릅니다.
+- 정확한 직접 의존성 버전과 라이선스 메모는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 를 참고하세요.
+
 ## 라이선스
 
-개인 프로젝트. 별도 명시 전까지 All rights reserved.
+프로젝트 소스코드와 프로젝트 작성 문서는 [GNU General Public License v3.0 only](LICENSE) (`GPL-3.0-only`) 로 배포합니다.
+
+[`frontend/static/fonts/`](frontend/static/fonts/) 아래의 번들 폰트 자산은 저장소 루트 `GPL-3.0-only` 고지로 재라이선스되지 않으며, 각 upstream 라이선스 조건을 그대로 따릅니다. 자세한 내용은 [`frontend/static/fonts/README.md`](frontend/static/fonts/README.md) 를 참고하세요.

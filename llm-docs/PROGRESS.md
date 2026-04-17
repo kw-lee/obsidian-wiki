@@ -344,3 +344,10 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 - [ ] Step 6: sidebar toolbar + persisted tree state
 - [ ] Step 7: drag-and-drop note/folder move
 - [ ] Step 8: advanced polish and non-MVP tools
+
+## Phase 11: Public Repository Readiness
+
+- [x] Align `README.md` / `README.ko.md` for a public-facing repository
+- [x] Add an open-source repository license with a third-party asset boundary note
+- [x] Document human + LLM branching strategy in `llm-docs/CONVENTIONS.md`
+- [x] Add direct dependency license notes and a `THIRD_PARTY_NOTICES.md` summary

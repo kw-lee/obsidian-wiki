@@ -38,6 +38,20 @@
   - `llm-docs/TESTING.md` for test workflow changes
   - `llm-docs/SETTINGS.md` / `llm-docs/SECURITY.md` when admin or security behavior changes
 
+### Branching Strategy for Human + LLM Collaboration
+- `main` stays releasable. Do not leave partial experiments, scratch prompts, or unrelated fixes stacked together there.
+- Start each task from the latest `main` and use a short-lived branch with a clear prefix:
+  - `feat/<area>-<summary>`
+  - `fix/<area>-<summary>`
+  - `docs/<summary>`
+  - `chore/<summary>`
+- Keep one branch focused on one reviewable goal. If backend, frontend, tests, and docs all belong to the same behavior change, keep them together in one branch. If the work is unrelated, split it.
+- When multiple humans or LLM agents work in parallel, give each branch a single owner and a disjoint write scope whenever possible.
+- If parallel work still needs one shared delivery target, merge the smaller branches into an integration branch only after each branch is locally coherent and passes its relevant checks.
+- Rebase or merge from `main` before large edits, before opening a PR, and again before final merge if the branch lived longer than a short session.
+- Avoid long-lived `llm/*` catch-all branches. Use a scoped `spike/<summary>` branch for disposable exploration, then either close it or squash only the useful result into a normal feature/fix/docs branch.
+- Land code, tests, docs, and config updates in the same branch when they describe the same behavior change, so an LLM handoff never depends on out-of-band context.
+
 ### Commit Messages
 Conventional commits: `feat|fix|docs|style|refactor|test|chore|build|ci|perf`
 ```

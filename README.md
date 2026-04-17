@@ -37,6 +37,12 @@ Architecture and data flow are documented in [`llm-docs/ARCHITECTURE.md`](llm-do
 - If using the Git backend: a remote Git repository (for example, a private GitHub repo) and an SSH key
 - If using the WebDAV backend: a WebDAV URL and account credentials
 
+### Repository Scope
+
+- This repository is intended to stay public-safe: application source, deployment files, and project docs live here.
+- Keep your real vault contents, `.env`, SSH keys, and runtime volumes private and out of Git.
+- Bundled font assets under [`frontend/static/fonts/`](frontend/static/fonts/) are third-party files and keep their upstream license terms.
+
 ### 1. Configure Environment Variables
 
 ```bash
@@ -125,10 +131,13 @@ Documentation language policy:
 - `README.md` is the default user-facing README and stays in English.
 - `README.ko.md` is the Korean user-facing README.
 - `llm-docs/` stays English-only for implementation and design references.
+- Agent-facing docs are versioned intentionally so human contributors and LLM tools follow the same project rules.
+- Third-party dependency and asset notices are tracked in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 - [`AGENTS.md`](AGENTS.md) — project-wide rules (shared by Claude/Codex)
 - [`CLAUDE.md`](CLAUDE.md) — pointer doc for Claude
 - [`CODEX.md`](CODEX.md) — pointer doc for Codex
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) — direct dependency versions and third-party license notes
 - [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — system architecture / technical decisions
 - [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — code style / Git / CI
 - [`llm-docs/SETTINGS.md`](llm-docs/SETTINGS.md) — admin settings UI / runtime settings
@@ -137,6 +146,15 @@ Documentation language policy:
 - [`llm-docs/TESTING.md`](llm-docs/TESTING.md) — testing guide
 - [`llm-docs/PROGRESS.md`](llm-docs/PROGRESS.md) — implementation progress
 
+## Upstream Dependencies & Licenses
+
+- Key upstream projects used directly include SvelteKit, Svelte, CodeMirror, d3, KaTeX, Marked, FastAPI, Pydantic, SQLAlchemy, Alembic, Uvicorn, HTTPX, and GitPython.
+- The direct dependencies reviewed from the lockfiles are permissively licensed (`MIT`, `Apache-2.0`, `BSD-3-Clause`, `ISC`). No direct dependency reviewed in this pass used `GPL`, `LGPL`, or `AGPL`.
+- Bundled font assets under [`frontend/static/fonts/`](frontend/static/fonts/) are licensed separately from the repository root license.
+- See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for exact direct dependency versions and license notes.
+
 ## License
 
-Personal project. All rights reserved unless stated otherwise.
+The project source code and project-authored docs are licensed under the [GNU General Public License v3.0 only](LICENSE) (`GPL-3.0-only`).
+
+Bundled third-party font assets under [`frontend/static/fonts/`](frontend/static/fonts/) are not relicensed under the repository root `GPL-3.0-only` notice and remain under their upstream terms. See [`frontend/static/fonts/README.md`](frontend/static/fonts/README.md).

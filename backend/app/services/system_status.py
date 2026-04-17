@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 
-_DEFAULT_APP_VERSION = "0.1.0"
-_PROCESS_STARTED_AT = datetime.now(timezone.utc)
+_DEFAULT_APP_VERSION = "0.0.1"
+_PROCESS_STARTED_AT = datetime.now(UTC)
 
 
 def get_app_version() -> str:

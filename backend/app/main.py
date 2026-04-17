@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import default_git_display_name, default_git_email
-from app.config import settings
+from app.config import build_cors_middleware_options, settings, validate_runtime_settings
 from app.db.models import User
 from app.db.session import Base, async_session, engine
 from app.routers import (
@@ -90,25 +90,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
 
 
-app = FastAPI(title="Obsidian Wiki API", lifespan=lifespan)
+def create_app() -> FastAPI:
+    validate_runtime_settings(settings)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    app = FastAPI(title="Obsidian Wiki API", lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, **build_cors_middleware_options(settings))
 
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(wiki.router, prefix="/api/wiki", tags=["wiki"])
-app.include_router(search.router, prefix="/api", tags=["search"])
-app.include_router(attachments.router, prefix="/api/attachments", tags=["attachments"])
-app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
-app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
-app.include_router(tags.router, prefix="/api", tags=["tags"])
-app.include_router(tasks.router, prefix="/api", tags=["tasks"])
-app.include_router(dataview.router, prefix="/api", tags=["dataview"])
+    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+    app.include_router(wiki.router, prefix="/api/wiki", tags=["wiki"])
+    app.include_router(search.router, prefix="/api", tags=["search"])
+    app.include_router(attachments.router, prefix="/api/attachments", tags=["attachments"])
+    app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
+    app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
+    app.include_router(tags.router, prefix="/api", tags=["tags"])
+    app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+    app.include_router(dataview.router, prefix="/api", tags=["dataview"])
+
+    return app
+
+
+app = create_app()
 
 
 @app.get("/health")

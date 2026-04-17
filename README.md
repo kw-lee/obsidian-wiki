@@ -1,130 +1,142 @@
 # Obsidian Web Wiki
 
-개인 [Obsidian](https://obsidian.md) vault를 웹 브라우저에서 읽고 편집할 수 있게 해주는 셀프호스트 위키입니다. 데스크톱에서는 기존 Obsidian 앱을 그대로 쓰고, 모바일/외부에서는 웹으로 같은 vault에 접근합니다.
+[한국어 README](README.ko.md)
 
-## 이게 뭔가요
+Self-hosted web wiki for a personal [Obsidian](https://obsidian.md) vault. You keep using the Obsidian desktop app on desktop, and access the same vault from a web browser on mobile or remotely.
 
-- **단일 사용자** 셀프호스트 위키. 집 서버나 VPS 에 Docker 로 띄워서 씁니다.
-- **Git 기반 양방향 동기화**: Obsidian ↔ 원격 Git 리포 ↔ 서버. 충돌은 3-way merge 로 자동 처리하고 실패 시 diff 를 돌려줍니다.
-- **Obsidian 호환**: `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callout, Mermaid, KaTeX, checkbox 지원.
-- **작업 보기**: Obsidian 체크박스 작업과 `📅 YYYY-MM-DD` due date를 `/tasks` 에서 모아 볼 수 있습니다.
-- **Excalidraw 읽기 전용**: `.excalidraw.md` 문서는 함께 export된 PNG/SVG가 있으면 웹에서 미리보기로 표시합니다.
-- **Dataview 기본 지원**: `dataview` 코드 블록에서 `LIST/TABLE FROM "folder"` 또는 `FROM #tag` 정적 조회를 렌더링합니다.
-- **검색**: PostgreSQL `tsvector` + `pg_trgm` 하이브리드 (한/영).
-- **편집**: CodeMirror 6 기반 마크다운 에디터 (구문 강조, ⌘S 저장).
-- **부가 기능**: 백링크 패널, 그래프 뷰 (d3-force), 커맨드 팔레트 (⌘P), Quick Switcher (⌘K), 다크/라이트 테마 (Catppuccin).
+## What This Is
 
-## 기술 스택
+- **Single-user** self-hosted wiki for a home server or VPS running Docker.
+- **Selectable bidirectional sync**: Obsidian ↔ remote Git or WebDAV ↔ server. Text conflicts attempt a 3-way merge; failures surface as conflicts with a diff.
+- **Save conflict handling**: if another change lands first while editing on the web, the app keeps your local draft, opens a conflict diff modal, and lets you reload the latest version or keep editing.
+- **Obsidian-compatible parsing**: supports `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callouts, Mermaid, KaTeX, checkboxes, and heading/block targets.
+- **Plugin and format compatibility**: aggregated Tasks view (`/tasks`), static Dataview `LIST/TABLE`, a safe Templater subset, and read-only Excalidraw previews.
+- **Navigation and file viewing**: dedicated `/wiki/...` document routes, internal link/embed resolution, create-note CTA for unresolved links, and viewers for images, PDFs, audio, video, and other attachments.
+- **Workspace UX**: CodeMirror 6 editor, optional split preview, backlinks/frontlinks/outline panel, graph view, global sync indicator, command palette (`Cmd+P`), and Quick Switcher (`Cmd+K`) in an Obsidian-like shell.
+- **File management**: explorer toolbar actions (new note/folder, sort, expand/collapse, reveal current note), drag-and-drop moves, and optional wikilink rewriting on move.
+- **Admin UI**: forced credential change after first login, `/settings/profile|sync|vault|appearance|system`, server default theme presets, and Korean/English UI switching.
+- **Search**: hybrid PostgreSQL `tsvector` + `pg_trgm` search (Korean/English), with graph, link panels, and command palette sharing the same routing model.
+
+## Tech Stack
 
 - **Frontend**: SvelteKit 5 (runes) · TypeScript · CodeMirror 6 · d3
 - **Backend**: Python 3.12 · FastAPI (async) · SQLAlchemy 2.0 · pydantic v2
 - **DB / Cache**: PostgreSQL 16 · Redis 7
-- **Auth**: JWT (access 15분 / refresh 7일) + bcrypt
+- **Auth**: JWT (15 min access / 7 day refresh) + bcrypt
+- **Sync**: Git or WebDAV
 - **Deploy**: Docker Compose
 
-아키텍처와 데이터 흐름은 [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) 에 정리되어 있습니다.
+Architecture and data flow are documented in [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md).
 
-## 빠른 시작
+## Quick Start
 
-### 필요한 것
+### Requirements
 
 - Docker + Docker Compose
-- Vault 를 담을 Git 원격 리포지토리 (예: private GitHub repo)
-- SSH 키 (서버가 vault 리포에 pull/push 할 수 있어야 함)
+- A remote store for your vault
+- If using the Git backend: a remote Git repository (for example, a private GitHub repo) and an SSH key
+- If using the WebDAV backend: a WebDAV URL and account credentials
 
-### 1. 환경 변수 설정
+### 1. Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-`.env` 편집:
+Edit `.env`:
 
 ```ini
-POSTGRES_PASSWORD=...               # 아무 강한 값
-JWT_SECRET=$(openssl rand -hex 32)  # 반드시 교체
-INIT_ADMIN_USERNAME=admin           # 최초 관리자 계정 (최초 로그인 후 강제 변경됨)
-INIT_ADMIN_PASSWORD=changeme
+APP_ENV=production
+POSTGRES_PASSWORD=...                         # strong password, at least 8 chars
+JWT_SECRET=$(openssl rand -hex 32)            # 32+ chars, must be replaced
+INIT_ADMIN_USERNAME=admin                     # initial admin account; forced change after first login
+INIT_ADMIN_PASSWORD=...                       # strong password, at least 12 chars
+CORS_ALLOWED_ORIGINS=https://wiki.example.com # comma-separated if multiple origins
 ```
 
-동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 초기값만 시드할 수 있습니다. 서버 기본 테마는 **`/settings/appearance`** 에서 지정하며, 개인 브라우저에 저장된 테마 선택이 없을 때 기본값으로 사용됩니다.
+Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
 
-### 2. 실행
+### 2. Run
 
 ```bash
-make up        # 프로덕션: 백그라운드 기동
-make dev       # 개발 모드: 핫리로드 + 포그라운드 로그
-make logs      # 로그 확인
-make down      # 정지
+make up        # production: start in background
+make dev       # development: hot reload + foreground logs
+make logs      # view logs
+make down      # stop
 ```
 
-브라우저에서 **`http://localhost:${WEB_PORT}`** (기본 80) 접속 → `INIT_ADMIN_*` 로 로그인
+Open **`http://localhost:${WEB_PORT}`** in your browser (default: `80`) and log in with `INIT_ADMIN_*`.
 
-> `BACKEND_PORT` / `FRONTEND_PORT` 는 nginx 를 거치지 않는 직접 접근용(디버그). 실제 사용 진입점은 `WEB_PORT` 입니다. → **강제 credential 변경 페이지** (`/auth/setup`) 에서 새 username/password 지정 → 필요하면 **설정 페이지** (`/settings/profile`, `/settings/sync`, `/settings/appearance`, `/settings/system`) 에서 계정/동기화/기본 테마/서버 상태를 바로 확인하고 조정합니다.
+> `BACKEND_PORT` and `FRONTEND_PORT` are for direct debug access without nginx. The real entrypoint is `WEB_PORT`. After login, complete the forced credential-change flow at **`/auth/setup`**, then use **`/settings/profile`**, **`/settings/sync`**, **`/settings/appearance`**, and **`/settings/system`** to review and adjust account, sync, theme, and server state.
 
-### 3. DB 마이그레이션 (스키마 변경 시)
+### 3. DB Migrations (When Schema Changes)
 
 ```bash
-make migrate                          # 최신으로 업그레이드
-make migrate-generate msg="add xyz"   # 새 리비전 생성 (autogenerate)
+make migrate                          # upgrade to latest
+make migrate-generate msg="add xyz"   # create a new revision (autogenerate)
 ```
 
-## 개발
+## Development
 
 ```bash
-make dev                 # 전체 스택 핫리로드 실행
-make shell-backend       # 백엔드 컨테이너 셸
-make shell-frontend      # 프론트 컨테이너 셸
+make dev                 # run the full stack with hot reload
+make shell-backend       # backend container shell
+make shell-frontend      # frontend container shell
 make shell-db            # psql
 make lint                # ruff + prettier + svelte-check
-make lint-fix            # 자동 포맷/수정
+make lint-fix            # auto-format / auto-fix
 ```
 
-## 테스트
+## Testing
 
-모든 테스트는 Docker 환경에서 실행합니다 (PostgreSQL + Redis 컨테이너 포함).
+All tests run in Docker (including PostgreSQL + Redis containers).
 
 ```bash
-make test              # backend + frontend 전체
-make test-backend      # backend 만 (pytest)
-make test-frontend     # frontend 만 (vitest)
-make test-clean        # 테스트 컨테이너/볼륨 정리
+make test              # full backend + frontend suite
+make test-backend      # backend only (pytest)
+make test-frontend     # frontend only (vitest)
+make test-clean        # clean test containers / volumes
 ```
 
-자세한 내용은 [`llm-docs/TESTING.md`](llm-docs/TESTING.md) 참고.
+See [`llm-docs/TESTING.md`](llm-docs/TESTING.md) for more details.
 
-## 배포
+## Deployment
 
-nginx reverse proxy + HTTPS 템플릿 포함. Docker 빌드/배포 가이드는 [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) 참고.
+Includes an nginx reverse proxy + HTTPS template. See [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) for build and deployment details.
 
-퍼시스턴트 볼륨 3개:
-- `db_data` — PostgreSQL 데이터
-- `vault_data` — Git 클론된 vault
-- `config_data` — 기타 서버 설정
+Three persistent volumes:
 
-## 주요 단축키
+- `db_data` — PostgreSQL data
+- `vault_data` — Git clone or WebDAV mirror of the vault
+- `config_data` — other server configuration
 
-| 키 | 동작 |
+## Keyboard Shortcuts
+
+| Key | Action |
 |----|------|
-| `⌘K` | Quick Switcher (파일 빠른 이동) |
-| `⌘P` | 커맨드 팔레트 (새 문서, Git sync, 테마 전환 등) |
-| `⌘S` | 편집 중 문서 저장 |
+| `Cmd+K` | Quick Switcher (fast document navigation) |
+| `Cmd+P` | Command palette (new doc, sync, theme toggle, etc.) |
+| `Cmd+S` | Save while editing |
 
-## 문서
+## Documentation
 
-문서 언어 정책:
-- `README.md` 는 사용자 안내 문서이므로 한국어를 유지합니다.
-- `llm-docs/` 는 구현/설계 참조 문서이므로 영어만 사용합니다.
+Documentation language policy:
 
-- [`AGENTS.md`](AGENTS.md) — 프로젝트 전반 규칙 (Claude/Codex 공통)
-- [`CLAUDE.md`](CLAUDE.md) — Claude용 포인터 문서
-- [`CODEX.md`](CODEX.md) — Codex용 포인터 문서
-- [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — 시스템 아키텍처 / 기술 결정
-- [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — 코드 스타일 / Git / CI
-- [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) — Docker 빌드·배포
-- [`llm-docs/TESTING.md`](llm-docs/TESTING.md) — 테스트 가이드
-- [`llm-docs/PROGRESS.md`](llm-docs/PROGRESS.md) — 구현 진행 상황
+- `README.md` is the default user-facing README and stays in English.
+- `README.ko.md` is the Korean user-facing README.
+- `llm-docs/` stays English-only for implementation and design references.
 
-## 라이선스
+- [`AGENTS.md`](AGENTS.md) — project-wide rules (shared by Claude/Codex)
+- [`CLAUDE.md`](CLAUDE.md) — pointer doc for Claude
+- [`CODEX.md`](CODEX.md) — pointer doc for Codex
+- [`llm-docs/ARCHITECTURE.md`](llm-docs/ARCHITECTURE.md) — system architecture / technical decisions
+- [`llm-docs/CONVENTIONS.md`](llm-docs/CONVENTIONS.md) — code style / Git / CI
+- [`llm-docs/SETTINGS.md`](llm-docs/SETTINGS.md) — admin settings UI / runtime settings
+- [`llm-docs/SECURITY.md`](llm-docs/SECURITY.md) — security review / hardening priorities
+- [`llm-docs/DOCKER.md`](llm-docs/DOCKER.md) — Docker build and deployment
+- [`llm-docs/TESTING.md`](llm-docs/TESTING.md) — testing guide
+- [`llm-docs/PROGRESS.md`](llm-docs/PROGRESS.md) — implementation progress
 
-개인 프로젝트. 별도 명시 전까지 All rights reserved.
+## License
+
+Personal project. All rights reserved unless stated otherwise.

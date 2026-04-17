@@ -8,6 +8,7 @@
 
 - **단일 사용자** 셀프호스트 위키. 집 서버나 VPS 에 Docker 로 띄워서 씁니다.
 - **선택형 양방향 동기화**: Obsidian ↔ 원격 Git 또는 WebDAV ↔ 서버. 텍스트 충돌은 3-way merge 를 시도하고, 실패하면 diff 와 함께 충돌 상태를 보여줍니다.
+- **Git 친화적인 웹 저장**: 웹 편집은 vault 와 검색 인덱스를 바로 갱신하고, Git backend 는 저장마다 commit 하지 않고 sync 시점에 변경분을 체크포인트 commit 으로 묶습니다.
 - **저장 충돌 대응**: 웹 편집 중 다른 변경이 먼저 저장되면 현재 draft 를 유지한 채 충돌 diff 모달을 띄우고, 최신 버전 다시 불러오기 또는 계속 편집을 선택할 수 있습니다.
 - **Obsidian 호환**: `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callout, Mermaid, KaTeX, checkbox, heading/block target 을 지원합니다.
 - **플러그인/포맷 호환**: Tasks 집계(`/tasks`), Dataview 정적 `LIST/TABLE`, Templater 안전 서브셋, Excalidraw 읽기 전용 미리보기를 지원합니다.

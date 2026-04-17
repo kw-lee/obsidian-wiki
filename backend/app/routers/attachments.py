@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, get_current_user, get_current_user_context
 from app.db.session import get_db
 from app.services.audit import record_audit_log
-from app.services.git_ops import build_git_actor, git_add_and_commit
 from app.services.indexer import index_attachment_file
 from app.services.sync_triggers import maybe_enqueue_sync_on_write
 from app.services.vault import resolve
@@ -107,22 +106,13 @@ async def upload_attachment(
     full.parent.mkdir(parents=True, exist_ok=True)
     size = await _write_upload(full, file)
 
-    commit_sha = git_add_and_commit(
-        [relative],
-        f"web: upload {relative}",
-        actor=build_git_actor(
-            display_name=user.git_display_name,
-            email=user.git_email,
-            username=user.username,
-        ),
-    )
     await index_attachment_file(db, relative, full)
     await record_audit_log(
         db,
         user=user,
         action="attachment.upload",
         path=relative,
-        commit_sha=commit_sha,
+        commit_sha=None,
     )
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)

@@ -53,7 +53,7 @@ async def run_backend_sync_cycle(
         pulled = True
 
     status_after_pull = await backend.status(db) if pulled else status_before
-    if status_after_pull.ahead > 0 and _mode_allows_push(mode):
+    if (status_after_pull.ahead > 0 or status_after_pull.dirty) and _mode_allows_push(mode):
         await backend.push(db, progress=progress)
 
     status = await backend.status(db)

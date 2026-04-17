@@ -14,7 +14,7 @@ export interface DocDetail {
   updated_at: string | null;
   content: string;
   rendered_content: string | null;
-  base_commit: string | null;
+  base_revision: string | null;
   outgoing_links: ResolvedWikiLink[];
 }
 

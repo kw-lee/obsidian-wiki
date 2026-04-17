@@ -10,7 +10,6 @@ from app.db.models import (  # noqa: F401
     AppSettings,
     Attachment,
     Document,
-    EditSession,
     Link,
     Tag,
     User,

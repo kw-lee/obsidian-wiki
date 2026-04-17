@@ -252,7 +252,7 @@ def sync_status(*, git_remote_url: str = "", git_branch: str = "main") -> dict:
         "last_sync": None,
         "ahead": 0,
         "behind": 0,
-        "dirty": repo.is_dirty(),
+        "dirty": repo.is_dirty(untracked_files=True),
         "message": None,
     }
     if "origin" not in [r.name for r in repo.remotes]:

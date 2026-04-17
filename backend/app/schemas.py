@@ -17,13 +17,14 @@ class DocMeta(BaseModel):
 class DocDetail(DocMeta):
     content: str
     rendered_content: str | None = None
-    base_commit: str | None = None
+    base_revision: str | None = None
     outgoing_links: list["ResolvedWikiLink"] = []
 
 
 class DocSaveRequest(BaseModel):
     content: str
-    base_commit: str | None = None
+    base_revision: str | None = None
+    base_content: str | None = None
 
 
 class DocCreateRequest(BaseModel):

@@ -132,6 +132,8 @@ Design: see [`llm-docs/SETTINGS.md`](SETTINGS.md) §3.2.c and [`llm-docs/ARCHITE
 - [x] `webdav_manifest` table (path, etag, mtime, sha256) + incremental diff algorithm
 - [x] 3-way merge helper extracted so both backends share it
 - [x] Scheduled auto-sync dispatch (`status → pull → push`) for both Git and WebDAV backends
+- [x] Batch Git commits at sync time and move web save conflicts to per-document revision tokens
+- [x] Remove the unused legacy `edit_sessions` table from the ORM/bootstrap schema and migration chain
 - [x] Fernet-based encryption helper for `webdav_password_enc` (key derived from `JWT_SECRET`)
 - [x] `POST /api/settings/sync/test` — validate credentials without persisting
 - [x] Extend `AppSettings` schema with WebDAV columns + CHECK constraint

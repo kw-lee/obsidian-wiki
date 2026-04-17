@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import SyncStatus, SyncTestResult
 from app.services.git_ops import (
+    git_add_all_and_commit,
     git_bootstrap_from_local,
     git_bootstrap_from_remote,
     git_pull,
@@ -26,6 +27,10 @@ class GitSyncBackend(SyncBackend):
         *,
         progress: ProgressCallback | None = None,
     ) -> tuple[str | None, list[str]]:
+        git_add_all_and_commit(
+            "sync: checkpoint local changes before pull",
+            git_remote_url=self.runtime.git_remote_url,
+        )
         await emit_progress(
             progress, phase="pulling", message="Fetching from Git remote", current=1, total=3
         )
@@ -50,6 +55,10 @@ class GitSyncBackend(SyncBackend):
         progress: ProgressCallback | None = None,
     ) -> None:
         del db
+        git_add_all_and_commit(
+            "sync: checkpoint local changes before push",
+            git_remote_url=self.runtime.git_remote_url,
+        )
         await emit_progress(
             progress, phase="pushing", message="Pushing to Git remote", current=1, total=2
         )

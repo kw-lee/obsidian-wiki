@@ -39,22 +39,21 @@ Browser → SvelteKit SSR load → FastAPI GET /api/wiki/doc/{path}
 
 ### Document Edit / Save
 ```
-Edit start: fetch document payload including base_commit = current HEAD
-Ctrl+S → PUT /api/wiki/doc/{path} (content + base_commit)
-  → Compare HEAD:
-    - Equal → write file → git add+commit → async DB update → optionally enqueue sync-on-save → invalidate cache
-    - Changed → check if this specific file was modified
-      - Untouched → same as above
-      - Modified → attempt 3-way merge
-          - Success → save merged result
-          - Failure → return 409+diff → frontend keeps the local draft, opens a conflict modal, and lets the user reload the latest version or continue editing
+Edit start: fetch document payload including base_revision = sha256(current file contents)
+Ctrl+S → PUT /api/wiki/doc/{path} (content + base_revision + base_content)
+  → Compare current revision:
+    - Equal → write file → async DB update → optionally enqueue sync-on-save → invalidate cache
+    - Changed → attempt 3-way merge with base_content, edited content, and current file contents
+        - Success → save merged result
+        - Failure → return 409+diff → frontend keeps the local draft, opens a conflict modal, and lets the user reload the latest version or continue editing
 ```
 
 ### Sync (backend-agnostic loop)
 ```
 Periodic (default 5 min, asyncio task):
   dispatch by settings.sync_backend:
-    git    → git fetch → compare local vs remote
+    git    → if worktree dirty, stage all + create a checkpoint commit
+              → git fetch → compare local vs remote
               - Local only changed  → push
               - Remote only changed → pull (fast-forward) → incremental index update
               - Both changed        → pull --rebase → per-file 3-way diff on conflict
@@ -243,7 +242,7 @@ See `backend/app/db/init.sql`. Main tables:
 - `links`: source_path → target_path (wikilink graph)
 - `tags`: name (UNIQUE) + doc_count
 - `attachments`: path, mime_type, size
-- `edit_sessions`: doc_path, base_commit, expires_at (conflict prevention)
+- Save conflicts use per-document revision tokens derived from the current file content; no separate edit-session table is required
 
 GIN indexes: search_vector, tags, path (trigram). B-tree: links source/target.
 
@@ -254,9 +253,9 @@ Two interchangeable implementations behind a common interface (`app.services.syn
 ### Git Backend (`services/git_ops.py`)
 - Clones the remote on first boot into `$VAULT_LOCAL_PATH`
 - Uses gitpython; SSH auth via `/root/.ssh/` bind-mounted key
-- Commit on every server-side write; periodic `fetch` + rebase loop
+- Web writes stay as filesystem changes until sync time; Git sync creates checkpoint commits before pull/push
 - Conflict resolution: Git merge tooling + 3-way file merge for text; binary `.obsidian/` files resolved "theirs"
-- Pros: full history, atomic commits, matches Obsidian Git plugin on desktop
+- Pros: full history, fewer tiny commits from web edits, matches Obsidian Git plugin on desktop
 - Cons: requires SSH key management; larger repo on binary-heavy vaults
 
 ### WebDAV Backend (`services/sync/webdav_backend.py`)

@@ -88,14 +88,6 @@ CREATE TABLE attachments (
     updated_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE edit_sessions (
-    id          SERIAL PRIMARY KEY,
-    doc_path    TEXT NOT NULL,
-    base_commit TEXT NOT NULL,
-    started_at  TIMESTAMPTZ DEFAULT NOW(),
-    expires_at  TIMESTAMPTZ NOT NULL
-);
-
 CREATE TABLE webdav_manifest (
     id    SERIAL PRIMARY KEY,
     path  TEXT UNIQUE NOT NULL,

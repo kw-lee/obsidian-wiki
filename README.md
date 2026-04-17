@@ -8,6 +8,7 @@ Self-hosted web wiki for a personal [Obsidian](https://obsidian.md) vault. You k
 
 - **Single-user** self-hosted wiki for a home server or VPS running Docker.
 - **Selectable bidirectional sync**: Obsidian ↔ remote Git or WebDAV ↔ server. Text conflicts attempt a 3-way merge; failures surface as conflicts with a diff.
+- **Git-friendly web saves**: web edits update the vault and search index immediately, while the Git backend batches pending changes into sync-time checkpoint commits instead of committing on every save.
 - **Save conflict handling**: if another change lands first while editing on the web, the app keeps your local draft, opens a conflict diff modal, and lets you reload the latest version or keep editing.
 - **Obsidian-compatible parsing**: supports `[[wikilink]]`, `![[embed]]`, `#tag`, YAML frontmatter, callouts, Mermaid, KaTeX, checkboxes, and heading/block targets.
 - **Plugin and format compatibility**: aggregated Tasks view (`/tasks`), static Dataview `LIST/TABLE`, a safe Templater subset, and read-only Excalidraw previews.

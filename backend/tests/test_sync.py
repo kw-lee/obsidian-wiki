@@ -468,3 +468,68 @@ async def test_run_scheduled_sync_push_only_skips_pull(client, monkeypatch, setu
     assert calls == ["status", "push", "status"]
     assert result.ahead == 0
     assert result.behind == 1
+
+
+@pytest.mark.asyncio
+async def test_run_scheduled_sync_pushes_dirty_git_worktree_even_without_ahead_commits(
+    client, monkeypatch, setup_vault
+):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "git"
+        row.sync_auto_enabled = True
+        await session.commit()
+
+    calls: list[str] = []
+    statuses = iter(
+        [
+            SyncStatus(backend="git", ahead=0, behind=0, dirty=True),
+            SyncStatus(backend="git", ahead=0, behind=0, dirty=False),
+        ]
+    )
+
+    async def fake_status(self, db):  # noqa: ANN001
+        del db
+        calls.append("status")
+        return next(statuses)
+
+    async def fake_push(self, db, *, progress=None):  # noqa: ANN001
+        del db, progress
+        calls.append("push")
+
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.status", fake_status)
+    monkeypatch.setattr("app.services.sync.git_backend.GitSyncBackend.push", fake_push)
+
+    async with session_mod.async_session() as session:
+        result = await run_scheduled_sync(session)
+
+    assert calls == ["status", "push", "status"]
+    assert result.dirty is False
+
+
+@pytest.mark.asyncio
+async def test_manual_git_push_commits_pending_worktree_changes_before_pushing(
+    client, auth_headers, setup_vault, git_remote_repo
+):
+    repo = Repo.init(setup_vault)
+    with repo.config_writer() as config:
+        config.set_value("user", "name", _TEST_GIT_ACTOR.name)
+        config.set_value("user", "email", _TEST_GIT_ACTOR.email)
+
+    repo.git.checkout("--orphan", "main")
+    note = setup_vault / "note.md"
+    note.write_text("# Initial\n", encoding="utf-8")
+    repo.git.add(A=True)
+    repo.index.commit("seed local", author=_TEST_GIT_ACTOR, committer=_TEST_GIT_ACTOR)
+
+    await _configure_git(client, auth_headers, str(git_remote_repo), branch="main")
+
+    note.write_text("# Updated from web\n", encoding="utf-8")
+
+    resp = await client.post("/api/sync/push", headers=auth_headers)
+    assert resp.status_code == 200
+
+    local_repo = Repo(setup_vault)
+    remote_repo = Repo(git_remote_repo)
+    assert local_repo.head.commit.message == "sync: checkpoint local changes before push"
+    assert remote_repo.git.show("refs/heads/main:note.md").strip() == "# Updated from web"

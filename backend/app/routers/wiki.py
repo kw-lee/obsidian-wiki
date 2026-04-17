@@ -28,15 +28,6 @@ from app.schemas import (
 from app.services import vault
 from app.services.audit import record_audit_log
 from app.services.conflict import three_way_merge
-from app.services.git_ops import (
-    build_git_actor,
-    file_changed_between,
-    git_add_all_and_commit,
-    git_add_and_commit,
-    git_stage_move_and_commit,
-    head_commit_sha,
-    read_file_at_commit,
-)
 from app.services.indexer import full_reindex, index_file
 from app.services.settings import ensure_app_settings
 from app.services.sync_triggers import maybe_enqueue_sync_on_write
@@ -50,14 +41,6 @@ from app.services.wiki_links import (
 )
 
 router = APIRouter()
-
-
-def _git_actor_for_user(user: CurrentUser):
-    return build_git_actor(
-        display_name=user.git_display_name,
-        email=user.git_email,
-        username=user.username,
-    )
 
 
 def _invalid_path(detail: str) -> HTTPException:
@@ -99,6 +82,10 @@ def _normalize_frontmatter(value: object) -> dict:
             return {}
         return decoded if isinstance(decoded, dict) else {}
     return {}
+
+
+def _doc_revision(content: str) -> str:
+    return vault.content_hash(content)
 
 
 def _normalize_snippet(text: str, max_length: int = 160) -> str:
@@ -397,7 +384,7 @@ async def get_doc(
         updated_at=doc.updated_at if doc else None,
         content=content,
         rendered_content=rendered_content,
-        base_commit=head_commit_sha(),
+        base_revision=_doc_revision(content),
         outgoing_links=outgoing_links,
     )
 
@@ -466,25 +453,18 @@ async def save_doc(
     user: CurrentUser = Depends(get_current_user_context),
 ) -> DocDetail:
     _resolve_or_400(path, for_write=True)
-    current_head = head_commit_sha()
 
-    # Conflict check
-    if (
-        body.base_commit
-        and current_head
-        and body.base_commit != current_head
-        and file_changed_between(path, body.base_commit, current_head)
-    ):
-        # Attempt 3-way merge
-        try:
-            base_content = read_file_at_commit(path, body.base_commit)
-        except Exception:
-            base_content = ""
-        try:
-            current_content = await vault.read_doc(path)
-        except ValueError as exc:
-            raise _invalid_path(str(exc)) from exc
-        merged, diff = three_way_merge(base_content, body.content, current_content)
+    try:
+        current_content = await vault.read_doc(path)
+    except ValueError as exc:
+        raise _invalid_path(str(exc)) from exc
+    except FileNotFoundError:
+        current_content = ""
+
+    current_revision = _doc_revision(current_content)
+
+    if body.base_revision and body.base_revision != current_revision:
+        merged, diff = three_way_merge(body.base_content or "", body.content, current_content)
         if merged is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -493,14 +473,8 @@ async def save_doc(
         body.content = merged
 
     await vault.write_doc(path, body.content)
-    commit_sha = git_add_and_commit(
-        [path],
-        f"web: update {path}",
-        actor=_git_actor_for_user(user),
-    )
-
     await index_file(db, path, body.content)
-    await record_audit_log(db, user=user, action="wiki.update", path=path, commit_sha=commit_sha)
+    await record_audit_log(db, user=user, action="wiki.update", path=path, commit_sha=None)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 
@@ -522,14 +496,8 @@ async def create_doc(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Document already exists")
 
     await vault.write_doc(path, body.content)
-    commit_sha = git_add_and_commit(
-        [path],
-        f"web: create {path}",
-        actor=_git_actor_for_user(user),
-    )
-
     await index_file(db, path, body.content)
-    await record_audit_log(db, user=user, action="wiki.create", path=path, commit_sha=commit_sha)
+    await record_audit_log(db, user=user, action="wiki.create", path=path, commit_sha=None)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 
@@ -553,15 +521,8 @@ async def create_folder(
     if full.exists():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Folder already exists")
 
-    placeholder_path = await vault.create_folder(path)
-    commit_sha = git_add_and_commit(
-        [placeholder_path],
-        f"web: create folder {path}",
-        actor=_git_actor_for_user(user),
-    )
-    await record_audit_log(
-        db, user=user, action="wiki.create_folder", path=path, commit_sha=commit_sha
-    )
+    await vault.create_folder(path)
+    await record_audit_log(db, user=user, action="wiki.create_folder", path=path, commit_sha=None)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
     return FolderCreateResponse(path=path)
@@ -615,24 +576,13 @@ async def move_path(
         rewritten_paths, rewritten_links = await _rewrite_links_after_move(
             source_path, moved_path, catalog
         )
-        commit_sha = git_add_all_and_commit(
-            f"web: move {source_path} -> {moved_path}",
-            actor=_git_actor_for_user(user),
-        )
-    else:
-        commit_sha = git_stage_move_and_commit(
-            source_path,
-            moved_path,
-            f"web: move {source_path} -> {moved_path}",
-            actor=_git_actor_for_user(user),
-        )
     await full_reindex(db)
     await record_audit_log(
         db,
         user=user,
         action="wiki.move",
         path=f"{source_path} -> {moved_path}",
-        commit_sha=commit_sha,
+        commit_sha=None,
     )
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
@@ -653,15 +603,10 @@ async def delete_doc(
 ) -> None:
     _resolve_or_400(path, for_write=True)
     await vault.delete_doc(path)
-    commit_sha = git_add_and_commit(
-        [path],
-        f"web: delete {path}",
-        actor=_git_actor_for_user(user),
-    )
 
     await db.execute(sql_delete(Link).where(Link.source_path == path))
     await db.execute(sql_delete(Document).where(Document.path == path))
-    await record_audit_log(db, user=user, action="wiki.delete", path=path, commit_sha=commit_sha)
+    await record_audit_log(db, user=user, action="wiki.delete", path=path, commit_sha=None)
     await db.commit()
     await maybe_enqueue_sync_on_write(request, db)
 

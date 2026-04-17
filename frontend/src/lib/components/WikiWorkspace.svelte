@@ -121,7 +121,7 @@
   );
   const docHistoryKey = $derived(
     doc && isNotePath(doc.path)
-      ? `${doc.path}:${doc.base_commit ?? ""}:${doc.updated_at ?? ""}`
+      ? `${doc.path}:${doc.base_revision ?? ""}:${doc.updated_at ?? ""}`
       : "",
   );
 
@@ -403,10 +403,16 @@
   });
 
   async function handleSave() {
-    if (!doc || !isEditable) return;
+    const currentDoc = doc;
+    if (!currentDoc || !isEditable) return;
     saving = true;
     try {
-      doc = await saveDoc(doc.path, editContent, doc.base_commit);
+      doc = await saveDoc(
+        currentDoc.path,
+        editContent,
+        currentDoc.base_revision,
+        currentDoc.content,
+      );
       editing = false;
       showToast(t("home.saveSuccess"));
     } catch (error) {
@@ -699,7 +705,7 @@
       created_at: null,
       updated_at: null,
       content: "",
-      base_commit: null,
+      base_revision: null,
       outgoing_links: [],
     };
   }

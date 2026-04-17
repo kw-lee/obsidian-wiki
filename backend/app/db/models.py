@@ -211,16 +211,6 @@ class Attachment(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EditSession(Base):
-    __tablename__ = "edit_sessions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    doc_path: Mapped[str] = mapped_column(Text, nullable=False)
-    base_commit: Mapped[str] = mapped_column(Text, nullable=False)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
 class WebDAVManifest(Base):
     __tablename__ = "webdav_manifest"
 

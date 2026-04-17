@@ -26,11 +26,16 @@ export const fetchDocHistory = (path: string, limit = 6) =>
 export const saveDoc = (
   path: string,
   content: string,
-  baseCommit: string | null,
+  baseRevision: string | null,
+  baseContent: string,
 ) =>
   api<DocDetail>(`/wiki/doc/${path}`, {
     method: "PUT",
-    body: JSON.stringify({ content, base_commit: baseCommit }),
+    body: JSON.stringify({
+      content,
+      base_revision: baseRevision,
+      base_content: baseContent,
+    }),
   });
 
 export const createDoc = (path: string, content: string = "") =>

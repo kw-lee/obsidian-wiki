@@ -2,7 +2,7 @@ Bundled font assets
 
 These files are third-party assets.
 
-- They are not relicensed under the repository root `GPL-3.0-only` notice.
+- They are not relicensed under the repository root `MIT` notice.
 - Keep the original upstream copyright and license terms when updating or redistributing them.
 
 - `nanum-square/*`: sourced from the official NanumSquare repository.

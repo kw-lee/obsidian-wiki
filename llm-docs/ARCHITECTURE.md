@@ -219,9 +219,13 @@ Initial account is created from Docker env:
 ### Forced Change on First Login
 - `users` table has a `must_change_credentials: bool` flag
 - Initial account is created with `must_change_credentials=true`
-- On successful login, if the flag is true the token carries a `must_change=true` claim
+- On successful login, the backend returns a short-lived access token and sets the refresh token in an `httpOnly` cookie (`SameSite=Lax`, `Secure` in production)
+- Access tokens are kept in browser session storage rather than `localStorage`; refresh tokens are never exposed to frontend JavaScript
+- If the flag is true the access token carries a `must_change=true` claim
 - Frontend: when it sees `must_change=true` it redirects to the forced credential-change screen and blocks all other routes
-- `POST /api/auth/change-credentials` → updates both username and password → clears the flag → issues new tokens
+- `POST /api/auth/change-credentials` → updates both username and password → clears the flag → issues a new access token and refresh cookie
+- `PUT /api/settings/profile` reissues the access token and refresh cookie after a successful credential change
+- Auth failure counters are rate-limited per client/actor using Redis (with in-process fallback when Redis is unavailable)
 
 ### `users` table
 ```sql

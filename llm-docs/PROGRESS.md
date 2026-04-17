@@ -73,6 +73,8 @@ When multiple people work in parallel, always mark WIP items with an owner to av
 - [x] Frontend tests — API client, wiki API, type contracts (3 added)
 - [x] `llm-docs/DOCKER.md` — Docker build / deployment guide
 - [x] `llm-docs/TESTING.md` — testing guide (backend, frontend, Docker integration)
+- [x] GHCR deployment path — `.github/workflows/publish-ghcr.yml` + `docker-compose.ghcr.yml` + docs
+- [x] Branch policy for human + LLM collaboration documented in `llm-docs/CONVENTIONS.md`
 
 ## Phase 6: Auth Improvements (Docker env seed + forced change)
 
@@ -172,15 +174,15 @@ Reference: see [`llm-docs/SECURITY.md`](SECURITY.md).
 
 ### Planned fixes
 
-- [ ] Move auth away from `localStorage` token storage (`httpOnly` refresh cookie + safer access-token handling)
-- [ ] Redact sync secrets from settings responses and log surfaces
-- [ ] Add SSRF protections for WebDAV / Git remote targets
-- [ ] Enforce write restrictions for `.obsidian/` and `.git/`
-- [ ] Harden attachment upload path, filename, and size validation
+- [x] Move auth away from `localStorage` token storage (`httpOnly` refresh cookie + safer access-token handling)
+- [x] Redact sync secrets from settings responses and log surfaces
+- [x] Add SSRF protections for WebDAV / Git remote targets
+- [x] Enforce write restrictions for `.obsidian/` and `.git/`
+- [x] Harden attachment upload path, filename, and size validation
 - [x] Fail startup on placeholder or missing production secrets
 - [x] Tighten CORS configuration for production
-- [ ] Add auth rate limiting and strengthen password policy
-- [ ] Expand negative/security regression tests
+- [x] Add auth rate limiting and strengthen password policy
+- [x] Expand negative/security regression tests
 
 ## Phase 9: Wiki Navigation & File Viewer Overhaul
 
@@ -350,7 +352,7 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 
 ## Phase 11: Public Repository Readiness
 
-- [x] Align `README.md` / `README.ko.md` for a public-facing repository
+- [x] Align `README.md` / `README.en.md` for a public-facing repository
 - [x] Add an open-source repository license with a third-party asset boundary note
 - [x] Document human + LLM branching strategy in `llm-docs/CONVENTIONS.md`
 - [x] Add direct dependency license notes and a `THIRD_PARTY_NOTICES.md` summary

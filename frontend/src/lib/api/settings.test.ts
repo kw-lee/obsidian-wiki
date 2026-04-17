@@ -45,7 +45,7 @@ describe("Settings API functions", () => {
   });
 
   it("updateProfileSettings sends PUT payload", async () => {
-    mockApi.mockResolvedValueOnce({ access_token: "a", refresh_token: "b" });
+    mockApi.mockResolvedValueOnce({ access_token: "a", username: "writer" });
     await updateProfileSettings({
       current_password: "testpass",
       new_username: "writer",
@@ -241,7 +241,7 @@ describe("Settings API functions", () => {
   });
 
   it("fetchSystemSettings calls the system endpoint", async () => {
-    mockApi.mockResolvedValueOnce({ version: "0.1.0" });
+    mockApi.mockResolvedValueOnce({ version: "0.0.1" });
     await fetchSystemSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/system");
   });

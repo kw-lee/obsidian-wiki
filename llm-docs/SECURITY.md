@@ -1,6 +1,6 @@
 # Security Review
 
-Security review snapshot taken on 2026-04-13 before the next hardening pass.
+Security review snapshot taken on 2026-04-13 and updated on 2026-04-17 after the v0.0.1 hardening pass.
 
 This document tracks:
 - the current risk assessment of the codebase,
@@ -40,82 +40,82 @@ The largest current risks are:
 
 ---
 
+## v0.0.1 Hardening Landed
+
+The following release-blocking items are now implemented:
+
+- Refresh tokens moved out of `localStorage` into an `httpOnly` auth cookie; frontend JavaScript only handles the short-lived access token.
+- Credential-bearing sync URLs are rejected on write and redacted in settings/log responses.
+- Git/WebDAV sync targets now reject private, loopback, link-local, and credential-bearing URLs unless explicitly allowed by config.
+- Vault path policy blocks `.git/` access and `.obsidian/` web writes; attachment uploads validate folder, filename, and size.
+- Production startup fails on placeholder secrets; CORS is explicit in production.
+- Auth endpoints and profile credential changes are rate-limited; new passwords must meet a stronger policy.
+- Security regression coverage now includes cookie transport, sync target validation, path policy, upload validation, and auth throttling.
+
 ## Findings
 
-### 1. Browser tokens are stored in `localStorage`
+### 1. Browser tokens are no longer persisted in `localStorage`
+
+Severity: Mitigated for v0.0.1
+
+Current behavior:
+- refresh tokens are set in an `httpOnly` cookie and are not readable by frontend JavaScript
+- access tokens are kept in browser session storage and rotated through the refresh endpoint
+- XSS impact is reduced because the long-lived refresh token is no longer script-readable
+
+Residual risk:
+- access tokens are still script-readable for the lifetime of the browser tab
+- full cookie-based auth plus CSRF protection would be a further hardening step if the app broadens beyond the current single-user scope
+
+Implemented fix:
+- refresh token moved to an `httpOnly`, `Secure`-in-production, `SameSite=Lax` cookie
+- frontend storage no longer uses `localStorage` for auth tokens
+
+### 2. Sync configuration secret exposure is mitigated
 
 Severity: High
 
 Current behavior:
-- access and refresh tokens are stored in `localStorage`
-- any successful XSS can exfiltrate both tokens
-
-Why this matters:
-- token theft becomes a session takeover
-- refresh token exposure turns short-lived access tokens into a longer-lived compromise
-
-Recommended fix:
-- move the refresh token to an `httpOnly`, `Secure`, `SameSite` cookie
-- preferably keep access tokens in memory only, or also migrate to cookie-based auth
-- add CSRF protection at the same time if cookie auth is introduced
-
-### 2. Sync configuration can leak credentials back to the UI
-
-Severity: High
-
-Current behavior:
-- `git_remote_url` is returned in sync settings responses
-- if an operator pastes an HTTPS remote with embedded credentials or token, the secret is echoed back to the browser
-- logs may also end up containing sync-related error details
+- sync settings responses redact credential-bearing URL components
+- settings writes reject embedded credentials in Git/WebDAV URLs
+- buffered system logs scrub URL credentials before they reach the UI
 
 Why this matters:
 - secrets become visible in the UI, browser devtools, and possibly system log output
 
-Recommended fix:
-- redact credential-bearing URL components in API responses
-- reject or normalize URLs with embedded credentials
-- scrub secrets from sync/log messages before they reach the UI
+Status:
+- implemented for v0.0.1
 
-### 3. WebDAV and Git remote configuration can be used as SSRF pivots
+### 3. WebDAV and Git remote SSRF pivots are guarded
 
 Severity: High
 
 Current behavior:
-- sync settings accept arbitrary remote endpoints
-- `test`, `status`, scheduler, `pull`, and `push` paths cause the backend to connect to the configured remote
-- no allowlist or private-network guard is currently applied
+- sync target validation restricts allowed schemes and rejects localhost, loopback, link-local, and private IP ranges by default
+- a trusted self-hosted deployment can opt out explicitly through `ALLOW_PRIVATE_SYNC_TARGETS`
 
 Why this matters:
 - an attacker with authenticated access, or with stolen tokens, could make the server connect to internal services or metadata endpoints
 
-Recommended fix:
-- restrict allowed URL schemes
-- reject localhost, link-local, loopback, and private IP ranges unless explicitly allowed by configuration
-- consider an explicit `ALLOW_PRIVATE_SYNC_TARGETS` escape hatch for trusted self-hosted deployments
+Status:
+- implemented for v0.0.1
 
-### 4. Filesystem write guards are too weak for `.obsidian/`, `.git/`, and upload paths
+### 4. Filesystem write guards for `.obsidian/`, `.git/`, and uploads are in place
 
 Severity: High
 
 Current behavior:
-- `resolve()` prevents escaping the vault root, which is good
-- however, application-level policy does not currently block writes to sensitive in-vault paths
-- the attachment upload endpoint trusts `folder` and `file.filename`
-- wiki save/create routes do not enforce the documented `.obsidian/` read-only rule
+- vault path resolution blocks `.git/` access and `.obsidian/` writes from web routes
+- attachment uploads validate folder paths, filenames, and hidden targets before writing
+- traversal-style input is mapped to `400`/`404` client errors rather than uncaught server failures
 
 Why this matters:
 - `.obsidian/` can be modified from the web despite the architecture rule saying it is read-only
 - `.git/` contents inside the vault can potentially be overwritten via upload paths
 - this is both a security and integrity risk
 
-Recommended fix:
-- add a central path validator that rejects:
-  - `.obsidian/` writes from web routes
-  - `.git/` reads/writes
-  - absolute paths
-  - empty / dot-only path segments
-  - suspicious upload filenames containing path separators
-- return `400` instead of uncaught `500` errors for traversal attempts
+Status:
+- implemented for v0.0.1
 
 ### 5. CORS is wide open
 
@@ -147,89 +147,80 @@ Recommended fix:
 - fail startup when `JWT_SECRET`, `POSTGRES_PASSWORD`, or bootstrap credentials are missing or still set to placeholder values
 - document exact minimum secret requirements
 
-### 7. Login flow has no brute-force protection
+### 7. Auth endpoints now have brute-force protection
 
 Severity: Medium
 
 Current behavior:
-- no rate limiting, lockout, or backoff is applied on auth endpoints
+- failed attempts on `/api/auth/login`, `/api/auth/refresh`, `/api/auth/change-credentials`, and `/api/settings/profile` are rate-limited
+- counters use Redis when available and fall back to in-process tracking for degraded environments/tests
+- successful auth clears the relevant failure counter
 
 Why this matters:
 - even single-user deployments benefit from basic online guessing protection
 
-Recommended fix:
-- add Redis-backed rate limiting for:
-  - `/api/auth/login`
-  - `/api/auth/refresh`
-  - `/api/auth/change-credentials`
-  - `/api/settings/profile`
+Status:
+- implemented for v0.0.1
 
-### 8. Attachment upload currently lacks size/type policy
+### 8. Attachment upload size/path policy is enforced
 
 Severity: Medium
 
 Current behavior:
-- the backend reads the whole upload into memory
-- there is no file size cap or explicit attachment policy
+- uploads are streamed in chunks to a temporary file
+- a maximum upload size is enforced
+- destination folder and filename validation rejects unsafe paths and hidden targets
 
 Why this matters:
 - large uploads can increase memory pressure
 - non-attachment writes can be abused to corrupt repository state
 
-Recommended fix:
-- stream uploads where possible
-- enforce a maximum upload size
-- restrict upload destinations to approved attachment directories
+Status:
+- implemented for v0.0.1
 
-### 9. Some traversal/error-path tests still tolerate `500`
+### 9. Security regression coverage was expanded
 
 Severity: Low
 
 Current behavior:
-- current tests allow `500` on traversal attempts in some cases
+- regression coverage now includes auth cookie transport, auth throttling, sync target validation/redaction, `.obsidian/` and `.git/` write rejection, and upload validation
 
 Why this matters:
 - this usually means invalid user input is not being mapped cleanly to a client error
 - it also makes regression detection weaker
 
-Recommended fix:
-- tighten tests to require `400`/`404` only where appropriate
-- add negative tests for `.obsidian/`, `.git/`, and encoded traversal attempts
+Residual follow-up:
+- continue adding encoded traversal and broader end-to-end abuse cases as the route surface grows
 
 ---
 
-## Recommended Hardening Order
+## Remaining Follow-up
 
-1. Move refresh tokens out of `localStorage` and redesign auth transport safely.
-2. Redact sync secrets and reject credential-bearing remote URLs.
-3. Add SSRF guards for WebDAV and Git remotes.
-4. Enforce path policy for wiki writes and attachment uploads.
-5. Fail fast on insecure bootstrap configuration.
-6. Tighten CORS and deployment defaults.
-7. Add auth rate limiting and stronger password policy.
-8. Expand security-focused automated tests.
+The highest-signal remaining security follow-ups after the v0.0.1 pass are:
+
+1. Consider full cookie-based auth plus CSRF protection if the deployment model broadens beyond the current same-origin single-user setup.
+2. Consider stricter attachment type policy if the instance will accept uploads from less-trusted networks.
+3. Keep expanding negative/security regression tests alongside new API surface.
 
 ---
 
-## Test Coverage To Add
+## Test Coverage Landed
 
-- auth token storage / cookie transport tests
-- secret redaction tests for sync settings and system logs
-- SSRF guard tests for private, loopback, and link-local sync targets
+- auth cookie transport and refresh flow tests
+- secret redaction tests for sync settings and buffered system logs
+- SSRF guard tests for private and credential-bearing sync targets
 - `.obsidian/` and `.git/` write rejection tests
-- upload filename and folder validation tests
-- traversal tests using encoded paths and nested separators
+- upload filename, folder, and max-size validation tests
 - startup validation tests for placeholder secrets
-- login rate-limit tests
+- auth/profile rate-limit tests
 
 ---
 
-## Deployment Guidance Before Hardening Lands
+## Deployment Guidance
 
-Until the code changes below are implemented:
-- keep the repository private
-- do not store credentials inside `git_remote_url`
-- prefer SSH remotes over token-in-URL HTTPS remotes
+- keep `CORS_ALLOWED_ORIGINS` explicit in production
+- prefer HTTPS in production so the refresh cookie is sent with the `Secure` flag
+- do not store credentials inside `git_remote_url`; use SSH remotes or password fields instead
 - do not expose backend, DB, or Redis ports publicly
+- keep `ALLOW_PRIVATE_SYNC_TARGETS=false` unless you intentionally need self-hosted/private remotes
 - use a strong `.env` and verify all placeholder values are replaced
-- treat browser XSS as session compromise because tokens are currently script-readable

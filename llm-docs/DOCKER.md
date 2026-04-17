@@ -24,6 +24,58 @@ make up
 
 Open `http://localhost` in a browser.
 
+## Deployment Modes
+
+### 1. Source build on the server
+
+Use the default compose file when the server can clone the repository and build images locally.
+
+```bash
+git clone https://github.com/<owner>/obsidian-wiki.git
+cd obsidian-wiki
+cp .env.example .env
+docker compose build
+docker compose up -d
+```
+
+### 2. Prebuilt app images from GHCR
+
+Use GHCR when you do not want to build `backend` and `frontend` on the server.
+
+This repository ships:
+
+- `.github/workflows/publish-ghcr.yml` — builds and pushes `backend` / `frontend` to `ghcr.io`
+- `docker-compose.ghcr.yml` — overrides app services from local `build:` to prebuilt `image:`
+
+Recommended image names:
+
+```text
+ghcr.io/<owner>/obsidian-wiki-backend:latest
+ghcr.io/<owner>/obsidian-wiki-frontend:latest
+```
+
+Add these to `.env` on the server:
+
+```ini
+BACKEND_IMAGE=ghcr.io/<owner>/obsidian-wiki-backend:latest
+FRONTEND_IMAGE=ghcr.io/<owner>/obsidian-wiki-frontend:latest
+```
+
+Then deploy with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+```
+
+If the GHCR package is private, log in first:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-username> --password-stdin
+```
+
+`GHCR_TOKEN` should be a GitHub token with package read permission.
+
 ## Architecture
 
 ```
@@ -114,14 +166,17 @@ make prune   # Docker system prune
 | `DATABASE_URL` | SQLAlchemy connection string | (auto-generated) |
 | `REDIS_URL` | Redis connection | `redis://redis:6379/0` |
 | `JWT_SECRET` | JWT signing key | (must change) |
-| `ADMIN_USERNAME` | Admin username | `admin` |
-| `ADMIN_PASSWORD_HASH` | bcrypt hash | (must change) |
-| `GIT_REMOTE_URL` | Vault Git remote | (required) |
-| `GIT_BRANCH` | Git branch | `main` |
-| `GIT_SYNC_INTERVAL_SECONDS` | Sync interval (seconds) | `300` |
+| `INIT_ADMIN_USERNAME` | Initial admin username | `admin` |
+| `INIT_ADMIN_PASSWORD` | Initial admin password | (must change) |
+| `APP_ENV` | Runtime environment | `development` |
+| `CORS_ALLOWED_ORIGINS` | Allowed browser origins | (empty) |
+| `APP_TIMEZONE` | App / container timezone | `Asia/Seoul` |
 | `VAULT_LOCAL_PATH` | Vault path inside container | `/data/vault` |
+| `WEB_PORT` | Host port (nginx entrypoint) | `80` |
 | `BACKEND_PORT` | Host port (backend) | `8000` |
 | `FRONTEND_PORT` | Host port (frontend) | `3000` |
+| `BACKEND_IMAGE` | Optional GHCR backend image | (unset) |
+| `FRONTEND_IMAGE` | Optional GHCR frontend image | (unset) |
 
 ### Generate Password Hash
 
@@ -151,7 +206,7 @@ make dev
 
 ```bash
 cp .env.example .env
-# Change every secret (JWT_SECRET, ADMIN_PASSWORD_HASH, POSTGRES_PASSWORD)
+# Change every secret (JWT_SECRET, INIT_ADMIN_PASSWORD, POSTGRES_PASSWORD)
 ```
 
 ### 2. HTTPS Setup (optional)
@@ -176,6 +231,14 @@ make up
 make migrate  # DB migrations
 ```
 
+For GHCR-based deployment, replace the build step with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml pull
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.ghcr.yml exec backend alembic upgrade head
+```
+
 ### 4. Verify
 
 ```bash
@@ -184,6 +247,26 @@ curl http://localhost/health  # {"status": "ok"}
 ```
 
 ## Docker Image Details
+
+### GHCR publishing
+
+The GitHub Actions workflow publishes two application images:
+
+- `ghcr.io/<owner>/obsidian-wiki-backend`
+- `ghcr.io/<owner>/obsidian-wiki-frontend`
+
+Publishing triggers:
+
+- push to `main`
+- Git tag matching `v*`
+- manual `workflow_dispatch`
+
+Generated tags include:
+
+- branch name
+- git tag
+- commit SHA
+- `latest` on the default branch
 
 ### Backend (Python 3.12-slim)
 

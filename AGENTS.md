@@ -65,7 +65,7 @@ GET    /api/tags|graph
 - Python: `ruff format` + `ruff check`, type hints 필수
 - TypeScript: strict mode, prettier + prettier-plugin-svelte
 - 커밋: conventional commits (`feat:`, `fix:`, `docs:` ...)
-- 문서 동기화: 기능을 구현하거나 UX/설정/배포/보안 동작을 바꾸면 같은 변경 안에서 `README.md`, `README.ko.md`, `llm-docs/PROGRESS.md`, 그리고 영향받는 `llm-docs/*.md` 를 함께 갱신
+- 문서 동기화: 기능을 구현하거나 UX/설정/배포/보안 동작을 바꾸면 같은 변경 안에서 `README.md`, `README.en.md`, `llm-docs/PROGRESS.md`, 그리고 영향받는 `llm-docs/*.md` 를 함께 갱신
 - 에러: FastAPI HTTPException, 프론트 toast
 - 환경변수: `.env` → `config.py` (pydantic-settings)
 

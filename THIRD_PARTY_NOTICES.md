@@ -10,7 +10,7 @@ This file summarizes the direct dependencies and bundled third-party assets inte
 
 - The direct dependencies reviewed here are permissively licensed: `MIT`, `Apache-2.0`, `BSD-3-Clause`, or `ISC`.
 - No `GPL`, `LGPL`, or `AGPL` copyleft license was found in this direct-dependency review.
-- Bundled font assets are not relicensed under the repository root `GPL-3.0-only` notice and keep their upstream terms.
+- Bundled font assets are not relicensed under the repository root `MIT` notice and keep their upstream terms.
 
 ## Frontend Direct Dependencies
 
@@ -70,7 +70,7 @@ This file summarizes the direct dependencies and bundled third-party assets inte
 
 ## Practical Guidance
 
-- The project's own source code is licensed under `GPL-3.0-only`; that choice does not require the permissively licensed dependencies above to change their own licenses.
+- The project's own source code is licensed under `MIT`; that choice does not require the permissively licensed dependencies above to change their own licenses.
 - What matters is compliance with each upstream license when you redistribute copies, Docker images, build artifacts, or bundled assets that include them.
 - If you later vendor source code or add new bundled binary assets, re-check whether extra notice files or attribution text are required.
 

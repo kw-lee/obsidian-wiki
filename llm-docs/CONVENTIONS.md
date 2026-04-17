@@ -30,7 +30,7 @@
 ### Branches & Commits
 - Commit per phase or per meaningful feature unit
 - Verify `ruff check` / `svelte-check` / lints pass before committing
-- Update `README.md` and `README.ko.md` in the same commit when a user-visible feature, setup flow, supported integration, or UX behavior changes
+- Update `README.md` and `README.en.md` in the same commit when a user-visible feature, setup flow, supported integration, or UX behavior changes
 - Update `llm-docs/PROGRESS.md` with completed items in the same commit
 - Update the relevant design/ops docs in the same commit when behavior changes their scope:
   - `llm-docs/ARCHITECTURE.md` for routing, data flow, sync, storage, or UI-shell behavior
@@ -40,17 +40,23 @@
 
 ### Branching Strategy for Human + LLM Collaboration
 - `main` stays releasable. Do not leave partial experiments, scratch prompts, or unrelated fixes stacked together there.
+- Treat `main` as a protected release branch for both humans and LLM agents. Day-to-day work should happen on a separate short-lived branch and merge back only after the branch is coherent.
 - Start each task from the latest `main` and use a short-lived branch with a clear prefix:
   - `feat/<area>-<summary>`
   - `fix/<area>-<summary>`
   - `docs/<summary>`
   - `chore/<summary>`
+- Unless the task is "cut a release" or "merge a reviewed branch", do not commit directly on `main`.
 - Keep one branch focused on one reviewable goal. If backend, frontend, tests, and docs all belong to the same behavior change, keep them together in one branch. If the work is unrelated, split it.
 - When multiple humans or LLM agents work in parallel, give each branch a single owner and a disjoint write scope whenever possible.
 - If parallel work still needs one shared delivery target, merge the smaller branches into an integration branch only after each branch is locally coherent and passes its relevant checks.
 - Rebase or merge from `main` before large edits, before opening a PR, and again before final merge if the branch lived longer than a short session.
 - Avoid long-lived `llm/*` catch-all branches. Use a scoped `spike/<summary>` branch for disposable exploration, then either close it or squash only the useful result into a normal feature/fix/docs branch.
 - Land code, tests, docs, and config updates in the same branch when they describe the same behavior change, so an LLM handoff never depends on out-of-band context.
+
+### Release Tagging
+- Use semantic version tags such as `v0.0.1`, `v0.1.0`, or `v1.0.0` on reviewed `main` commits only.
+- Create the release tag after the matching docs and deployment metadata are already merged into `main`.
 
 ### Commit Messages
 Conventional commits: `feat|fix|docs|style|refactor|test|chore|build|ci|perf`

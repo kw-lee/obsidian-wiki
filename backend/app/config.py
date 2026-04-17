@@ -1,9 +1,10 @@
 import json
+from typing import Annotated
 from typing import Any
 from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, NoDecode
 
 _PRODUCTION_ENVS = {"prod", "production"}
 _DEV_CORS_ALLOWED_ORIGINS = [
@@ -47,7 +48,9 @@ class Settings(BaseSettings):
     init_admin_password: str = "changeme"
     app_timezone: str = Field(default="Asia/Seoul", alias="APP_TIMEZONE")
     allow_private_sync_targets: bool = Field(default=False, alias="ALLOW_PRIVATE_SYNC_TARGETS")
-    cors_allowed_origins: list[str] = Field(default_factory=list, alias="CORS_ALLOWED_ORIGINS")
+    cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, alias="CORS_ALLOWED_ORIGINS"
+    )
     auth_rate_limit_window_seconds: int = Field(default=300, alias="AUTH_RATE_LIMIT_WINDOW_SECONDS")
     auth_rate_limit_max_attempts: int = Field(default=10, alias="AUTH_RATE_LIMIT_MAX_ATTEMPTS")
     auth_password_min_length: int = Field(default=12, alias="AUTH_PASSWORD_MIN_LENGTH")

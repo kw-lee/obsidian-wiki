@@ -608,7 +608,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     async def fake_redis_ping():
         return False, "Connection refused"
 
-    monkeypatch.setattr("app.routers.settings.get_app_version", lambda: "0.0.1")
+    monkeypatch.setattr("app.routers.settings.get_app_version", lambda: "0.0.2")
     monkeypatch.setattr("app.routers.settings.get_process_started_at", lambda: started_at)
     monkeypatch.setattr("app.routers.settings.ping_database", fake_database_ping)
     monkeypatch.setattr("app.routers.settings.ping_redis", fake_redis_ping)
@@ -627,7 +627,7 @@ async def test_get_system_settings(client, auth_headers, monkeypatch, setup_vaul
     resp = await client.get("/api/settings/system", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["version"] == "0.0.1"
+    assert data["version"] == "0.0.2"
     assert data["started_at"] == "2026-04-13T01:00:00Z"
     assert data["timezone"] == "Asia/Seoul"
     assert data["editor_split_preview_enabled"] is False

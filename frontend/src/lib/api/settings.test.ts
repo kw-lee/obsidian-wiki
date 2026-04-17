@@ -241,7 +241,7 @@ describe("Settings API functions", () => {
   });
 
   it("fetchSystemSettings calls the system endpoint", async () => {
-    mockApi.mockResolvedValueOnce({ version: "0.0.1" });
+    mockApi.mockResolvedValueOnce({ version: "0.0.2" });
     await fetchSystemSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/system");
   });

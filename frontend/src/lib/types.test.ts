@@ -388,7 +388,7 @@ describe("Type contracts", () => {
 
   it("SystemSettings has expected shape", () => {
     const system: SystemSettings = {
-      version: "0.0.1",
+      version: "0.0.2",
       started_at: "2026-04-13T02:00:00Z",
       timezone: "Asia/Seoul",
       editor_split_preview_enabled: true,

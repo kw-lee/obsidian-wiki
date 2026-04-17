@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 
-_DEFAULT_APP_VERSION = "0.0.1"
+_DEFAULT_APP_VERSION = "0.0.2"
 _PROCESS_STARTED_AT = datetime.now(UTC)
 
 

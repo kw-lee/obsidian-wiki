@@ -41,6 +41,10 @@ def test_cors_allowed_origins_accepts_comma_separated_env_values():
     ]
 
 
+def test_cors_allowed_origins_accepts_empty_env_value():
+    assert Settings._parse_cors_allowed_origins("") == []  # noqa: SLF001
+
+
 def test_validate_runtime_settings_rejects_insecure_production_defaults():
     settings = _make_settings(
         app_env="production",

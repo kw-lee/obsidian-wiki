@@ -123,6 +123,7 @@ Bootstrap: seed via `INSERT ... ON CONFLICT DO NOTHING` in the migration. If the
 - `PUT  /api/settings/sync` → save config + reload scheduler; accepts only the fields relevant to the selected backend
 - `POST /api/settings/sync/test` → validate credentials against the configured backend without persisting
 - Existing `POST /api/sync/pull|push`, `GET /api/sync/status` remain but dispatch by active backend
+- Frontend guard: the Sync tab should only rehydrate form state after sync jobs observed in the current page session settle, so stale completed jobs do not overwrite an in-progress backend switch
 
 **Scheduler Integration**
 - The backend `sync scheduler` reads DB values at startup; on config change, an in-process event (`asyncio.Event`) cancels and restarts it with the newly selected backend.

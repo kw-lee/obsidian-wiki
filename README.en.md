@@ -69,7 +69,7 @@ INIT_ADMIN_PASSWORD=...                       # strong password, at least 12 cha
 CORS_ALLOWED_ORIGINS=https://wiki.example.com # comma-separated if multiple origins
 ```
 
-Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
+Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. The settings form now rehydrates from the server only after sync jobs observed in the current page session, so an older completed job cannot silently snap an in-progress WebDAV form back to the saved Git configuration. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
 
 ### 2. Point to GHCR Images
 

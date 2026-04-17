@@ -11,6 +11,10 @@
     getSyncMonitor,
     isSyncJobActive,
   } from "$lib/stores/sync.svelte";
+  import {
+    shouldRefreshSyncSettingsAfterJob,
+    trackSyncSettingsRefreshTarget,
+  } from "$lib/utils/sync-settings-refresh";
   import type {
     SyncBackend,
     SyncJob,
@@ -44,6 +48,7 @@
   let error = $state("");
   let success = $state("");
   let lastSettledJobId = $state<string | null>(null);
+  let trackedRefreshJobId = $state<string | null>(null);
   const syncMonitor = getSyncMonitor();
   const hasActiveSyncJob = $derived(isSyncJobActive(syncMonitor.currentJob));
   const recentSyncJobs = $derived.by(() =>
@@ -57,13 +62,15 @@
   });
 
   $effect(() => {
+    trackedRefreshJobId = trackSyncSettingsRefreshTarget(
+      trackedRefreshJobId,
+      syncMonitor.currentJob,
+    );
+  });
+
+  $effect(() => {
     const job = syncMonitor.currentJob;
-    if (
-      !job ||
-      isSyncJobActive(job) ||
-      !job.finished_at ||
-      lastSettledJobId === job.id
-    )
+    if (!shouldRefreshSyncSettingsAfterJob(job, trackedRefreshJobId, lastSettledJobId))
       return;
     lastSettledJobId = job.id;
     void loadSettings(false);
@@ -142,7 +149,8 @@
     error = "";
     success = "";
     try {
-      await enqueueSyncJob({ action: kind });
+      const job = await enqueueSyncJob({ action: kind });
+      trackedRefreshJobId = job.id;
       success = t(
         kind === "pull"
           ? "sync.jobPullStarted"
@@ -170,10 +178,11 @@
     error = "";
     success = "";
     try {
-      await enqueueSyncJob({
+      const job = await enqueueSyncJob({
         action: "bootstrap",
         bootstrap_strategy: strategy,
       });
+      trackedRefreshJobId = job.id;
       success = t(
         strategy === "remote"
           ? "sync.jobBootstrapRemoteStarted"

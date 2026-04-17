@@ -69,7 +69,7 @@ INIT_ADMIN_PASSWORD=...                       # 12자 이상 강한 값
 CORS_ALLOWED_ORIGINS=https://wiki.example.com # 쉼표로 여러 origin 지정 가능
 ```
 
-동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 여기서 Git / WebDAV / 비활성화 중 하나를 고르고, 연결 테스트와 수동 pull/push, sync 상태 확인까지 할 수 있습니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 Git 초기값만 시드할 수 있습니다. 서버 기본 테마와 언어 관련 기본 동작은 **`/settings/appearance`** 에서, 상태 확인과 인덱스 재생성은 **`/settings/vault`** / **`/settings/system`** 에서 관리합니다.
+동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 여기서 Git / WebDAV / 비활성화 중 하나를 고르고, 연결 테스트와 수동 pull/push, sync 상태 확인까지 할 수 있습니다. 설정 폼은 사용자가 현재 페이지에서 직접 시작한 sync 작업이 끝났을 때만 서버 상태로 다시 새로고침되므로, 예전에 끝난 작업 때문에 작성 중이던 WebDAV 입력값이 Git 설정으로 덮어써지지 않습니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 Git 초기값만 시드할 수 있습니다. 서버 기본 테마와 언어 관련 기본 동작은 **`/settings/appearance`** 에서, 상태 확인과 인덱스 재생성은 **`/settings/vault`** / **`/settings/system`** 에서 관리합니다.
 
 ### 2. GHCR 이미지 지정
 

@@ -147,6 +147,7 @@ Design: see [`llm-docs/SETTINGS.md`](SETTINGS.md) §3.2.c and [`llm-docs/ARCHITE
 - [x] "Test connection" button + result toast
 - [x] Warning modal when switching active backend (no data migration)
 - [x] Conditional rendering based on `sync_backend` selection
+- [x] Guard Sync settings rehydration so stale completed jobs cannot flip an in-progress WebDAV form back to Git
 
 ### Phase 7-2: Follow-up
 

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { api, clearTokens, fetchApiResource, setTokens } from "./client";
+import {
+  api,
+  ApiError,
+  clearTokens,
+  fetchApiResource,
+  setTokens,
+} from "./client";
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -123,6 +129,30 @@ describe("api()", () => {
     await expect(api("/sync/pull", { method: "POST" })).rejects.toThrow(
       "WebDAV pull conflict: note.md",
     );
+  });
+
+  it("preserves structured error metadata", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      statusText: "Conflict",
+      json: async () => ({
+        detail: {
+          message: "Merge conflict",
+          diff: "@@ -1 +1 @@",
+        },
+      }),
+    });
+
+    try {
+      await api("/wiki/doc/note.md", { method: "PUT", body: "{}" });
+      expect.unreachable("api() should throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(409);
+      expect((error as ApiError).diff).toBe("@@ -1 +1 @@");
+      expect((error as ApiError).message).toBe("Merge conflict");
+    }
   });
 
   it("attempts token refresh on 401", async () => {

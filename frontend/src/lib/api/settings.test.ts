@@ -207,6 +207,7 @@ describe("Settings API functions", () => {
       dataview_show_source: false,
       folder_note_enabled: false,
       templater_enabled: false,
+      katex_enabled: true,
     });
     await fetchPluginSettings();
     expect(mockApi).toHaveBeenCalledWith("/settings/plugin");
@@ -218,12 +219,14 @@ describe("Settings API functions", () => {
       dataview_show_source: true,
       folder_note_enabled: true,
       templater_enabled: true,
+      katex_enabled: false,
     });
     await updatePluginSettings({
       dataview_enabled: false,
       dataview_show_source: true,
       folder_note_enabled: true,
       templater_enabled: true,
+      katex_enabled: false,
     });
     expect(mockApi).toHaveBeenCalledWith("/settings/plugin", {
       method: "PUT",
@@ -232,6 +235,7 @@ describe("Settings API functions", () => {
         dataview_show_source: true,
         folder_note_enabled: true,
         templater_enabled: true,
+        katex_enabled: false,
       }),
     });
   });

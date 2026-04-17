@@ -184,6 +184,8 @@ The file explorer pane includes lightweight toolbar actions similar to desktop n
 - collapse or expand tree
 - reveal/open current note in the tree
 
+The explorer pane is its own scroll container so long vault trees remain usable on both desktop and mobile while the toolbar stays visible.
+
 Drag-and-drop moves enforce collision prevention and can optionally rewrite affected wiki links after the move.
 
 ### Command Palette Role

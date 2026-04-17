@@ -14,7 +14,7 @@ Self-hosted web wiki for a personal [Obsidian](https://obsidian.md) vault. You k
 - **Plugin and format compatibility**: aggregated Tasks view (`/tasks`), static Dataview `LIST/TABLE`, a safe Templater subset, and read-only Excalidraw previews.
 - **Navigation and file viewing**: dedicated `/wiki/...` document routes, internal link/embed resolution, create-note CTA for unresolved links, and viewers for images, PDFs, audio, video, and other attachments.
 - **Workspace UX**: CodeMirror 6 editor, optional split preview, backlinks/frontlinks/outline panel, graph view, global sync indicator, command palette (`Cmd+P`), and Quick Switcher (`Cmd+K`) in an Obsidian-like shell.
-- **File management**: explorer toolbar actions (new note/folder, sort, expand/collapse, reveal current note), drag-and-drop moves, and optional wikilink rewriting on move.
+- **File management**: explorer toolbar actions (new note/folder, sort, expand/collapse, reveal current note), independent explorer scrolling on desktop/mobile, drag-and-drop moves, and optional wikilink rewriting on move.
 - **Admin UI**: forced credential change after first login, `/settings/profile|sync|vault|appearance|system`, server default theme presets, and Korean/English UI switching.
 - **Search**: hybrid PostgreSQL `tsvector` + `pg_trgm` search (Korean/English), with graph, link panels, and command palette sharing the same routing model.
 

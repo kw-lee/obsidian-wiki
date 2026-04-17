@@ -287,6 +287,7 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 - [ ] Restructure the left workspace to match an Obsidian-like shell: icon rail, file-explorer pane, and contextual right panel
 - [ ] Define the sidebar information architecture: vault tree, favorites/recent, tags, sync status shortcut, create note/folder actions
 - [x] Add file-explorer toolbar actions such as new note, new folder, sort, collapse/expand all, and reveal current note
+- [x] Make the file explorer pane independently scrollable on desktop/mobile while keeping the toolbar visible
 - [ ] Improve selected-state, hover, drag target, and empty-folder states
 - [ ] Decide which left-rail icons/actions are core for MVP (files, graph, calendar/tasks, bookmarks, recents/history, settings shortcut)
 - [x] Add persistence for sidebar open/closed state and expanded folders

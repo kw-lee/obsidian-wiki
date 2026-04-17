@@ -244,8 +244,15 @@
 <style>
   .explorer {
     display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    flex: 1;
     gap: 0.55rem;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0 0.65rem 0.65rem;
+    -webkit-overflow-scrolling: touch;
   }
 
   .toolbar {

@@ -10,6 +10,29 @@ type ErrorPayload = {
   diff?: unknown;
 };
 
+export class ApiError extends Error {
+  status: number;
+  statusText: string;
+  detail: unknown;
+  diff: string | null;
+
+  constructor(params: {
+    message: string;
+    status: number;
+    statusText: string;
+    detail: unknown;
+    diff?: string | null;
+  }) {
+    super(params.message);
+    this.name = "ApiError";
+    this.status = params.status;
+    this.statusText = params.statusText;
+    this.detail = params.detail;
+    this.diff = params.diff ?? null;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");
@@ -117,6 +140,21 @@ function formatErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function extractErrorDiff(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const data = payload as ErrorPayload;
+  if (typeof data.diff === "string" && data.diff) {
+    return data.diff;
+  }
+  if (data.detail && typeof data.detail === "object") {
+    return extractErrorDiff(data.detail);
+  }
+  return null;
+}
+
 export async function api<T = unknown>(
   path: string,
   options: FetchOptions = {},
@@ -126,7 +164,13 @@ export async function api<T = unknown>(
 
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(formatErrorMessage(detail, res.statusText));
+    throw new ApiError({
+      message: formatErrorMessage(detail, res.statusText),
+      status: res.status,
+      statusText: res.statusText,
+      detail,
+      diff: extractErrorDiff(detail),
+    });
   }
 
   if (res.status === 204) return undefined as T;
@@ -141,7 +185,13 @@ export async function fetchApiResource(
   const res = await performAuthorizedFetch(url, options);
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(formatErrorMessage(detail, res.statusText));
+    throw new ApiError({
+      message: formatErrorMessage(detail, res.statusText),
+      status: res.status,
+      statusText: res.statusText,
+      detail,
+      diff: extractErrorDiff(detail),
+    });
   }
   return res;
 }

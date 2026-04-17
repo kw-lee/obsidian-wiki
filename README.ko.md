@@ -14,7 +14,7 @@
 - **플러그인/포맷 호환**: Tasks 집계(`/tasks`), Dataview 정적 `LIST/TABLE`, Templater 안전 서브셋, Excalidraw 읽기 전용 미리보기를 지원합니다.
 - **탐색과 파일 보기**: 전용 `/wiki/...` 문서 경로, 내부 링크/임베드 해석, 미해결 링크의 새 문서 생성 CTA, 이미지/PDF/오디오/비디오/기타 첨부 뷰어를 제공합니다.
 - **작업공간 UX**: CodeMirror 6 편집기, 선택형 split preview, 백링크/앞링크/목차 패널, 그래프 뷰, 글로벌 sync indicator, 커맨드 팔레트(⌘P), Quick Switcher(⌘K)를 갖춘 Obsidian 스타일 레이아웃입니다.
-- **파일 관리**: 탐색기 툴바(새 문서/폴더, 정렬, 펼치기/접기, 현재 문서 reveal), 드래그 앤 드롭 이동, 이동 시 위키링크 재작성 옵션을 지원합니다.
+- **파일 관리**: 탐색기 툴바(새 문서/폴더, 정렬, 펼치기/접기, 현재 문서 reveal), 데스크톱/모바일 독립 스크롤, 드래그 앤 드롭 이동, 이동 시 위키링크 재작성 옵션을 지원합니다.
 - **관리 UI**: 첫 로그인 후 강제 credential 변경, `/settings/profile|sync|vault|appearance|system` 관리 화면, 서버 기본 테마 프리셋, 한국어/영어 UI 전환을 제공합니다.
 - **검색**: PostgreSQL `tsvector` + `pg_trgm` 하이브리드 검색(한/영)과 그래프/링크 패널/명령 팔레트가 같은 문서 라우팅 모델을 공유합니다.
 

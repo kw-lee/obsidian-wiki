@@ -544,6 +544,7 @@ async def get_plugin_settings(
         dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
+        katex_enabled=row.katex_enabled,
     )
 
 
@@ -558,6 +559,7 @@ async def update_plugin_settings(
     row.dataview_show_source = body.dataview_show_source
     row.folder_note_enabled = body.folder_note_enabled
     row.templater_enabled = body.templater_enabled
+    row.katex_enabled = body.katex_enabled
     await db.commit()
     invalidate_settings_cache()
     return PluginSettingsResponse(
@@ -565,6 +567,7 @@ async def update_plugin_settings(
         dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
+        katex_enabled=row.katex_enabled,
     )
 
 

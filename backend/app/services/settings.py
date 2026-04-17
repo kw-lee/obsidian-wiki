@@ -36,6 +36,7 @@ class SyncRuntimeSettings:
     dataview_show_source: bool
     folder_note_enabled: bool
     templater_enabled: bool
+    katex_enabled: bool
 
 
 _settings_cache: SyncRuntimeSettings | None = None
@@ -69,6 +70,7 @@ def _to_runtime_snapshot(row: AppSettings) -> SyncRuntimeSettings:
         dataview_show_source=row.dataview_show_source,
         folder_note_enabled=row.folder_note_enabled,
         templater_enabled=row.templater_enabled,
+        katex_enabled=row.katex_enabled,
     )
 
 
@@ -104,6 +106,7 @@ async def ensure_app_settings(db: AsyncSession) -> AppSettings:
         dataview_show_source=False,
         folder_note_enabled=False,
         templater_enabled=False,
+        katex_enabled=True,
     )
     db.add(row)
     await db.commit()

@@ -8,8 +8,11 @@
     buildResolvedLinkLookup,
     consumeResolvedLink,
     extractMarkdownPreviewText,
+    renderKatexExpression,
     renderResolvedWikiMarkup,
     stripYamlFrontmatter,
+    tokenizeBlockMath,
+    tokenizeInlineMath,
   } from "$lib/utils/markdown";
   import { buildAttachmentApiPath, getViewerKind } from "$lib/utils/routes";
   import DataviewBlock from "./DataviewBlock.svelte";
@@ -22,6 +25,7 @@
     links = [],
     dataviewEnabled = true,
     dataviewShowSource = false,
+    katexEnabled = true,
     onnavigate,
   }: {
     path: string;
@@ -29,6 +33,7 @@
     links?: ResolvedWikiLink[];
     dataviewEnabled?: boolean;
     dataviewShowSource?: boolean;
+    katexEnabled?: boolean;
     onnavigate: (path: string) => void;
   } = $props();
 
@@ -125,8 +130,60 @@
   function renderMarkdown(source: string) {
     const marked = new Marked();
     const lookup = buildResolvedLinkLookup(links);
+    const extensions = [];
+
+    if (katexEnabled) {
+      extensions.push(
+        {
+          name: "mathBlock",
+          level: "block",
+          start(src: string) {
+            return src.indexOf("$$");
+          },
+          tokenizer(src: string) {
+            const match = tokenizeBlockMath(src);
+            if (match) {
+              return {
+                type: "mathBlock",
+                raw: match.raw,
+                text: match.text,
+              };
+            }
+            return undefined;
+          },
+          renderer(token: unknown) {
+            const t = token as Record<string, string>;
+            return renderKatexExpression(String(t.text ?? ""), true);
+          },
+        },
+        {
+          name: "mathInline",
+          level: "inline",
+          start(src: string) {
+            return src.indexOf("$");
+          },
+          tokenizer(src: string) {
+            const match = tokenizeInlineMath(src);
+            if (match) {
+              return {
+                type: "mathInline",
+                raw: match.raw,
+                text: match.text,
+              };
+            }
+            return undefined;
+          },
+          renderer(token: unknown) {
+            const t = token as Record<string, string>;
+            return renderKatexExpression(String(t.text ?? ""), false);
+          },
+        },
+      );
+    }
+
     marked.use({
       extensions: [
+        ...extensions,
         {
           name: "wikilink",
           level: "inline",
@@ -667,6 +724,24 @@
     background: var(--bg-tertiary);
     padding: 0.15rem 0.35rem;
     border-radius: 3px;
+  }
+  .markdown-body :global(.katex) {
+    font-size: 1.02em;
+  }
+  .markdown-body :global(.katex-display) {
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin: 0.85rem 0;
+    padding: 0.35rem 0;
+  }
+  .markdown-body :global(.katex-fallback) {
+    color: var(--warning);
+    font-family: var(--font-editor);
+    white-space: pre-wrap;
+  }
+  .markdown-body :global(.katex-fallback.block) {
+    display: block;
+    margin: 0.85rem 0;
   }
   .markdown-body :global(blockquote) {
     border-left: 3px solid var(--accent);

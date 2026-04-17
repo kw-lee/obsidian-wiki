@@ -1,3 +1,5 @@
+@import "katex/dist/katex.min.css";
+
 @font-face {
   font-family: "NanumSquare";
   font-style: normal;

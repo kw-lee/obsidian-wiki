@@ -178,6 +178,23 @@ export const messages: Record<Locale, Record<string, string>> = {
     "workspace.historyAction.move": "경로 이동",
     "workspace.historyAction.createFolder": "폴더 생성",
     "workspace.historyAction.upload": "첨부 업로드",
+    "workspace.saveConflictTitle": "저장 충돌",
+    "workspace.saveConflictDescription":
+      "다른 변경이 먼저 저장되어 현재 초안을 바로 저장할 수 없습니다.",
+    "workspace.saveConflictDiff": "충돌 diff",
+    "workspace.saveConflictNoDiff":
+      "자동 병합에 필요한 diff를 만들 수 없었습니다. 최신 버전을 다시 불러온 뒤 필요한 내용을 다시 반영해주세요.",
+    "workspace.saveConflictHelp":
+      "현재 초안은 그대로 유지됩니다. diff를 참고해 수동으로 반영하거나 최신 버전을 다시 불러오세요.",
+    "workspace.saveConflictContinue": "계속 편집",
+    "workspace.saveConflictReload": "최신 버전 불러오기",
+    "workspace.saveConflictReloading": "최신 버전 불러오는 중...",
+    "workspace.saveConflictReloaded":
+      "최신 버전을 불러왔습니다. 필요한 변경은 다시 반영해주세요.",
+    "workspace.saveConflictReloadFailed":
+      "최신 버전을 불러오지 못했습니다.",
+    "workspace.saveConflictDraftKept":
+      "현재 초안을 유지했습니다. 다시 저장하려면 최신 버전을 먼저 확인해주세요.",
     "settings.title": "관리자 설정",
     "settings.backToWiki": "← Wiki로 돌아가기",
     "settings.description": "런타임 설정과 계정 정보를 여기서 관리합니다.",
@@ -410,7 +427,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.saveFailed": "플러그인 설정 저장에 실패했습니다.",
     "plugin.summaryTitle": "활성화된 호환 기능",
     "plugin.summaryDescription":
-      "Dataview, Templater, Folder Note처럼 웹에서 흉내 내는 기능을 한곳에서 관리합니다.",
+      "Dataview, Templater, Folder Note, KaTeX처럼 웹에서 흉내 내는 기능을 한곳에서 관리합니다.",
     "plugin.enabledCount": "{count}개 사용 중",
     "plugin.upstream": "Upstream 보기",
     "plugin.dataview.title": "Dataview",
@@ -440,6 +457,14 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.folderNote.limits":
       "대응 노트가 없는 폴더는 기존처럼 디렉터리만 펼쳐집니다.",
     "plugin.folderNote.toggle": "Folder Note 호환 모드 사용",
+    "plugin.katex.title": "LaTeX / KaTeX",
+    "plugin.katex.description":
+      "문서 안의 `$...$`, `$$...$$` 수식 구문을 KaTeX로 렌더링합니다.",
+    "plugin.katex.supportedSubset":
+      "Obsidian에서 자주 쓰는 인라인/블록 수식 표기를 브라우저에서 빠르게 표시합니다.",
+    "plugin.katex.limits":
+      "MathJax 전용 확장이나 매우 복잡한 매크로 설정은 그대로 보이거나 일부만 렌더링될 수 있습니다.",
+    "plugin.katex.toggle": "KaTeX 수식 렌더링 사용",
     "system.title": "서버 상태",
     "system.description":
       "애플리케이션 버전, 의존 서비스 연결 상태, 로컬 vault git 상태를 확인합니다.",
@@ -807,6 +832,23 @@ export const messages: Record<Locale, Record<string, string>> = {
     "workspace.historyAction.move": "Moved path",
     "workspace.historyAction.createFolder": "Created folder",
     "workspace.historyAction.upload": "Uploaded attachment",
+    "workspace.saveConflictTitle": "Save conflict",
+    "workspace.saveConflictDescription":
+      "Another change was saved first, so this draft cannot be written immediately.",
+    "workspace.saveConflictDiff": "Conflict diff",
+    "workspace.saveConflictNoDiff":
+      "No diff was available for automatic merging. Reload the latest version, then re-apply the changes you still need.",
+    "workspace.saveConflictHelp":
+      "Your current draft stays in the editor. Review the diff or reload the latest version before saving again.",
+    "workspace.saveConflictContinue": "Keep editing",
+    "workspace.saveConflictReload": "Reload latest version",
+    "workspace.saveConflictReloading": "Reloading latest version...",
+    "workspace.saveConflictReloaded":
+      "Reloaded the latest version. Re-apply any changes you still want to keep.",
+    "workspace.saveConflictReloadFailed":
+      "Failed to reload the latest version.",
+    "workspace.saveConflictDraftKept":
+      "Kept the current draft. Check the latest version before saving again.",
     "settings.title": "Admin Settings",
     "settings.backToWiki": "← Back to Wiki",
     "settings.description":
@@ -1041,7 +1083,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.saveFailed": "Failed to save the plugin settings.",
     "plugin.summaryTitle": "Enabled Compatibility Layers",
     "plugin.summaryDescription":
-      "Manage the web-side compatibility features for Dataview, Templater, and Folder Note in one place.",
+      "Manage the web-side compatibility features for Dataview, Templater, Folder Note, and KaTeX in one place.",
     "plugin.enabledCount": "{count} enabled",
     "plugin.upstream": "View upstream",
     "plugin.dataview.title": "Dataview",
@@ -1071,6 +1113,14 @@ export const messages: Record<Locale, Record<string, string>> = {
     "plugin.folderNote.limits":
       "Folders without a matching note keep the default directory behavior.",
     "plugin.folderNote.toggle": "Enable Folder Note compatibility",
+    "plugin.katex.title": "LaTeX / KaTeX",
+    "plugin.katex.description":
+      "Render `$...$` and `$$...$$` math syntax with KaTeX inside note content.",
+    "plugin.katex.supportedSubset":
+      "Covers the inline and display math patterns commonly used in Obsidian notes.",
+    "plugin.katex.limits":
+      "MathJax-only extensions or heavily customized macros may remain raw or render only partially.",
+    "plugin.katex.toggle": "Enable KaTeX math rendering",
     "system.title": "Server Status",
     "system.description":
       "Review the app version, dependency health, and local vault git status.",

@@ -5,6 +5,7 @@
   import type { PluginSettings } from "$lib/types";
 
   const DATAVIEW_REPO_URL = "https://github.com/blacksmithgu/obsidian-dataview";
+  const KATEX_URL = "https://katex.org/";
 
   let pluginSettings = $state<PluginSettings | null>(null);
   let loading = $state(true);
@@ -16,10 +17,12 @@
   let dataviewShowSource = $state(false);
   let folderNoteEnabled = $state(false);
   let templaterEnabled = $state(false);
+  let katexEnabled = $state(true);
 
   const enabledCount = $derived(
-    [dataviewEnabled, folderNoteEnabled, templaterEnabled].filter(Boolean)
-      .length,
+    [dataviewEnabled, folderNoteEnabled, templaterEnabled, katexEnabled].filter(
+      Boolean,
+    ).length,
   );
 
   onMount(async () => {
@@ -40,6 +43,7 @@
       dataviewShowSource = data.dataview_show_source;
       folderNoteEnabled = data.folder_note_enabled;
       templaterEnabled = data.templater_enabled;
+      katexEnabled = data.katex_enabled;
     } catch (err) {
       error = err instanceof Error ? err.message : t("plugin.loadFailed");
     } finally {
@@ -66,6 +70,7 @@
         dataview_show_source: dataviewShowSource,
         folder_note_enabled: folderNoteEnabled,
         templater_enabled: templaterEnabled,
+        katex_enabled: katexEnabled,
       });
       success = t("plugin.saveSuccess");
     } catch (err) {
@@ -174,6 +179,31 @@
         <p class="copy">{t("plugin.folderNote.description")}</p>
         <p class="detail-note">{t("plugin.folderNote.supportedSubset")}</p>
         <p class="detail-note">{t("plugin.folderNote.limits")}</p>
+      </article>
+
+      <article class="plugin-card">
+        <div class="plugin-head">
+          <div>
+            <span>{t("plugin.katex.title")}</span>
+            <strong>{statusLabel(katexEnabled)}</strong>
+          </div>
+          <input
+            type="checkbox"
+            bind:checked={katexEnabled}
+            aria-label={t("plugin.katex.toggle")}
+          />
+        </div>
+        <p class="copy">{t("plugin.katex.description")}</p>
+        <p class="detail-note">{t("plugin.katex.supportedSubset")}</p>
+        <p class="detail-note">{t("plugin.katex.limits")}</p>
+        <a
+          class="plugin-link"
+          href={KATEX_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t("plugin.upstream")}
+        </a>
       </article>
     </div>
 

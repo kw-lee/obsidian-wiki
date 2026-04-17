@@ -14,12 +14,14 @@
     doc,
     dataviewEnabled = true,
     dataviewShowSource = false,
+    katexEnabled = true,
     onnavigate,
   }: {
     path: string;
     doc: DocDetail | null;
     dataviewEnabled?: boolean;
     dataviewShowSource?: boolean;
+    katexEnabled?: boolean;
     onnavigate: (path: string) => void;
   } = $props();
 
@@ -84,6 +86,7 @@
     links={doc.outgoing_links}
     {dataviewEnabled}
     {dataviewShowSource}
+    {katexEnabled}
     {onnavigate}
   />
 {:else}

@@ -4,8 +4,11 @@ import {
   buildResolvedLinkLookup,
   consumeResolvedLink,
   extractMarkdownPreviewText,
+  renderKatexExpression,
   renderResolvedWikiMarkup,
   stripYamlFrontmatter,
+  tokenizeBlockMath,
+  tokenizeInlineMath,
 } from "./markdown";
 
 describe("stripYamlFrontmatter", () => {
@@ -179,5 +182,26 @@ This should be omitted.`,
     ).toBe(true);
     expect(preview).not.toContain("Nothing to see here.");
     expect(preview).not.toContain("This should be omitted.");
+  });
+
+  it("tokenizes inline math expressions", () => {
+    expect(tokenizeInlineMath("$E=mc^2$ then text")).toEqual({
+      raw: "$E=mc^2$",
+      text: "E=mc^2",
+    });
+    expect(tokenizeInlineMath("\\$100")).toBeUndefined();
+  });
+
+  it("tokenizes display math blocks", () => {
+    expect(tokenizeBlockMath("$$\na^2 + b^2 = c^2\n$$\nNext")).toEqual({
+      raw: "$$\na^2 + b^2 = c^2\n$$\n",
+      text: "a^2 + b^2 = c^2",
+    });
+  });
+
+  it("renders katex expressions to html", () => {
+    const html = renderKatexExpression("c = \\pm\\sqrt{a^2 + b^2}", true);
+    expect(html).toContain("katex");
+    expect(html).toContain("sqrt");
   });
 });

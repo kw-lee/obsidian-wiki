@@ -1,3 +1,4 @@
+import katex from "katex";
 import type { ResolvedWikiLink } from "$lib/types";
 import {
   buildAttachmentApiPath,
@@ -8,6 +9,11 @@ import {
 
 const FRONTMATTER_OPENING = /^(?:\ufeff)?---[ \t]*\r?\n/;
 const FRONTMATTER_CLOSING = /^(?:---|\.\.\.)[ \t]*$/;
+
+type MathTokenMatch = {
+  raw: string;
+  text: string;
+};
 
 function isYamlMetadataLine(line: string): boolean {
   const trimmed = line.trim();
@@ -68,6 +74,75 @@ export function buildResolvedLinkLookup(items: ResolvedWikiLink[]) {
     map.set(key, queue);
   }
   return map;
+}
+
+export function tokenizeBlockMath(source: string): MathTokenMatch | undefined {
+  const match = /^\$\$[ \t]*\r?\n?([\s\S]+?)\r?\n?\$\$(?:\r?\n|$)/.exec(source);
+  if (!match) {
+    return undefined;
+  }
+
+  const text = match[1].trim();
+  if (!text) {
+    return undefined;
+  }
+
+  return {
+    raw: match[0],
+    text,
+  };
+}
+
+export function tokenizeInlineMath(source: string): MathTokenMatch | undefined {
+  if (
+    !source.startsWith("$") ||
+    source.startsWith("$$") ||
+    source.startsWith("\\$")
+  ) {
+    return undefined;
+  }
+
+  for (let index = 1; index < source.length; index += 1) {
+    if (source[index] === "\n") {
+      return undefined;
+    }
+
+    if (source[index] !== "$" || isEscaped(source, index)) {
+      continue;
+    }
+
+    const text = source.slice(1, index);
+    if (!text.trim() || /^\s|\s$/.test(text)) {
+      return undefined;
+    }
+
+    return {
+      raw: source.slice(0, index + 1),
+      text,
+    };
+  }
+
+  return undefined;
+}
+
+export function renderKatexExpression(
+  expression: string,
+  displayMode: boolean,
+): string {
+  try {
+    return katex.renderToString(expression, {
+      displayMode,
+      output: "htmlAndMathml",
+      strict: "ignore",
+      throwOnError: false,
+    });
+  } catch {
+    const fallback = escapeHtml(expression);
+    if (displayMode) {
+      return `<div class="katex-fallback block">${fallback}</div>`;
+    }
+    return `<span class="katex-fallback inline">${fallback}</span>`;
+  }
 }
 
 export function consumeResolvedLink(
@@ -291,6 +366,18 @@ function stripMarkdownSyntax(source: string): string {
 
 function collapseWhitespace(source: string): string {
   return source.replace(/\s+/g, " ").trim();
+}
+
+function isEscaped(source: string, index: number) {
+  let slashCount = 0;
+  for (
+    let cursor = index - 1;
+    cursor >= 0 && source[cursor] === "\\";
+    cursor -= 1
+  ) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
 }
 
 function escapeHtml(value: string) {

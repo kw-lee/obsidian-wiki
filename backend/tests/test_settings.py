@@ -494,6 +494,7 @@ async def test_get_plugin_settings(client, auth_headers, setup_vault):
         "dataview_show_source": False,
         "folder_note_enabled": False,
         "templater_enabled": False,
+        "katex_enabled": True,
     }
 
 
@@ -506,6 +507,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
             "dataview_show_source": True,
             "folder_note_enabled": True,
             "templater_enabled": True,
+            "katex_enabled": False,
         },
         headers=auth_headers,
     )
@@ -515,6 +517,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
         "dataview_show_source": True,
         "folder_note_enabled": True,
         "templater_enabled": True,
+        "katex_enabled": False,
     }
 
     read_resp = await client.get("/api/settings/plugin", headers=auth_headers)
@@ -524,6 +527,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
         "dataview_show_source": True,
         "folder_note_enabled": True,
         "templater_enabled": True,
+        "katex_enabled": False,
     }
 
     async with session_mod.async_session() as session:
@@ -533,6 +537,7 @@ async def test_update_plugin_settings_persists_values(client, auth_headers, setu
         assert row.dataview_show_source is True
         assert row.folder_note_enabled is True
         assert row.templater_enabled is True
+        assert row.katex_enabled is False
 
 
 @pytest.mark.asyncio

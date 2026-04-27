@@ -168,7 +168,7 @@
     loadedFingerprint = fingerprintFromSettings(data);
     draftDirty = false;
     statusNotice = isSyncStatusDiagnostic(data.status.message)
-      ? data.status.message
+      ? (data.status.message ?? "")
       : "";
   }
 
@@ -234,7 +234,7 @@
       hydrate(updated, "save");
       success = t("sync.saveSuccess");
       if (isSyncStatusDiagnostic(updated.status.message)) {
-        statusNotice = updated.status.message;
+        statusNotice = updated.status.message ?? "";
       }
     } catch (err) {
       console.error("[sync-settings] Failed to save sync settings.", err, {

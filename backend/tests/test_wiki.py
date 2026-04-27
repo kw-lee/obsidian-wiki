@@ -429,6 +429,32 @@ async def test_move_doc(client, auth_headers, setup_vault):
 
 
 @pytest.mark.asyncio
+async def test_move_doc_reindexes_only_changed_paths(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    _git_init(setup_vault)
+    (setup_vault / "notes").mkdir()
+    (setup_vault / "archive").mkdir()
+    await write_doc("notes/move-me.md", "# Move me")
+
+    changed_calls: list[list[str]] = []
+
+    async def fake_incremental_reindex(db, changed_paths):  # noqa: ANN001
+        changed_calls.append(changed_paths)
+
+    monkeypatch.setattr("app.routers.wiki.incremental_reindex", fake_incremental_reindex)
+
+    resp = await client.post(
+        "/api/wiki/move",
+        json={"source_path": "notes/move-me.md", "destination_path": "archive/move-me.md"},
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    assert changed_calls == [["notes/move-me.md", "archive/move-me.md"]]
+
+
+@pytest.mark.asyncio
 async def test_move_folder_rewrites_wikilinks_when_requested(client, auth_headers, setup_vault):
     _git_init(setup_vault)
     (setup_vault / "notes").mkdir()

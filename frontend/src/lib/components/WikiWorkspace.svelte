@@ -31,7 +31,16 @@
   } from "$lib/types";
   import { findTreeNode, resolveFolderNotePath } from "$lib/utils/folder-notes";
   import { stripYamlFrontmatter } from "$lib/utils/markdown";
-  import { describeMoveToast } from "$lib/utils/move";
+  import {
+    describeMoveToast,
+    moveAttachmentCatalog,
+    moveDocDetail,
+    moveExpandedPaths,
+    moveNoteCatalog,
+    moveOpenTabs,
+    moveTreeNodes,
+    translateMovedPath,
+  } from "$lib/utils/move";
   import {
     resolveRequestedNotePath,
     suggestNewNotePath,
@@ -681,16 +690,20 @@
     rewriteLinks: boolean,
   ) {
     try {
+      const currentSelectedPath = selectedPath;
       const moved = await movePath(sourcePath, destinationPath, rewriteLinks);
-      await refreshVaultCatalog();
+      applyOptimisticMove(sourcePath, moved.path);
+      const refreshPromise = refreshVaultCatalog();
 
       if (
-        selectedPath === sourcePath ||
-        selectedPath.startsWith(`${sourcePath}/`)
+        currentSelectedPath === sourcePath ||
+        currentSelectedPath.startsWith(`${sourcePath}/`)
       ) {
-        const nextPath = `${moved.path}${selectedPath.slice(sourcePath.length)}`;
+        const nextPath = `${moved.path}${currentSelectedPath.slice(sourcePath.length)}`;
         await navigateTo(nextPath);
       }
+
+      void refreshPromise.catch(() => {});
 
       const summary = describeMoveToast(sourcePath, moved.path, moved);
       showToast(t(summary.key, summary.values));
@@ -733,6 +746,32 @@
         toast = "";
       }
     }, 3000);
+  }
+
+  function applyOptimisticMove(sourcePath: string, destinationPath: string) {
+    tree = moveTreeNodes(tree, sourcePath, destinationPath);
+    attachmentCatalog = moveAttachmentCatalog(
+      attachmentCatalog,
+      sourcePath,
+      destinationPath,
+    );
+    noteCatalog = moveNoteCatalog(noteCatalog, sourcePath, destinationPath);
+    openTabs = moveOpenTabs(openTabs, sourcePath, destinationPath);
+    explorerExpandedPaths = moveExpandedPaths(
+      explorerExpandedPaths,
+      sourcePath,
+      destinationPath,
+    );
+    doc = moveDocDetail(doc, sourcePath, destinationPath);
+    selectedPath = translateMovedPath(selectedPath, sourcePath, destinationPath);
+    missingPath = translateMovedPath(missingPath, sourcePath, destinationPath);
+
+    if (saveConflict) {
+      saveConflict = {
+        ...saveConflict,
+        path: translateMovedPath(saveConflict.path, sourcePath, destinationPath),
+      };
+    }
   }
 
   function clearSaveConflict() {

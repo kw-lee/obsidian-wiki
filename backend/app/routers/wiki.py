@@ -33,7 +33,7 @@ from app.schemas import (
 from app.services import vault
 from app.services.audit import record_audit_log
 from app.services.conflict import three_way_merge
-from app.services.indexer import full_reindex, index_file
+from app.services.indexer import incremental_reindex, index_file
 from app.services.settings import ensure_app_settings
 from app.services.sync_triggers import maybe_enqueue_sync_on_write
 from app.services.templater import TemplaterRenderContext, render_template_markdown
@@ -247,6 +247,21 @@ def _reverse_translate_moved_path(path: str, source_root: str, destination_root:
     if path.startswith(destination_prefix):
         return f"{source_root}/{path.removeprefix(destination_prefix)}"
     return path
+
+
+def _collect_indexed_descendant_paths(root) -> list[str]:
+    if root.is_file():
+        return [root.relative_to(vault.vault_path()).as_posix()]
+
+    paths: list[str] = []
+    for child in root.rglob("*"):
+        if not child.is_file():
+            continue
+        relative_parts = child.relative_to(vault.vault_path()).parts
+        if any(part.startswith(".") for part in relative_parts):
+            continue
+        paths.append(child.relative_to(vault.vault_path()).as_posix())
+    return paths
 
 
 def _parse_audit_move_path(raw_path: str) -> tuple[str | None, str | None]:
@@ -756,6 +771,7 @@ async def move_path(
         )
 
     catalog = await load_resolver_catalog(db)
+    source_descendants = _collect_indexed_descendant_paths(source_full)
     moved_path = await vault.move_path(source_path, destination_path)
     rewritten_paths: list[str] = []
     rewritten_links = 0
@@ -763,7 +779,11 @@ async def move_path(
         rewritten_paths, rewritten_links = await _rewrite_links_after_move(
             source_path, moved_path, catalog
         )
-    await full_reindex(db)
+    moved_descendants = [
+        _translate_moved_path(path, source_path, moved_path) for path in source_descendants
+    ]
+    changed_paths = list(dict.fromkeys([*source_descendants, *moved_descendants, *rewritten_paths]))
+    await incremental_reindex(db, changed_paths)
     await record_audit_log(
         db,
         user=user,

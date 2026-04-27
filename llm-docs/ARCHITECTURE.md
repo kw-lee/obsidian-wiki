@@ -186,7 +186,7 @@ The file explorer pane includes lightweight toolbar actions similar to desktop n
 
 The explorer pane is its own scroll container so long vault trees remain usable on both desktop and mobile while the toolbar stays visible.
 
-Drag-and-drop moves enforce collision prevention and can optionally rewrite affected wiki links after the move.
+Drag-and-drop moves enforce collision prevention and can optionally rewrite affected wiki links after the move. The frontend applies an optimistic tree/catalog/tab update immediately after a successful move response so the current document and explorer state do not require a manual browser refresh to catch up.
 
 ### Command Palette Role
 
@@ -207,7 +207,7 @@ Sync state is not buried only in settings. The workspace shell exposes a lightwe
 ## Indexing
 
 - **Full rebuild**: truncate → walk vault `.md`/`.mdx` → extract frontmatter/wikilinks/tags → upsert into DB → invalidate all caches
-- **Incremental**: only changed/deleted files from git pull → refresh tag counts → invalidate affected caches
+- **Incremental**: changed/deleted files from git pull or local move/rename operations → refresh tag counts → invalidate affected caches
 
 ## Authentication Flow
 

@@ -218,6 +218,7 @@ Goal: make Obsidian-style links navigable in the web UI, handle note-vs-attachme
 
 - [x] Separate note viewer concerns from file viewer concerns instead of routing every target through `MarkdownView`
 - [x] Add viewer dispatch by file type: markdown note, image, PDF, audio/video, unsupported binary download
+
 - [x] Keep `.excalidraw.md` and future embed-capable note formats on the note-viewer path
 - [x] Define empty / error / not-found states for deleted files, broken links, and unauthorized paths
 
@@ -323,6 +324,8 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 - [ ] Define rename/move semantics for paths, including nested children, collision handling, and `.obsidian/` restrictions
 - [x] Decide how moved note links should be handled: optional rewrite/update step on move
 - [ ] Add confirmation/error UX for invalid drops, overwrite conflicts, and large folder moves
+- [x] Apply optimistic frontend tree/catalog/tab updates after successful moves so the workspace does not require a manual refresh
+- [x] Replace full vault reindex on local moves with changed-path incremental reindexing
 
 ### 10-6. Command palette expansion
 
@@ -337,6 +340,7 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 - [x] Add drill-down details for last sync time, ahead/behind/dirty counts, active job progress, and recent failures
 - [ ] Make manual sync actions discoverable from both the main screen and settings without duplicating confusing controls
 - [ ] Decide how sync conflict/warning states should surface in the workspace shell and current document view
+- [ ] Refresh the workspace immediately after completed sync jobs so tree/document/status changes do not require a manual browser refresh
 
 ### 10-8. Testing and rollout
 
@@ -344,6 +348,9 @@ Goal: make the main shell feel like a usable wiki workspace rather than a collec
 - [ ] Add integration tests for settings → main navigation, graph → note navigation, and drag-and-drop move flows
 - [ ] Add regression coverage for sync status rendering during idle/running/conflict/error states
 - [ ] Run manual UX smoke tests on desktop and mobile layouts before implementation is marked complete
+- [ ] Prefetch likely next documents when hovering/searching/switching tabs to reduce open latency
+- [ ] Adopt stale-while-revalidate caches for tree/note catalogs so background refreshes do not block visible interactions
+- [ ] Profile large-vault explorer rendering and add virtualization/windowing if tree size becomes a measurable bottleneck
 
 ### 10-9. Suggested implementation order
 

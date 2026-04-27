@@ -113,6 +113,7 @@ async def index_attachment_file(session: AsyncSession, relative_path: str, full_
         path=relative_path,
         mime_type=mime_type,
         size_bytes=full_path.stat().st_size,
+        updated_at=func.now(),
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["path"],

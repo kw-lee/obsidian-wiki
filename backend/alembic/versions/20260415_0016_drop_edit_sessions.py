@@ -17,7 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.drop_table("edit_sessions")
+    op.execute("DROP TABLE IF EXISTS edit_sessions")
 
 
 def downgrade() -> None:

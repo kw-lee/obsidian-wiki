@@ -48,6 +48,8 @@ CREATE TABLE app_settings (
                           CHECK (editor_font IN ('system', 'd2coding')),
     editor_split_preview_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     dataview_enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+    dataview_show_source  BOOLEAN NOT NULL DEFAULT FALSE,
+    katex_enabled         BOOLEAN NOT NULL DEFAULT TRUE,
     folder_note_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
     templater_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),

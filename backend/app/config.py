@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Annotated
 from typing import Any
 from urllib.parse import urlparse
@@ -27,6 +28,7 @@ _PLACEHOLDER_VALUES = {
     "your-secret-here",
     "your-secret",
 }
+_LOG_LEVEL_NAMES = {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"}
 
 
 class Settings(BaseSettings):
@@ -54,6 +56,7 @@ class Settings(BaseSettings):
     auth_rate_limit_window_seconds: int = Field(default=300, alias="AUTH_RATE_LIMIT_WINDOW_SECONDS")
     auth_rate_limit_max_attempts: int = Field(default=10, alias="AUTH_RATE_LIMIT_MAX_ATTEMPTS")
     auth_password_min_length: int = Field(default=12, alias="AUTH_PASSWORD_MIN_LENGTH")
+    backend_log_level: str = Field(default="INFO", alias="BACKEND_LOG_LEVEL")
 
     # Legacy bootstrap-only sync seed values for the first AppSettings row.
     bootstrap_git_remote_url: str = Field(default="", alias="GIT_REMOTE_URL")
@@ -93,6 +96,16 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.app_env.strip().lower() in _PRODUCTION_ENVS
 
+    @field_validator("backend_log_level")
+    @classmethod
+    def _normalize_backend_log_level(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in _LOG_LEVEL_NAMES:
+            raise ValueError(
+                f"BACKEND_LOG_LEVEL must be one of: {', '.join(sorted(_LOG_LEVEL_NAMES))}"
+            )
+        return normalized
+
     @property
     def resolved_cors_allowed_origins(self) -> list[str]:
         if self.cors_allowed_origins:
@@ -109,6 +122,10 @@ def build_cors_middleware_options(current: Settings) -> dict[str, object]:
         "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Authorization", "Content-Type"],
     }
+
+
+def get_backend_log_level_number(current: Settings) -> int:
+    return logging.getLevelNamesMapping()[current.backend_log_level]
 
 
 def validate_runtime_settings(current: Settings) -> None:

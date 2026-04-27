@@ -137,6 +137,7 @@ Design: see [`llm-docs/SETTINGS.md`](SETTINGS.md) §3.2.c and [`llm-docs/ARCHITE
 - [x] Scheduled auto-sync dispatch (`status → pull → push`) for both Git and WebDAV backends
 - [x] Batch Git commits at sync time and move web save conflicts to per-document revision tokens
 - [x] Remove the unused legacy `edit_sessions` table from the ORM/bootstrap schema and migration chain
+- [x] Align bootstrap schema detection with post-`sync_mode`/audit-log migrations so fresh Docker databases do not replay already-materialized columns
 - [x] Fernet-based encryption helper for `webdav_password_enc` (key derived from `JWT_SECRET`)
 - [x] `POST /api/settings/sync/test` — validate credentials without persisting
 - [x] Extend `AppSettings` schema with WebDAV columns + CHECK constraint
@@ -148,6 +149,9 @@ Design: see [`llm-docs/SETTINGS.md`](SETTINGS.md) §3.2.c and [`llm-docs/ARCHITE
 - [x] Warning modal when switching active backend (no data migration)
 - [x] Conditional rendering based on `sync_backend` selection
 - [x] Guard Sync settings rehydration so stale completed jobs cannot flip an in-progress WebDAV form back to Git
+- [x] Preserve saved sync settings when WebDAV status probing fails; surface diagnostics in the UI and logs instead of snapping back to blank defaults
+- [x] Add `BACKEND_LOG_LEVEL` wiring so Docker Compose can tune backend/Uvicorn log verbosity without code changes
+- [x] Fix attachment indexing on PostgreSQL by restoring the `attachments.updated_at` default and explicitly stamping attachment upserts
 
 ### Phase 7-2: Follow-up
 

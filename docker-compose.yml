@@ -42,12 +42,19 @@ services:
     env_file: .env
     environment:
       TZ: ${APP_TIMEZONE:-Asia/Seoul}
+      BACKEND_LOG_LEVEL: ${BACKEND_LOG_LEVEL:-INFO}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - vault_data:/data/vault
       - config_data:/data/config
       - ./config/ssh:/root/.ssh:ro
+    command:
+      - sh
+      - -c
+      - >
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+        --log-level ${BACKEND_LOG_LEVEL:-info}
     depends_on:
       db:
         condition: service_healthy

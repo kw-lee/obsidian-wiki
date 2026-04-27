@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
@@ -9,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import default_git_display_name, default_git_email
-from app.config import build_cors_middleware_options, settings, validate_runtime_settings
+from app.config import (
+    build_cors_middleware_options,
+    get_backend_log_level_number,
+    settings,
+    validate_runtime_settings,
+)
 from app.db.models import User
 from app.db.session import Base, async_session, engine
 from app.routers import (
@@ -30,6 +36,17 @@ from app.services.settings import ensure_app_settings
 from app.services.sync_job_manager import SyncJobManager
 from app.services.sync_scheduler import SyncScheduler
 from app.services.sync_triggers import enqueue_startup_sync_if_enabled
+
+
+def configure_logging() -> None:
+    level = get_backend_log_level_number(settings)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        force=True,
+    )
+    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
+        logging.getLogger(logger_name).setLevel(level)
 
 
 async def _ensure_initial_admin() -> None:
@@ -63,7 +80,7 @@ async def _ensure_initial_admin() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # startup: create tables (dev only; prod uses alembic)
-    install_log_buffer()
+    install_log_buffer(get_backend_log_level_number(settings))
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await _ensure_initial_admin()
@@ -91,6 +108,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    configure_logging()
+    install_log_buffer(get_backend_log_level_number(settings))
     validate_runtime_settings(settings)
 
     app = FastAPI(title="Obsidian Wiki API", lifespan=lifespan)

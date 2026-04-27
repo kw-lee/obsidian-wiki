@@ -302,6 +302,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.description":
       "Git과 WebDAV 설정을 여기서 전환하고, 저장 전 연결 테스트까지 바로 확인할 수 있습니다.",
     "sync.loadFailed": "동기화 설정을 불러오지 못했습니다.",
+    "sync.retryLoadButton": "다시 불러오기",
     "sync.saveSuccess": "동기화 설정이 저장되었습니다.",
     "sync.saveFailed": "동기화 설정 저장에 실패했습니다.",
     "sync.pullSuccess": "Pull 완료: {count}개 파일 변경",
@@ -961,6 +962,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     "sync.description":
       "Switch between Git and WebDAV here, and test the connection before saving.",
     "sync.loadFailed": "Failed to load sync settings.",
+    "sync.retryLoadButton": "Retry loading",
     "sync.saveSuccess": "Saved sync settings.",
     "sync.saveFailed": "Failed to save sync settings.",
     "sync.pullSuccess": "Pull complete: {count} file changes",

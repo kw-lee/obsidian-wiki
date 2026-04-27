@@ -14,6 +14,7 @@ async def _scalar_bool(conn: AsyncConnection, sql: str, **params: object) -> boo
 
 
 async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
+    current_version: str | None = None
     has_alembic_version_table = await _scalar_bool(
         conn,
         """
@@ -27,8 +28,6 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
     )
     if has_alembic_version_table:
         current_version = await conn.scalar(text("SELECT version_num FROM alembic_version LIMIT 1"))
-        if current_version:
-            return None
 
     has_app_settings = await _scalar_bool(
         conn,
@@ -43,6 +42,97 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
     )
     if not has_app_settings:
         return None
+
+    has_katex_enabled = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'katex_enabled'
+        )
+        """,
+    )
+    if has_katex_enabled:
+        has_edit_sessions = await _scalar_bool(
+            conn,
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = 'edit_sessions'
+            )
+            """,
+        )
+        detected_revision = "20260415_0015" if has_edit_sessions else "20260415_0016"
+        if current_version and current_version >= detected_revision:
+            return None
+        return detected_revision
+
+    has_dataview_show_source = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'dataview_show_source'
+        )
+        """,
+    )
+    if has_dataview_show_source:
+        if current_version and current_version >= "20260415_0014":
+            return None
+        return "20260415_0014"
+
+    has_audit_logs = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'audit_logs'
+        )
+        """,
+    )
+    has_git_email = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'users'
+              AND column_name = 'git_email'
+        )
+        """,
+    )
+    if has_audit_logs or has_git_email:
+        if current_version and current_version >= "20260415_0013":
+            return None
+        return "20260415_0013"
+
+    has_sync_mode = await _scalar_bool(
+        conn,
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'app_settings'
+              AND column_name = 'sync_mode'
+        )
+        """,
+    )
+    if has_sync_mode:
+        if current_version and current_version >= "20260415_0012":
+            return None
+        return "20260415_0012"
 
     has_editor_font = await _scalar_bool(
         conn,
@@ -69,8 +159,12 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_editor_split_preview_enabled:
+        if current_version and current_version >= "20260415_0011":
+            return None
         return "20260415_0011"
     if has_editor_font:
+        if current_version and current_version >= "20260415_0010":
+            return None
         return "20260415_0010"
 
     has_dataview_enabled = await _scalar_bool(
@@ -86,6 +180,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_dataview_enabled:
+        if current_version and current_version >= "20260415_0009":
+            return None
         return "20260415_0009"
 
     has_templater_enabled = await _scalar_bool(
@@ -101,6 +197,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_templater_enabled:
+        if current_version and current_version >= "20260414_0008":
+            return None
         return "20260414_0008"
 
     has_folder_note_enabled = await _scalar_bool(
@@ -116,6 +214,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_folder_note_enabled:
+        if current_version and current_version >= "20260414_0007":
+            return None
         return "20260414_0007"
 
     has_theme_preset = await _scalar_bool(
@@ -131,6 +231,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_theme_preset:
+        if current_version and current_version >= "20260413_0006":
+            return None
         return "20260413_0006"
 
     has_timezone = await _scalar_bool(
@@ -146,6 +248,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_timezone:
+        if current_version and current_version >= "20260413_0005":
+            return None
         return "20260413_0005"
 
     has_default_theme = await _scalar_bool(
@@ -161,6 +265,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_default_theme:
+        if current_version and current_version >= "20260413_0004":
+            return None
         return "20260413_0004"
 
     has_base_content = await _scalar_bool(
@@ -176,6 +282,8 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_base_content:
+        if current_version and current_version >= "20260413_0003":
+            return None
         return "20260413_0003"
 
     has_webdav_url = await _scalar_bool(
@@ -191,8 +299,12 @@ async def detect_legacy_revision(conn: AsyncConnection) -> str | None:
         """,
     )
     if has_webdav_url:
+        if current_version and current_version >= "20260413_0002":
+            return None
         return "20260413_0002"
 
+    if current_version and current_version >= "20260413_0001":
+        return None
     return "20260413_0001"
 
 

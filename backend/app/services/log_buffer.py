@@ -23,13 +23,17 @@ class _InMemoryLogHandler(logging.Handler):
         )
 
 
-def install_log_buffer() -> None:
+def install_log_buffer(level: int = logging.INFO) -> None:
     global _HANDLER
     if _HANDLER is not None:
+        _HANDLER.setLevel(level)
+        root_logger = logging.getLogger()
+        if _HANDLER not in root_logger.handlers:
+            root_logger.addHandler(_HANDLER)
         return
 
     _HANDLER = _InMemoryLogHandler()
-    _HANDLER.setLevel(logging.INFO)
+    _HANDLER.setLevel(level)
     logging.getLogger().addHandler(_HANDLER)
 
 
@@ -37,6 +41,3 @@ def get_recent_logs(limit: int = 50) -> list[dict[str, object]]:
     if limit <= 0:
         return []
     return list(reversed(list(_LOG_ENTRIES)[-limit:]))
-
-
-install_log_buffer()

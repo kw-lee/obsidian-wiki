@@ -2,10 +2,18 @@ services:
   backend:
     build:
       target: dev
+    environment:
+      BACKEND_LOG_LEVEL: ${BACKEND_LOG_LEVEL:-DEBUG}
     volumes:
       - ./backend:/app
       - vault_data:/data/vault
       - config_data:/data/config
+    command:
+      - sh
+      - -c
+      - >
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        --log-level ${BACKEND_LOG_LEVEL:-debug}
 
   frontend:
     build:

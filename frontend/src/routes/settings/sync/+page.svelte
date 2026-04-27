@@ -47,8 +47,11 @@
   let pendingBackend = $state<SyncBackend | null>(null);
   let error = $state("");
   let success = $state("");
+  let statusNotice = $state("");
   let lastSettledJobId = $state<string | null>(null);
   let trackedRefreshJobId = $state<string | null>(null);
+  let loadedFingerprint = $state("");
+  let draftDirty = $state(false);
   const syncMonitor = getSyncMonitor();
   const hasActiveSyncJob = $derived(isSyncJobActive(syncMonitor.currentJob));
   const recentSyncJobs = $derived.by(() =>
@@ -73,10 +76,78 @@
     if (!shouldRefreshSyncSettingsAfterJob(job, trackedRefreshJobId, lastSettledJobId))
       return;
     lastSettledJobId = job.id;
-    void loadSettings(false);
+    void loadSettings(false, "refresh");
   });
 
-  function hydrate(data: SyncSettings) {
+  function fingerprintFromSettings(data: SyncSettings) {
+    return JSON.stringify({
+      sync_backend: data.sync_backend,
+      sync_interval_seconds: data.sync_interval_seconds,
+      sync_auto_enabled: data.sync_auto_enabled,
+      sync_mode: data.sync_mode,
+      sync_run_on_startup: data.sync_run_on_startup,
+      sync_startup_delay_seconds: data.sync_startup_delay_seconds,
+      sync_on_save: data.sync_on_save,
+      git_remote_url: data.git_remote_url,
+      git_branch: data.git_branch,
+      webdav_url: data.webdav_url,
+      webdav_username: data.webdav_username,
+      webdav_remote_root: data.webdav_remote_root,
+      webdav_verify_tls: data.webdav_verify_tls,
+      webdav_obsidian_policy: data.webdav_obsidian_policy,
+      has_webdav_password: data.has_webdav_password,
+    });
+  }
+
+  function fingerprintFromDraft() {
+    return JSON.stringify({
+      sync_backend: syncBackend,
+      sync_interval_seconds: syncIntervalSeconds,
+      sync_auto_enabled: syncAutoEnabled,
+      sync_mode: syncMode,
+      sync_run_on_startup: syncRunOnStartup,
+      sync_startup_delay_seconds: syncStartupDelaySeconds,
+      sync_on_save: syncOnSave,
+      git_remote_url: gitRemoteUrl,
+      git_branch: gitBranch,
+      webdav_url: webdavUrl,
+      webdav_username: webdavUsername,
+      webdav_remote_root: webdavRemoteRoot,
+      webdav_verify_tls: webdavVerifyTls,
+      webdav_obsidian_policy: webdavObsidianPolicy,
+      has_webdav_password: hasWebdavPassword || Boolean(webdavPassword),
+    });
+  }
+
+  function isSyncStatusDiagnostic(message: string | null | undefined) {
+    return Boolean(message?.startsWith("Unable to verify current sync status:"));
+  }
+
+  function shouldPreserveCurrentDraft(data: SyncSettings, source: "initial" | "save" | "refresh") {
+    if (source === "save") return false;
+    return Boolean(
+      syncBackend === "webdav" &&
+        (webdavUrl || webdavUsername || hasWebdavPassword || webdavPassword) &&
+        data.sync_backend === "webdav" &&
+        !data.webdav_url &&
+        !data.webdav_username &&
+        !data.has_webdav_password,
+    );
+  }
+
+  function hydrate(data: SyncSettings, source: "initial" | "save" | "refresh") {
+    if (shouldPreserveCurrentDraft(data, source)) {
+      const message =
+        "Unexpected empty WebDAV settings response detected. Keeping the current draft values.";
+      console.warn("[sync-settings]", {
+        message,
+        source,
+        incoming: data,
+      });
+      statusNotice = message;
+      return;
+    }
+
     settings = data;
     syncBackend = data.sync_backend;
     syncIntervalSeconds = data.sync_interval_seconds;
@@ -94,16 +165,38 @@
     webdavObsidianPolicy = data.webdav_obsidian_policy;
     hasWebdavPassword = data.has_webdav_password;
     webdavPassword = "";
+    loadedFingerprint = fingerprintFromSettings(data);
+    draftDirty = false;
+    statusNotice = isSyncStatusDiagnostic(data.status.message)
+      ? data.status.message
+      : "";
   }
 
-  async function loadSettings(showSpinner = true) {
+  $effect(() => {
+    draftDirty = loadedFingerprint !== "" && fingerprintFromDraft() !== loadedFingerprint;
+  });
+
+  async function loadSettings(
+    showSpinner = true,
+    source: "initial" | "save" | "refresh" = "initial",
+  ) {
     if (showSpinner) {
       loading = true;
     }
     error = "";
     try {
-      hydrate(await fetchSyncSettings());
+      const next = await fetchSyncSettings();
+      if (source === "refresh" && draftDirty) {
+        console.info("[sync-settings] Skipping background refresh while the form has unsaved changes.", {
+          next,
+        });
+        statusNotice =
+          "Background sync status refresh was skipped to avoid overwriting unsaved sync settings.";
+        return;
+      }
+      hydrate(next, source);
     } catch (err) {
+      console.error("[sync-settings] Failed to load sync settings.", err);
       error = err instanceof Error ? err.message : t("sync.loadFailed");
     } finally {
       if (showSpinner) {
@@ -116,6 +209,7 @@
     event.preventDefault();
     error = "";
     success = "";
+    statusNotice = "";
 
     saving = true;
     try {
@@ -136,9 +230,23 @@
         webdav_verify_tls: webdavVerifyTls,
         webdav_obsidian_policy: webdavObsidianPolicy,
       });
-      hydrate(updated);
+      console.info("[sync-settings] Saved sync settings response.", updated);
+      hydrate(updated, "save");
       success = t("sync.saveSuccess");
+      if (isSyncStatusDiagnostic(updated.status.message)) {
+        statusNotice = updated.status.message;
+      }
     } catch (err) {
+      console.error("[sync-settings] Failed to save sync settings.", err, {
+        syncBackend,
+        gitRemoteUrl,
+        gitBranch,
+        webdavUrl,
+        webdavUsername,
+        webdavRemoteRoot,
+        webdavVerifyTls,
+        webdavObsidianPolicy,
+      });
       error = err instanceof Error ? err.message : t("sync.saveFailed");
     } finally {
       saving = false;
@@ -285,6 +393,15 @@
 
   {#if loading}
     <p class="state">{t("common.loading")}</p>
+  {:else if !settings}
+    <div class="subpanel">
+      <p class="feedback error">{error || t("sync.loadFailed")}</p>
+      <div class="actions">
+        <button type="button" onclick={() => void loadSettings(true, "initial")}>
+          {t("sync.retryLoadButton")}
+        </button>
+      </div>
+    </div>
   {:else}
     <form class="form" onsubmit={handleSave}>
       <div class="segmented">
@@ -512,6 +629,9 @@
       {/if}
       {#if success}
         <p class="feedback success">{success}</p>
+      {/if}
+      {#if statusNotice}
+        <p class="feedback warning">{statusNotice}</p>
       {/if}
 
       <div class="actions">
@@ -902,6 +1022,11 @@
   .feedback.success {
     background: color-mix(in srgb, var(--accent) 15%, transparent);
     color: var(--text-primary);
+  }
+
+  .feedback.warning {
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    color: color-mix(in srgb, var(--warning) 82%, var(--text-primary));
   }
 
   .notice {

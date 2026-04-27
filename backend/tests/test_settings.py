@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import bcrypt
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
 
 import app.db.session as session_mod
@@ -416,6 +417,75 @@ async def test_sync_settings_redact_and_persist_webdav_password(
     read_data = read_resp.json()
     assert read_data["has_webdav_password"] is True
     assert "webdav_password" not in read_data
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_put_returns_saved_config_when_status_probe_fails(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    async def fail_status(self, db):  # noqa: ANN001
+        del self, db
+        raise HTTPException(status_code=400, detail="WebDAV authentication failed")
+
+    monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.status", fail_status)
+
+    resp = await client.put(
+        "/api/settings/sync",
+        json={
+            "sync_backend": "webdav",
+            "sync_interval_seconds": 300,
+            "sync_auto_enabled": False,
+            "git_remote_url": "",
+            "git_branch": "main",
+            "webdav_url": "https://dav.example.com/remote.php/dav/files/me",
+            "webdav_username": "me",
+            "webdav_password": "app-token",
+            "webdav_remote_root": "/vault",
+            "webdav_verify_tls": True,
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sync_backend"] == "webdav"
+    assert data["webdav_url"] == "https://dav.example.com/remote.php/dav/files/me"
+    assert data["webdav_username"] == "me"
+    assert (
+        data["status"]["message"]
+        == "Unable to verify current sync status: WebDAV authentication failed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sync_settings_get_returns_saved_config_when_status_probe_fails(
+    client, auth_headers, monkeypatch, setup_vault
+):
+    async with session_mod.async_session() as session:
+        row = await ensure_app_settings(session)
+        row.sync_backend = "webdav"
+        row.webdav_url = "https://dav.example.com/remote.php/dav/files/me"
+        row.webdav_username = "me"
+        row.webdav_password_enc = encrypt_secret("app-token")
+        row.webdav_remote_root = "/vault"
+        await session.commit()
+
+    async def fail_status(self, db):  # noqa: ANN001
+        del self, db
+        raise HTTPException(status_code=400, detail="WebDAV authentication failed")
+
+    monkeypatch.setattr("app.services.sync.webdav_backend.WebDAVSyncBackend.status", fail_status)
+
+    resp = await client.get("/api/settings/sync", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sync_backend"] == "webdav"
+    assert data["webdav_url"] == "https://dav.example.com/remote.php/dav/files/me"
+    assert data["webdav_username"] == "me"
+    assert data["has_webdav_password"] is True
+    assert (
+        data["status"]["message"]
+        == "Unable to verify current sync status: WebDAV authentication failed"
+    )
 
 
 @pytest.mark.asyncio

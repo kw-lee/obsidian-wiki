@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -83,6 +84,7 @@ from app.services.system_status import (
 
 router = APIRouter()
 PROFILE_RATE_LIMIT = RateLimitRule(bucket="settings-profile")
+logger = logging.getLogger(__name__)
 
 
 def _normalize_username(value: str | None) -> str | None:
@@ -139,6 +141,16 @@ def _redact_sync_url(value: str) -> str:
     return redact_url_secrets(value) if value else ""
 
 
+def _sync_status_probe_message(detail: str) -> str:
+    return f"Unable to verify current sync status: {detail}"
+
+
+def _http_exception_detail(exc: HTTPException) -> str:
+    if isinstance(exc.detail, str) and exc.detail:
+        return exc.detail
+    return f"HTTP {exc.status_code}"
+
+
 def _validate_sync_targets(git_remote_url: str, webdav_url: str) -> tuple[str, str]:
     try:
         validated_git = validate_git_remote_url(
@@ -191,6 +203,40 @@ def _build_sync_settings_response(
         has_webdav_password=has_webdav_password,
         status=status_data,
     )
+
+
+async def _safe_sync_status(
+    request: Request,
+    db: AsyncSession,
+    *,
+    backend_hint: str,
+    timezone: str | None,
+) -> SyncStatus:
+    try:
+        status_data = await get_active_sync_status(db)
+    except HTTPException as exc:
+        detail = _http_exception_detail(exc)
+        logger.warning(
+            "Sync status probe failed while serving sync settings: backend=%s detail=%s",
+            backend_hint,
+            detail,
+        )
+        status_data = SyncStatus(
+            backend=backend_hint,
+            timezone=timezone,
+            message=_sync_status_probe_message(detail),
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected sync status probe failure while serving sync settings: backend=%s",
+            backend_hint,
+        )
+        status_data = SyncStatus(
+            backend=backend_hint,
+            timezone=timezone,
+            message=_sync_status_probe_message("Check system logs for more details"),
+        )
+    return await _with_last_sync_from_jobs(request, status_data)
 
 
 def _vault_disk_usage_bytes(root: Path) -> int:
@@ -365,8 +411,12 @@ async def get_sync_settings(
     db: AsyncSession = Depends(get_db),
 ) -> SyncSettingsResponse:
     row = await ensure_app_settings(db)
-    status_data = await get_active_sync_status(db)
-    status_data = await _with_last_sync_from_jobs(request, status_data)
+    status_data = await _safe_sync_status(
+        request,
+        db,
+        backend_hint=row.sync_backend,
+        timezone=getattr(row, "timezone", None),
+    )
     return _build_sync_settings_response(
         sync_backend=row.sync_backend,
         sync_interval_seconds=row.sync_interval_seconds,
@@ -398,6 +448,16 @@ async def update_sync_settings(
 
     git_branch = body.git_branch.strip() or "main"
     git_remote_url, webdav_url = _validate_sync_targets(body.git_remote_url, body.webdav_url)
+    logger.info(
+        "Updating sync settings: backend=%s git_remote=%s webdav_url=%s webdav_user=%s remote_root=%s auto=%s mode=%s",
+        body.sync_backend,
+        bool(git_remote_url),
+        bool(webdav_url),
+        body.webdav_username.strip(),
+        _normalize_remote_root(body.webdav_remote_root),
+        body.sync_auto_enabled,
+        body.sync_mode,
+    )
     row.sync_backend = body.sync_backend
     row.sync_interval_seconds = body.sync_interval_seconds
     row.sync_auto_enabled = body.sync_auto_enabled
@@ -423,8 +483,12 @@ async def update_sync_settings(
 
     await db.refresh(row)
     runtime = await get_runtime_sync_settings(db, use_cache=False)
-    status_data = await get_active_sync_status(db)
-    status_data = await _with_last_sync_from_jobs(request, status_data)
+    status_data = await _safe_sync_status(
+        request,
+        db,
+        backend_hint=runtime.sync_backend,
+        timezone=runtime.timezone,
+    )
     return _build_sync_settings_response(
         sync_backend=runtime.sync_backend,
         sync_interval_seconds=runtime.sync_interval_seconds,

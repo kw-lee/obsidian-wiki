@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 from git import Actor, GitCommandError, Repo
 
 import app.db.session as session_mod
@@ -117,6 +118,25 @@ async def test_sync_status_uses_last_successful_job_when_backend_omits_last_sync
     assert resp.status_code == 200
     assert resp.json()["last_sync"] == "2026-04-13T08:31:00Z"
     assert resp.json()["timezone"] == "Asia/Seoul"
+
+
+@pytest.mark.asyncio
+async def test_sync_status_returns_warning_when_status_probe_fails(
+    client, auth_headers, setup_vault, monkeypatch
+):
+    async def fail_status(db):  # noqa: ANN001
+        del db
+        raise HTTPException(status_code=400, detail="WebDAV authentication failed")
+
+    monkeypatch.setattr("app.routers.sync.get_active_sync_status", fail_status)
+
+    resp = await client.get("/api/sync/status", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["backend"] == "unknown"
+    assert (
+        resp.json()["message"]
+        == "Unable to verify current sync status: WebDAV authentication failed"
+    )
 
 
 @pytest.mark.asyncio

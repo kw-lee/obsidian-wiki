@@ -84,6 +84,8 @@ docker compose up -d
 docker compose exec backend alembic upgrade head
 ```
 
+The source-build path is intentionally secondary to GHCR for production because Python dependency installation can dominate build time on smaller servers. The backend Dockerfile keeps the production image on runtime dependencies only, while the `dev` target layers test/lint tooling on top for local development.
+
 ## Architecture
 
 ```

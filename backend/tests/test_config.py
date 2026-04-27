@@ -1,6 +1,11 @@
 import pytest
 
-from app.config import Settings, build_cors_middleware_options, validate_runtime_settings
+from app.config import (
+    Settings,
+    build_cors_middleware_options,
+    get_backend_log_level_number,
+    validate_runtime_settings,
+)
 
 
 def _make_settings(**overrides) -> Settings:
@@ -43,6 +48,34 @@ def test_cors_allowed_origins_accepts_comma_separated_env_values():
 
 def test_cors_allowed_origins_accepts_empty_env_value():
     assert Settings._parse_cors_allowed_origins("") == []  # noqa: SLF001
+
+
+def test_backend_log_level_is_normalized_to_uppercase():
+    settings = Settings(
+        BACKEND_LOG_LEVEL="warning",
+        DATABASE_URL="sqlite+aiosqlite:///test.db",
+        REDIS_URL="redis://localhost:6379/15",
+        JWT_SECRET="test-secret-key-for-testing-only",
+        INIT_ADMIN_USERNAME="admin",
+        INIT_ADMIN_PASSWORD="testpass",
+        VAULT_LOCAL_PATH="/tmp/test-vault",
+    )
+
+    assert settings.backend_log_level == "WARNING"
+    assert get_backend_log_level_number(settings) == 30
+
+
+def test_backend_log_level_rejects_unknown_values():
+    with pytest.raises(ValueError, match="BACKEND_LOG_LEVEL must be one of"):
+        Settings(  # noqa: FBT003
+            BACKEND_LOG_LEVEL="chatty",
+            DATABASE_URL="sqlite+aiosqlite:///test.db",
+            REDIS_URL="redis://localhost:6379/15",
+            JWT_SECRET="test-secret-key-for-testing-only",
+            INIT_ADMIN_USERNAME="admin",
+            INIT_ADMIN_PASSWORD="testpass",
+            VAULT_LOCAL_PATH="/tmp/test-vault",
+        )
 
 
 def test_validate_runtime_settings_rejects_insecure_production_defaults():

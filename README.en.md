@@ -67,9 +67,10 @@ JWT_SECRET=$(openssl rand -hex 32)            # 32+ chars, must be replaced
 INIT_ADMIN_USERNAME=admin                     # initial admin account; forced change after first login
 INIT_ADMIN_PASSWORD=...                       # strong password, at least 12 chars
 CORS_ALLOWED_ORIGINS=https://wiki.example.com # comma-separated if multiple origins
+BACKEND_LOG_LEVEL=INFO                        # DEBUG / INFO / WARNING / ERROR / CRITICAL
 ```
 
-Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. The settings form now rehydrates from the server only after sync jobs observed in the current page session, so an older completed job cannot silently snap an in-progress WebDAV form back to the saved Git configuration. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
+Sync is configured after first login from **`/settings/sync`**. There you can choose Git / WebDAV / disabled, run connection tests, trigger manual pull/push, and inspect sync status. The settings form now rehydrates from the server only after sync jobs observed in the current page session, so an older completed job cannot silently snap an in-progress WebDAV form back to the saved Git configuration. If the WebDAV status probe fails, the saved settings are still preserved, the page shows a warning, and diagnostic details are left in the browser console and server logs. If container logs are too noisy, lower **`BACKEND_LOG_LEVEL`** in `.env` to `WARNING` or `ERROR` to suppress routine request/status chatter. If needed, you can still place `GIT_REMOTE_URL`, `GIT_BRANCH`, and `GIT_SYNC_INTERVAL_SECONDS` in `.env` to seed initial Git values into the first `app_settings` row only. Server default theme and language defaults are managed in **`/settings/appearance`**, while status checks and rebuild operations live in **`/settings/vault`** and **`/settings/system`**.
 
 ### 2. Point to GHCR Images
 
@@ -110,6 +111,8 @@ make build
 make up
 make migrate
 ```
+
+Depending on the server, source builds can still be noticeably slower than pulling GHCR images. For production deployments, GHCR remains the recommended path; the backend production image now skips dev-only Python dependencies so rebuilds are lighter than before.
 
 ### 5. DB Migrations (When Schema Changes)
 

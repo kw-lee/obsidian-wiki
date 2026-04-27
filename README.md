@@ -67,9 +67,10 @@ JWT_SECRET=$(openssl rand -hex 32)            # 32자 이상, 반드시 교체
 INIT_ADMIN_USERNAME=admin                     # 최초 관리자 계정 (최초 로그인 후 강제 변경됨)
 INIT_ADMIN_PASSWORD=...                       # 12자 이상 강한 값
 CORS_ALLOWED_ORIGINS=https://wiki.example.com # 쉼표로 여러 origin 지정 가능
+BACKEND_LOG_LEVEL=INFO                        # DEBUG / INFO / WARNING / ERROR / CRITICAL
 ```
 
-동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 여기서 Git / WebDAV / 비활성화 중 하나를 고르고, 연결 테스트와 수동 pull/push, sync 상태 확인까지 할 수 있습니다. 설정 폼은 사용자가 현재 페이지에서 직접 시작한 sync 작업이 끝났을 때만 서버 상태로 다시 새로고침되므로, 예전에 끝난 작업 때문에 작성 중이던 WebDAV 입력값이 Git 설정으로 덮어써지지 않습니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 Git 초기값만 시드할 수 있습니다. 서버 기본 테마와 언어 관련 기본 동작은 **`/settings/appearance`** 에서, 상태 확인과 인덱스 재생성은 **`/settings/vault`** / **`/settings/system`** 에서 관리합니다.
+동기화 설정은 첫 로그인 후 **`/settings/sync`** 에서 관리합니다. 여기서 Git / WebDAV / 비활성화 중 하나를 고르고, 연결 테스트와 수동 pull/push, sync 상태 확인까지 할 수 있습니다. 설정 폼은 사용자가 현재 페이지에서 직접 시작한 sync 작업이 끝났을 때만 서버 상태로 다시 새로고침되므로, 예전에 끝난 작업 때문에 작성 중이던 WebDAV 입력값이 Git 설정으로 덮어써지지 않습니다. 또 WebDAV 상태 조회가 실패하더라도 저장된 설정 자체는 유지되고, 페이지에는 경고가 표시되며 브라우저 콘솔/서버 로그에 진단 정보가 남습니다. 컨테이너 로그가 너무 많다면 `.env` 의 **`BACKEND_LOG_LEVEL`** 을 `WARNING` 또는 `ERROR` 로 낮춰 일반 요청/상태 로그를 줄일 수 있습니다. 필요하면 `.env` 에 `GIT_REMOTE_URL`, `GIT_BRANCH`, `GIT_SYNC_INTERVAL_SECONDS` 를 임시로 넣어 첫 `app_settings` 레코드의 Git 초기값만 시드할 수 있습니다. 서버 기본 테마와 언어 관련 기본 동작은 **`/settings/appearance`** 에서, 상태 확인과 인덱스 재생성은 **`/settings/vault`** / **`/settings/system`** 에서 관리합니다.
 
 ### 2. GHCR 이미지 지정
 
@@ -110,6 +111,8 @@ make build
 make up
 make migrate
 ```
+
+로컬 소스 빌드는 서버 사양에 따라 꽤 느릴 수 있습니다. 운영 배포에서는 GHCR 이미지를 우선 권장하며, 소스 빌드를 쓸 경우 최근 버전에서는 backend 프로덕션 이미지가 dev 의존성을 함께 설치하지 않도록 정리되어 이전보다 재빌드 부담이 줄었습니다.
 
 ### 5. DB 마이그레이션 (스키마 변경 시)
 

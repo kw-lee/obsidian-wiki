@@ -10,7 +10,7 @@ Web-based settings and administration page for the single-user self-hosted wiki.
 
 ## 1. Design Principles
 
-1. **`.env` is bootstrap-only**. Only values required to boot the server (`JWT_SECRET`, `DATABASE_URL`, `REDIS_URL`, `INIT_ADMIN_*`, `WEB_PORT`) live in `.env`.
+1. **`.env` is bootstrap-only**. Only values required to boot the server (`JWT_SECRET`, `DATABASE_URL`, `REDIS_URL`, `INIT_ADMIN_*`, `WEB_PORT`) plus operational runtime knobs like `BACKEND_LOG_LEVEL` live in `.env`.
 2. **Runtime-mutable values live in the DB**. Git sync interval / remote URL, account info, default theme, etc. are stored in the DB so changes apply without restart.
 3. **Mask sensitive data**. SSH keys and password hashes are redacted in responses (`****`) and accepted write-only.
 4. **Minimal audit logging**. Full audit logging is overkill for a single user. Record only important changes (credential changes, sync config changes) in a simple `settings_audit` table with timestamp + action.
@@ -124,6 +124,7 @@ Bootstrap: seed via `INSERT ... ON CONFLICT DO NOTHING` in the migration. If the
 - `POST /api/settings/sync/test` → validate credentials against the configured backend without persisting
 - Existing `POST /api/sync/pull|push`, `GET /api/sync/status` remain but dispatch by active backend
 - Frontend guard: the Sync tab should only rehydrate form state after sync jobs observed in the current page session settle, so stale completed jobs do not overwrite an in-progress backend switch
+- If a backend status probe fails during `GET/PUT /api/settings/sync`, keep returning the saved config and downgrade the probe failure to a warning message so the form does not appear to reset itself
 
 **Scheduler Integration**
 - The backend `sync scheduler` reads DB values at startup; on config change, an in-process event (`asyncio.Event`) cancels and restarts it with the newly selected backend.

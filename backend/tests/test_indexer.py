@@ -113,6 +113,7 @@ async def test_full_reindex_indexes_attachment_metadata(client, setup_vault):
 
     assert attachment.mime_type == "image/png"
     assert attachment.size_bytes == len(b"png-data")
+    assert attachment.updated_at is not None
 
 
 @pytest.mark.asyncio
@@ -138,6 +139,7 @@ async def test_incremental_reindex_updates_attachment_metadata_and_deletes_remov
 
     assert attachment.mime_type == "audio/mpeg"
     assert attachment.size_bytes == len(b"version-two")
+    assert attachment.updated_at is not None
 
     attachment_path.unlink()
     async with async_session() as session:

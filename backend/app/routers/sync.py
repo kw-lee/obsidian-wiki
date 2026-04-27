@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Request, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -12,6 +14,7 @@ from app.services.sync_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _get_job_manager(request: Request) -> SyncJobManager:
@@ -56,7 +59,21 @@ async def get_sync_status(
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ) -> SyncStatus:
-    status_data = await get_active_sync_status(db)
+    try:
+        status_data = await get_active_sync_status(db)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else f"HTTP {exc.status_code}"
+        logger.warning("Sync status probe failed: %s", detail)
+        status_data = SyncStatus(
+            backend="unknown",
+            message=f"Unable to verify current sync status: {detail}",
+        )
+    except Exception:
+        logger.exception("Unexpected sync status probe failure")
+        status_data = SyncStatus(
+            backend="unknown",
+            message="Unable to verify current sync status: Check system logs for more details",
+        )
     return await _with_last_sync_from_jobs(request, status_data)
 
 
